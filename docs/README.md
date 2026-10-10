@@ -2,8 +2,11 @@
 
 Q58 已确认首期 MVP 整体设计。文档已进入详细规格，应用实现与外部能力联调尚未开始。
 
+完整需求已发布为 [GitHub 总 Issue #1](https://github.com/Hou1464851806/AgenticVideoProject/issues/1)，标记 `ready-for-agent`。
+
 | 阅读目的 | 文档 |
 | --- | --- |
+| 首版用户能力、完整需求与验收边界 | [完整需求](requirements.md) |
 | 目标、服务与完整链路 | [系统架构](architecture.md) |
 | 术语与决定依据 | [领域术语](../GLOSSARY.md)、[访谈记录](design-interview.md)、[ADR](adr/) |
 | Agent自治、工具与智能验收 | [Agent设计](agent-design.md) |
