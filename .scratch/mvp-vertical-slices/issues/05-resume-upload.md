@@ -1,0 +1,38 @@
+# T05：断网、暂停与刷新后继续原上传
+
+状态：已发布为 [#6](https://github.com/Hou1464851806/AgenticVideoProject/issues/6)。T 编号保留为审阅映射。
+
+## Parent
+
+[MVP 总需求 #1](https://github.com/Hou1464851806/AgenticVideoProject/issues/1)
+
+## Priority
+
+P0；标签为 `priority:P0` 和 `ready-for-agent`。
+
+## What to build
+
+用户暂停或中断上传后继续；刷新后重选原文件，只补传未成功分片。
+
+本票包含该功能所需的持久化、业务接口、界面与必要验证，按用户操作闭环交付。新增入口必须验证项目权限，耗时任务沿用权威任务状态、当前尝试校验和幂等发布；不得把这些要求延后到最终验收。
+
+## Acceptance criteria
+
+- [ ] 暂停停止后续调度并收敛在途请求；断网仅对失败分片有限退避重试，成功分片保留。
+- [ ] 分片授权过期后为原上传会话重新签发，不创建新上传或重新传完整文件。
+- [ ] 刷新重选通过有界增量 SHA-256 检查并显示计算进度，后端分页核对真实分片；同名同大小但内容不同的文件不能续接。
+- [ ] 同一上传会话只有一个有效写入者，多标签页竞争被明确拒绝；恢复进度以服务端核对结果为准。
+
+## Verification
+
+浏览器断网、授权过期、刷新重选及双标签页演示，核对已成功分片没有被重复传输。
+
+## Blocked by
+
+- [#4](https://github.com/Hou1464851806/AgenticVideoProject/issues/4)：分片上传视频并看到待验证状态
+
+## Requirement coverage
+
+总需求用户故事：US-08, US-09, US-10, US-11, US-12。
+
+总需求验收：AC-03, AC-04（本票负责对应行为；跨功能复验另由 [#32](https://github.com/Hou1464851806/AgenticVideoProject/issues/32) 汇总）。

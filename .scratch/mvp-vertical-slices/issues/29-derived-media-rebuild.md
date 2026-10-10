@@ -1,0 +1,39 @@
+# T29：回收派生媒体后仍能核查历史证据
+
+状态：已发布为 [#30](https://github.com/Hou1464851806/AgenticVideoProject/issues/30)。T 编号保留为审阅映射。
+
+## Parent
+
+[MVP 总需求 #1](https://github.com/Hou1464851806/AgenticVideoProject/issues/1)
+
+## Priority
+
+P1；标签为 `priority:P1` 和 `ready-for-agent`。
+
+## What to build
+
+用户减少派生音频／普通帧占用后，历史方案与证据仍可检查，必要派生媒体按源素材重新提取。
+
+本票包含该功能所需的持久化、业务接口、界面与必要验证，按用户操作闭环交付。新增入口必须验证项目权限，耗时任务沿用权威任务状态、当前尝试校验和幂等发布；不得把这些要求延后到最终验收。
+
+## Acceptance criteria
+
+- [ ] 派生音频与普通代表帧使用独立可配置容量策略，不直接套用预览 2 GB／7 天规则，执行中使用的文件受保护。
+- [ ] 原始观察证据、必要模型结果、时间映射及分析版本随素材保留；历史方案引用不会因缓存清理丢失。
+- [ ] 佐证帧保留或按受保护源文件、精确实际时间和规则可靠复现，界面不会留下不能核查的证据链接。
+- [ ] 派生文件重建只执行媒体提取，不再次调用 ASR／VLM，分类用量按实际回收／生成更新。
+
+## Verification
+
+清理普通派生音频／帧与一份历史证据帧后，实际重建核查并对比模型调用次数、时间定位与占用。
+
+## Blocked by
+
+- [#12](https://github.com/Hou1464851806/AgenticVideoProject/issues/12)：查询画面与可见文字并核查观察时刻
+- [#20](https://github.com/Hou1464851806/AgenticVideoProject/issues/20)：从讲话视频生成一条可核查的短视频方案
+
+## Requirement coverage
+
+总需求用户故事：US-80, US-82, US-84。
+
+总需求验收：AC-28, AC-32（本票负责对应行为；跨功能复验另由 [#32](https://github.com/Hou1464851806/AgenticVideoProject/issues/32) 汇总）。

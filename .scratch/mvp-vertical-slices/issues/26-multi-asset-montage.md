@@ -1,0 +1,38 @@
+# T26：按需求跨素材编排并导出基础混剪
+
+状态：已发布为 [#27](https://github.com/Hou1464851806/AgenticVideoProject/issues/27)。T 编号保留为审阅映射。
+
+## Parent
+
+[MVP 总需求 #1](https://github.com/Hou1464851806/AgenticVideoProject/issues/1)
+
+## Priority
+
+P1；标签为 `priority:P1` 和 `ready-for-agent`。
+
+## What to build
+
+用户指定主题和顺序，从多个素材选择片段生成单条混剪方案，确认后得到可播放的混剪成片。
+
+本票包含该功能所需的持久化、业务接口、界面与必要验证，按用户操作闭环交付。新增入口必须验证项目权限，耗时任务沿用权威任务状态、当前尝试校验和幂等发布；不得把这些要求延后到最终验收。
+
+## Acceptance criteria
+
+- [ ] Agent 依据多个素材的证据及邻近上下文选段，按用户指定顺序组成一条成片定义，片段均有出处与合法范围。
+- [ ] 复用完整版本、确认、编辑互斥及受控导出规则，不另建一套混剪方案模型；缺素材或顺序无法满足时解释。
+- [ ] 真实跨素材硬切与统一音画正确，处理不同尺寸／采样率及有音轨／无音轨组合；横竖屏留边、原声及中文字幕时间符合方案。
+- [ ] 用户能检查各源片段、查看方案和下载实际混剪 MP4；混剪与再次渲染复用既有分析。
+
+## Verification
+
+人工标注的至少两个不同媒体规格素材，真实 Agent 编排并实际导出，核对顺序、上下文、字幕及无音轨组合。
+
+## Blocked by
+
+- [#25](https://github.com/Hou1464851806/AgenticVideoProject/issues/25)：确认具体版本后明确导出并下载一条成片
+
+## Requirement coverage
+
+总需求用户故事：US-52, US-53, US-54, US-70, US-71, US-84。
+
+总需求验收：AC-10, AC-18, AC-27, AC-32（本票负责对应行为；跨功能复验另由 [#32](https://github.com/Hou1464851806/AgenticVideoProject/issues/32) 汇总）。

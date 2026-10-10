@@ -1,0 +1,38 @@
+# T28：清理过期预览并按需重新生成
+
+状态：已发布为 [#29](https://github.com/Hou1464851806/AgenticVideoProject/issues/29)。T 编号保留为审阅映射。
+
+## Parent
+
+[MVP 总需求 #1](https://github.com/Hou1464851806/AgenticVideoProject/issues/1)
+
+## Priority
+
+P1；标签为 `priority:P1` 和 `ready-for-agent`。
+
+## What to build
+
+用户查看预览缓存占用，旧预览自动回收后仍能为历史版本重新生成。
+
+本票包含该功能所需的持久化、业务接口、界面与必要验证，按用户操作闭环交付。新增入口必须验证项目权限，耗时任务沿用权威任务状态、当前尝试校验和幂等发布；不得把这些要求延后到最终验收。
+
+## Acceptance criteria
+
+- [ ] 每项目默认 2 GB 或 7 天未访问的预览缓存可清理，均可配置；容量和访问时间来自实际产物记录。
+- [ ] 正在生成／播放的产物受占用保护，清理与播放竞争不删除使用中文件；原始素材、证据和正式成片不走预览清理。
+- [ ] 删除后同步标记产物不可用，不返回旧链接，相同版本重新请求会创建新预览，仍不重跑分析。
+- [ ] 界面展示回收前后真实预览占用，失败清理可再试，不因仅标记删除就提前释放物理字节。
+
+## Verification
+
+缩小容量／期限触发清理，维持部分预览播放和生成，核对保护、链接失效及重建后的内容。
+
+## Blocked by
+
+- [#24](https://github.com/Hou1464851806/AgenticVideoProject/issues/24)：手动生成带原声与字幕的低清效果预览
+
+## Requirement coverage
+
+总需求用户故事：US-69, US-80, US-81, US-84。
+
+总需求验收：AC-24, AC-32（本票负责对应行为；跨功能复验另由 [#32](https://github.com/Hou1464851806/AgenticVideoProject/issues/32) 汇总）。

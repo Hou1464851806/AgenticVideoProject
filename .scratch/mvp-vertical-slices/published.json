@@ -1,0 +1,338 @@
+{
+  "1": {
+    "number": 2,
+    "id": 5789252157,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/2",
+    "title": "[T01] 本机启动后注册、登录与退出",
+    "priority": "P0",
+    "dependencies": []
+  },
+  "2": {
+    "number": 3,
+    "id": 5789252998,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/3",
+    "title": "[T02] 创建与打开自己的私有项目",
+    "priority": "P0",
+    "dependencies": [
+      1
+    ]
+  },
+  "3": {
+    "number": 4,
+    "id": 5789255763,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/4",
+    "title": "[T03] 分片上传视频并看到待验证状态",
+    "priority": "P0",
+    "dependencies": [
+      2
+    ]
+  },
+  "4": {
+    "number": 5,
+    "id": 5789256999,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/5",
+    "title": "[T04] 验证视频后在素材库定位播放",
+    "priority": "P0",
+    "dependencies": [
+      3
+    ]
+  },
+  "5": {
+    "number": 6,
+    "id": 5789258104,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/6",
+    "title": "[T05] 断网、暂停与刷新后继续原上传",
+    "priority": "P0",
+    "dependencies": [
+      3
+    ]
+  },
+  "6": {
+    "number": 7,
+    "id": 5789259317,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/7",
+    "title": "[T06] 取消或过期上传并查看残留清理",
+    "priority": "P1",
+    "dependencies": [
+      3
+    ]
+  },
+  "7": {
+    "number": 8,
+    "id": 5789260680,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/8",
+    "title": "[T07] 超限或空间不足时阻止上传并解释原因",
+    "priority": "P1",
+    "dependencies": [
+      3
+    ]
+  },
+  "8": {
+    "number": 9,
+    "id": 5789270926,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/9",
+    "title": "[T08] 上传后自动生成可定位的语音证据",
+    "priority": "P0",
+    "dependencies": [
+      4
+    ]
+  },
+  "9": {
+    "number": 10,
+    "id": 5789272236,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/10",
+    "title": "[T09] 查找人名、数字和原句并跳转核查",
+    "priority": "P0",
+    "dependencies": [
+      8
+    ]
+  },
+  "10": {
+    "number": 11,
+    "id": 5789273443,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/11",
+    "title": "[T10] 用主题和近义表达检索视频内容",
+    "priority": "P1",
+    "dependencies": [
+      9
+    ]
+  },
+  "11": {
+    "number": 12,
+    "id": 5789274845,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/12",
+    "title": "[T11] 查询画面与可见文字并核查观察时刻",
+    "priority": "P1",
+    "dependencies": [
+      10
+    ]
+  },
+  "12": {
+    "number": 13,
+    "id": 5789276254,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/13",
+    "title": "[T12] 在预算内复查候选，超预算先询问",
+    "priority": "P1",
+    "dependencies": [
+      11
+    ]
+  },
+  "13": {
+    "number": 14,
+    "id": 5789277642,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/14",
+    "title": "[T13] 只恢复失败分析阶段并重建检索索引",
+    "priority": "P1",
+    "dependencies": [
+      11
+    ]
+  },
+  "14": {
+    "number": 15,
+    "id": 5789278996,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/15",
+    "title": "[T14] 在独立制作会话中对话查询素材",
+    "priority": "P0",
+    "dependencies": [
+      9
+    ]
+  },
+  "15": {
+    "number": 16,
+    "id": 5789280192,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/16",
+    "title": "[T15] 刷新或断线后恢复对话进度与结果",
+    "priority": "P1",
+    "dependencies": [
+      14
+    ]
+  },
+  "16": {
+    "number": 17,
+    "id": 5789281463,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/17",
+    "title": "[T16] 停止对话任务并关联原需求重试失败",
+    "priority": "P1",
+    "dependencies": [
+      14
+    ]
+  },
+  "17": {
+    "number": 18,
+    "id": 5789283094,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/18",
+    "title": "[T17] 纠正制作需求简报并回答关联澄清",
+    "priority": "P1",
+    "dependencies": [
+      14
+    ]
+  },
+  "18": {
+    "number": 19,
+    "id": 5789284339,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/19",
+    "title": "[T18] 长对话保留硬条件并分页查看完整历史",
+    "priority": "P1",
+    "dependencies": [
+      17
+    ]
+  },
+  "19": {
+    "number": 20,
+    "id": 5789285795,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/20",
+    "title": "[T19] 从讲话视频生成一条可核查的短视频方案",
+    "priority": "P0",
+    "dependencies": [
+      14
+    ]
+  },
+  "20": {
+    "number": 21,
+    "id": 5789286987,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/21",
+    "title": "[T20] 一次生成多条短视频成片定义",
+    "priority": "P1",
+    "dependencies": [
+      19
+    ]
+  },
+  "21": {
+    "number": 22,
+    "id": 5789288350,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/22",
+    "title": "[T21] 手动调整片段并从任意历史版本继续",
+    "priority": "P1",
+    "dependencies": [
+      19
+    ]
+  },
+  "22": {
+    "number": 23,
+    "id": 5789289804,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/23",
+    "title": "[T22] 对话替换指定片段并保留其他内容",
+    "priority": "P1",
+    "dependencies": [
+      17,
+      19
+    ]
+  },
+  "23": {
+    "number": 24,
+    "id": 5789292459,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/24",
+    "title": "[T23] 手动生成带原声与字幕的低清效果预览",
+    "priority": "P0",
+    "dependencies": [
+      19
+    ]
+  },
+  "24": {
+    "number": 25,
+    "id": 5789293710,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/25",
+    "title": "[T24] 确认具体版本后明确导出并下载一条成片",
+    "priority": "P0",
+    "dependencies": [
+      23
+    ]
+  },
+  "25": {
+    "number": 26,
+    "id": 5789295018,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/26",
+    "title": "[T25] 批量导出选定成片并展示部分完成",
+    "priority": "P1",
+    "dependencies": [
+      20,
+      24
+    ]
+  },
+  "26": {
+    "number": 27,
+    "id": 5789296741,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/27",
+    "title": "[T26] 按需求跨素材编排并导出基础混剪",
+    "priority": "P1",
+    "dependencies": [
+      24
+    ]
+  },
+  "27": {
+    "number": 28,
+    "id": 5789298077,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/28",
+    "title": "[T27] 隐藏、恢复和安全删除素材",
+    "priority": "P1",
+    "dependencies": [
+      19
+    ]
+  },
+  "28": {
+    "number": 29,
+    "id": 5789299361,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/29",
+    "title": "[T28] 清理过期预览并按需重新生成",
+    "priority": "P1",
+    "dependencies": [
+      23
+    ]
+  },
+  "29": {
+    "number": 30,
+    "id": 5789300590,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/30",
+    "title": "[T29] 回收派生媒体后仍能核查历史证据",
+    "priority": "P1",
+    "dependencies": [
+      11,
+      19
+    ]
+  },
+  "30": {
+    "number": 31,
+    "id": 5789302324,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/31",
+    "title": "[T30] 查看分类存储、模型用量和费用预警",
+    "priority": "P1",
+    "dependencies": [
+      14
+    ]
+  },
+  "31": {
+    "number": 32,
+    "id": 5789303699,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/32",
+    "title": "[T31] 在故障与权限边界下验收三条用户主线",
+    "priority": "P2",
+    "dependencies": [
+      5,
+      6,
+      7,
+      12,
+      13,
+      15,
+      16,
+      18,
+      21,
+      22,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30
+    ]
+  },
+  "32": {
+    "number": 33,
+    "id": 5789313138,
+    "url": "https://github.com/Hou1464851806/AgenticVideoProject/issues/33",
+    "title": "[T32] 从说明启动、测量并备份恢复完整系统",
+    "priority": "P2",
+    "dependencies": [
+      31
+    ]
+  }
+}

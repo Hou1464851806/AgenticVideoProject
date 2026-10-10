@@ -1,0 +1,15 @@
+{
+  "issues_verified": 32,
+  "native_sub_issues_verified": 32,
+  "native_dependency_edges_verified": 49,
+  "priority_counts": {
+    "P0": 11,
+    "P1": 19,
+    "P2": 2
+  },
+  "parent_body_title_state_and_labels_unchanged": true,
+  "body_and_four_acceptance_criteria_verified": true,
+  "frontier": [
+    2
+  ]
+}

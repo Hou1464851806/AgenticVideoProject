@@ -1,0 +1,124 @@
+flowchart TD
+  subgraph upload["账号、项目与上传"]
+    I2["#2 本机登录"]
+    I3["#3 私有项目"]
+    I4["#4 分片上传"]
+    I5["#5 验证与播放"]
+    I6["#6 上传恢复"]
+    I7["#7 取消与清理"]
+    I8["#8 容量限制"]
+  end
+  subgraph content["理解与检索"]
+    I9["#9 语音证据"]
+    I10["#10 原句查询"]
+    I11["#11 混合检索"]
+    I12["#12 画面与文字"]
+    I13["#13 预算内复查"]
+    I14["#14 阶段恢复"]
+  end
+  subgraph conversation["对话与成本"]
+    I15["#15 对话查询"]
+    I16["#16 流式与刷新恢复"]
+    I17["#17 停止与重试"]
+    I18["#18 简报与澄清"]
+    I19["#19 长对话"]
+    I31["#31 用量与费用"]
+  end
+  subgraph editing["方案与媒体制作"]
+    I20["#20 单条短视频方案"]
+    I21["#21 多条短视频"]
+    I22["#22 手动与历史"]
+    I23["#23 对话局部修改"]
+    I24["#24 低清预览"]
+    I25["#25 确认后单条导出"]
+    I26["#26 批量导出"]
+    I27["#27 跨素材混剪"]
+    I28["#28 素材隐藏删除"]
+    I29["#29 预览回收"]
+    I30["#30 派生媒体重建"]
+  end
+  subgraph delivery["最终交付"]
+    I32["#32 三主线与故障验收"]
+    I33["#33 测量与备份交付"]
+  end
+  #2 --> I3
+  #3 --> I4
+  #4 --> I5
+  #4 --> I6
+  #4 --> I7
+  #4 --> I8
+  #5 --> I9
+  #9 --> I10
+  #10 --> I11
+  #11 --> I12
+  #12 --> I13
+  #12 --> I14
+  #10 --> I15
+  #15 --> I16
+  #15 --> I17
+  #15 --> I18
+  #18 --> I19
+  #15 --> I20
+  #20 --> I21
+  #20 --> I22
+  #18 --> I23
+  #20 --> I23
+  #20 --> I24
+  #24 --> I25
+  #21 --> I26
+  #25 --> I26
+  #25 --> I27
+  #20 --> I28
+  #24 --> I29
+  #12 --> I30
+  #20 --> I30
+  #15 --> I31
+  #6 --> I32
+  #7 --> I32
+  #8 --> I32
+  #13 --> I32
+  #14 --> I32
+  #16 --> I32
+  #17 --> I32
+  #19 --> I32
+  #22 --> I32
+  #23 --> I32
+  #26 --> I32
+  #27 --> I32
+  #28 --> I32
+  #29 --> I32
+  #30 --> I32
+  #31 --> I32
+  #32 --> I33
+  click I2 "https://github.com/Hou1464851806/AgenticVideoProject/issues/2"
+  click I3 "https://github.com/Hou1464851806/AgenticVideoProject/issues/3"
+  click I4 "https://github.com/Hou1464851806/AgenticVideoProject/issues/4"
+  click I5 "https://github.com/Hou1464851806/AgenticVideoProject/issues/5"
+  click I6 "https://github.com/Hou1464851806/AgenticVideoProject/issues/6"
+  click I7 "https://github.com/Hou1464851806/AgenticVideoProject/issues/7"
+  click I8 "https://github.com/Hou1464851806/AgenticVideoProject/issues/8"
+  click I9 "https://github.com/Hou1464851806/AgenticVideoProject/issues/9"
+  click I10 "https://github.com/Hou1464851806/AgenticVideoProject/issues/10"
+  click I11 "https://github.com/Hou1464851806/AgenticVideoProject/issues/11"
+  click I12 "https://github.com/Hou1464851806/AgenticVideoProject/issues/12"
+  click I13 "https://github.com/Hou1464851806/AgenticVideoProject/issues/13"
+  click I14 "https://github.com/Hou1464851806/AgenticVideoProject/issues/14"
+  click I15 "https://github.com/Hou1464851806/AgenticVideoProject/issues/15"
+  click I16 "https://github.com/Hou1464851806/AgenticVideoProject/issues/16"
+  click I17 "https://github.com/Hou1464851806/AgenticVideoProject/issues/17"
+  click I18 "https://github.com/Hou1464851806/AgenticVideoProject/issues/18"
+  click I19 "https://github.com/Hou1464851806/AgenticVideoProject/issues/19"
+  click I20 "https://github.com/Hou1464851806/AgenticVideoProject/issues/20"
+  click I21 "https://github.com/Hou1464851806/AgenticVideoProject/issues/21"
+  click I22 "https://github.com/Hou1464851806/AgenticVideoProject/issues/22"
+  click I23 "https://github.com/Hou1464851806/AgenticVideoProject/issues/23"
+  click I24 "https://github.com/Hou1464851806/AgenticVideoProject/issues/24"
+  click I25 "https://github.com/Hou1464851806/AgenticVideoProject/issues/25"
+  click I26 "https://github.com/Hou1464851806/AgenticVideoProject/issues/26"
+  click I27 "https://github.com/Hou1464851806/AgenticVideoProject/issues/27"
+  click I28 "https://github.com/Hou1464851806/AgenticVideoProject/issues/28"
+  click I29 "https://github.com/Hou1464851806/AgenticVideoProject/issues/29"
+  click I30 "https://github.com/Hou1464851806/AgenticVideoProject/issues/30"
+  click I31 "https://github.com/Hou1464851806/AgenticVideoProject/issues/31"
+  click I32 "https://github.com/Hou1464851806/AgenticVideoProject/issues/32"
+  click I33 "https://github.com/Hou1464851806/AgenticVideoProject/issues/33"
