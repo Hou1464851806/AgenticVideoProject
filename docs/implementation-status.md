@@ -7,8 +7,8 @@
 | Issue | 优先级 | 直接前置 | 状态 |
 | --- | --- | --- | --- |
 | [#2](https://github.com/Hou1464851806/AgenticVideoProject/issues/2) [T01] 本机启动后注册、登录与退出 | P0 | 无 | 实现与验证完成，见 [记录](verification/issue-2.md) |
-| [#3](https://github.com/Hou1464851806/AgenticVideoProject/issues/3) [T02] 创建与打开自己的私有项目 | P0 | #2 | 下一张可开始 |
-| [#4](https://github.com/Hou1464851806/AgenticVideoProject/issues/4) [T03] 分片上传视频并看到待验证状态 | P0 | #3 | 待实施 |
+| [#3](https://github.com/Hou1464851806/AgenticVideoProject/issues/3) [T02] 创建与打开自己的私有项目 | P0 | #2 | 实现与验证完成，见 [记录](verification/issue-3.md) |
+| [#4](https://github.com/Hou1464851806/AgenticVideoProject/issues/4) [T03] 分片上传视频并看到待验证状态 | P0 | #3 | 下一张可开始 |
 | [#5](https://github.com/Hou1464851806/AgenticVideoProject/issues/5) [T04] 验证视频后在素材库定位播放 | P0 | #4 | 待实施 |
 | [#6](https://github.com/Hou1464851806/AgenticVideoProject/issues/6) [T05] 断网、暂停与刷新后继续原上传 | P0 | #4 | 待实施 |
 | [#7](https://github.com/Hou1464851806/AgenticVideoProject/issues/7) [T06] 取消或过期上传并查看残留清理 | P1 | #4 | 待实施 |

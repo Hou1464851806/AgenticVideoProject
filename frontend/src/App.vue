@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
+import { request } from './api';
+import ProjectWorkspace from './ProjectWorkspace.vue';
 
 type User = { id: string; username: string };
 const user = ref<User | null>(null);
@@ -9,21 +11,6 @@ const password = ref('');
 const busy = ref(false);
 const error = ref('');
 const notice = ref('');
-
-async function request<T>(path: string, method = 'GET', data?: unknown): Promise<T> {
-  const headers: Record<string, string> = {};
-  if (method !== 'GET') {
-    const csrf = await request<{ csrfToken: string }>('/auth/csrf');
-    headers['X-XSRF-TOKEN'] = csrf.csrfToken;
-    headers['Content-Type'] = 'application/json';
-  }
-  const response = await fetch(`/api/v1${path}`, {
-    method, headers, credentials: 'same-origin', body: data === undefined ? undefined : JSON.stringify(data),
-  });
-  const result = await response.json();
-  if (!response.ok) throw new Error(result.error?.message ?? '请求失败，请稍后重试');
-  return result.data;
-}
 
 async function submit() {
   busy.value = true;
@@ -72,15 +59,14 @@ onMounted(async () => {
 <template>
   <div class="shell">
     <header><span class="mark">AV</span><span>Agent 视频工作区</span></header>
-    <main>
+    <main v-if="user" class="authenticated">
+      <div class="session-bar"><p>已登录：{{ user.username }}</p><button :disabled="busy" @click="logout">退出登录</button></div>
+      <ProjectWorkspace />
+      <p v-if="error" role="alert" class="error">{{ error }}</p>
+    </main>
+    <main v-else>
       <section class="intro"><p class="eyebrow">视频理解 · 内容检索 · 编排剪辑</p><h1>让素材成为<br>你的下一条作品。</h1><p>登录你的私有工作区，开始整理视频素材。</p></section>
       <section class="account" aria-label="账号入口">
-        <template v-if="user">
-          <h2>欢迎回来</h2>
-          <p>已登录：{{ user.username }}</p>
-          <button :disabled="busy" @click="logout">退出登录</button>
-        </template>
-        <template v-else>
           <h2>{{ registering ? '创建你的账号' : '登录工作区' }}</h2>
           <form @submit.prevent="submit">
             <label for="username">用户名</label><input id="username" v-model="username" required maxlength="64" autocomplete="username">
@@ -89,7 +75,6 @@ onMounted(async () => {
             <button type="submit" :disabled="busy">{{ busy ? '正在处理…' : registering ? '注册' : '登录' }}</button>
           </form>
           <button class="secondary" :disabled="busy" @click="registering = !registering; error = ''; notice = ''">{{ registering ? '已有账号，返回登录' : '创建账号' }}</button>
-        </template>
         <p v-if="error" role="alert" class="error">{{ error }}</p>
         <p role="status" class="notice">{{ notice }}</p>
       </section>
@@ -104,6 +89,9 @@ body { margin: 0; }
 header { display: flex; align-items: center; gap: 12px; padding: 26px 6vw; font-weight: 650; }
 .mark { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 10px; background: #245c45; color: white; font-size: 14px; }
 main { max-width: 1120px; min-height: 72vh; margin: auto; padding: 48px 32px; display: grid; grid-template-columns: 1.2fr 1fr; align-items: center; gap: 64px; }
+.authenticated { display: block; max-width: 1400px; padding-top: 16px; }
+.session-bar { display: flex; justify-content: space-between; align-items: center; gap: 16px; color: #69766e; font-size: 14px; }
+.session-bar button { flex-shrink: 0; white-space: nowrap; width: auto; margin: 0; padding: 9px 16px; }
 .eyebrow { color: #47735e; font-size: 14px; }
 h1 { font-size: clamp(32px, 4.5vw, 56px); letter-spacing: -.03em; line-height: 1.3; margin: 24px 0; }
 .intro > p:last-child { color: #69766e; line-height: 1.7; }

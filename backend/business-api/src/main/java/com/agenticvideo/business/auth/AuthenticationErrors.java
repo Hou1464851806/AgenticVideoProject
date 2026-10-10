@@ -15,8 +15,11 @@ public class AuthenticationErrors {
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    ResponseEntity<?> validation() {
-        return ResponseEntity.badRequest().body(error("INVALID_REQUEST", "请检查用户名和密码长度"));
+    ResponseEntity<?> validation(MethodArgumentNotValidException failure) {
+        String message = failure.getBindingResult().getAllErrors().stream()
+                .map(org.springframework.validation.ObjectError::getDefaultMessage)
+                .distinct().collect(java.util.stream.Collectors.joining("；"));
+        return ResponseEntity.badRequest().body(error("INVALID_REQUEST", message));
     }
 
     static Map<String, Object> error(String code, String message) {
