@@ -30,9 +30,11 @@ onUnmounted(()=>clearInterval(informationTimer));
 const video = ref<HTMLVideoElement | null>(null);
 const source = ref(props.playback.url);
 let refreshed = false;
+let initialSeconds = props.playback.startMs === undefined ? undefined : props.playback.startMs / 1000;
 let restore: { seconds: number; playing: boolean } | undefined;
 watch(() => props.playback, playback => {
   source.value = playback.url;
+  initialSeconds = playback.startMs === undefined ? undefined : playback.startMs / 1000;
   refreshed = false;
   restore = undefined;
   error.value = '';
@@ -53,6 +55,11 @@ async function refreshAccess() {
   }
 }
 function loaded() {
+  if (!restore && initialSeconds !== undefined && video.value) {
+    video.value.currentTime = Math.max(0, Math.min(video.value.duration, initialSeconds));
+    initialSeconds = undefined;
+    void video.value.play().catch(() => {});
+  }
   if (restore && video.value) {
     video.value.currentTime = restore.seconds;
     if (restore.playing) void video.value.play();

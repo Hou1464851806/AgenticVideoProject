@@ -22,6 +22,8 @@ PostgreSQL 使用 `postgres_data` 持久卷。`docker compose restart` 保留账
 
 默认原生异步模型为 `qwen3-asr-flash-filetrans`，北京接口为 `https://dashscope.aliyuncs.com/api/v1`；`DASHSCOPE_BASE_URL` 可配置完整原生 API 前缀。派生音频经官方私有临时上传传给百炼，服务保存提供方任务 ID 与用量；查询失败或执行器重启后查询原任务，提交回执丢失时标记结果不明确并停止自动重新提交。
 
+素材库提供“查找原句”：输入人名、数字或原句，查看语音证据卡、邻近原文并定位原视频。当前仅有字面查询；未命中会列出语音分析覆盖，尚未具备语义检索能力。
+
 ## 开发验证
 
 安装 JDK 17、Maven 3.9.9 和 Node.js 24，保持 Docker Desktop 运行：

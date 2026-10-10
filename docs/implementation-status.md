@@ -2,6 +2,8 @@
 
 本轮按 ready-for-agent 的 32 张子任务实施；#1 为汇总需求。实施起点为 `63efde7`，在当前 main 分支逐票提交。
 
+按用户要求，#10 完成并提交后暂停，等待用户亲自体验及反馈。下一张可开始的 P0 任务为 #15。
+
 已确认测试边界：公开 HTTP 接口为主，关键 PostgreSQL／对象存储／消息／媒体／模型边界使用真实集成；浏览器验证用户操作闭环。
 
 | Issue | 优先级 | 直接前置 | 状态 |
@@ -14,7 +16,7 @@
 | [#7](https://github.com/Hou1464851806/AgenticVideoProject/issues/7) [T06] 取消或过期上传并查看残留清理 | P1 | #4 | 待实施 |
 | [#8](https://github.com/Hou1464851806/AgenticVideoProject/issues/8) [T07] 超限或空间不足时阻止上传并解释原因 | P1 | #4 | 待实施 |
 | [#9](https://github.com/Hou1464851806/AgenticVideoProject/issues/9) [T08] 上传后自动生成可定位的语音证据 | P0 | #5 | 实现与验证完成，见 [记录](verification/issue-9.md) |
-| [#10](https://github.com/Hou1464851806/AgenticVideoProject/issues/10) [T09] 查找人名、数字和原句并跳转核查 | P0 | #9 | 待实施 |
+| [#10](https://github.com/Hou1464851806/AgenticVideoProject/issues/10) [T09] 查找人名、数字和原句并跳转核查 | P0 | #9 | 实现与验证完成，见 [记录](verification/issue-10.md) |
 | [#11](https://github.com/Hou1464851806/AgenticVideoProject/issues/11) [T10] 用主题和近义表达检索视频内容 | P1 | #10 | 待实施 |
 | [#12](https://github.com/Hou1464851806/AgenticVideoProject/issues/12) [T11] 查询画面与可见文字并核查观察时刻 | P1 | #11 | 待实施 |
 | [#13](https://github.com/Hou1464851806/AgenticVideoProject/issues/13) [T12] 在预算内复查候选，超预算先询问 | P1 | #12 | 待实施 |
