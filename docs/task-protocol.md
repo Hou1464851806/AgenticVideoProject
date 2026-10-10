@@ -106,9 +106,11 @@ CANCELLED 表示系统不再发布该任务后续结果，本地执行已停止�
 
 ## 数据基线
 
-业务后端管理 users、projects、assets、asset_analysis_revisions、evidence_segments、editing_sessions、messages、edit_plans、plan_revisions、plan_confirmations、tasks、task_attempts、artifacts、outbox_events 与 model_usage。表名为设计基线，迁移时可调整；不可变媒体引用、不可变方案版本、修改来源、任务执行权与原子提交语义必须保留。
+业务后端管理 users、projects、assets、asset_analysis_revisions、evidence_segments、retrieval_units、asset_summaries、asset_index_generations、editing_sessions、messages、edit_plans、plan_revisions、plan_confirmations、tasks、task_attempts、artifacts、outbox_events 与 model_usage。表名为设计基线，迁移时可调整；不可变媒体引用、不可变方案版本、修改来源、任务执行权与原子提交语义必须保留。
 
 素材的媒体准备、内容分析和索引就绪分开记录，允许显示“可以播放但仍在分析”，也允许对已准备好的素材直接播放。索引最终一致，不能把尚未同步的证据当作检索可用。LangGraph 运行数据独立 schema／权限，不能用 checkpoint 覆盖业务表。
+
+Q45 已确认语音、视觉及其对应索引分阶段可用，分析阶段状态不替代持久化任务状态机；失败只重试受影响阶段。索引结果在新代次写入并验证，业务后端校验有效任务尝试后才发布数据库中的有效代次映射，各召回通道查询前按该映射过滤；迟到尝试写出的未发布索引不影响在线结果。历史观察证据受引用保护，具体时间、来源、版本与保留规则见 video-understanding-retrieval.md。
 
 ## 事实来源
 
