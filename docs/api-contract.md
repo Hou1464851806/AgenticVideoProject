@@ -59,10 +59,10 @@
 
 | 方法与路径 | 语义 |
 | --- | --- |
-| POST /api/v1/projects/{projectId}/uploads | filename、sizeBytes、sha256、contentTypeHint；检查与预留，创建唯一会话 |
+| POST /api/v1/projects/{projectId}/uploads | filename、sizeBytes、sha256、idempotencyKey、writerId；检查与预留，创建唯一会话 |
 | GET /api/v1/projects/{projectId}/uploads | 未完成／最近上传分页，支持恢复队列 |
 | GET /api/v1/uploads/{uploadId} | 状态、分片规则、核对后片清单分页、期限和 assetId／validationTaskId |
-| POST /api/v1/uploads/{uploadId}/resume | 重选文件的 sizeBytes／sha256、客户端实例；核对同内容并取得上传执行资格 |
+| POST /api/v1/uploads/{uploadId}/resume | 必填 sizeBytes、sha256、writerId；核对同内容、分页核对实际分片并取得上传执行资格 |
 | POST /api/v1/uploads/{uploadId}/part-urls | partNumbers、writerToken；小批量签发，返回每片 URL、expiresAt、必须请求头和字节规则 |
 | PUT /api/v1/uploads/{uploadId}/parts/{partNumber} | etag、sizeBytes、writerToken；幂等登记并核对实际分片，不能凭声明认定成功 |
 | POST /api/v1/uploads/{uploadId}/pause | 停止新授权并记录暂停；客户端同时停止调度，已签请求可收敛 |
@@ -88,6 +88,8 @@
 32 MiB 仅用于结构举例，分片尺寸与并发不是已实测最优值。writerToken 保护签发／登记操作，同一会话同时只有一个上传控制者；已经签发的 S3 URL 不因控制者切换立即失效，需要短期限、分片核对与最终哈希验证。客户端只保存会话身份／片记录，不保存整个视频；刷新重新取得 File 后恢复。
 
 完成返回 `202` 和现有 assetId／validationTaskId，或 COMPLETING 状态及查询路径；不会提前宣称 VALID。完成响应丢失使用同键重试／查询，后端恢复对象与会话，返回同一素材。取消返回 CANCEL_REQUESTED／ABORTED；容量释放状态单独返回，残留未清不当作空间已回收。
+
+当前实现每片 8 MiB、浏览器共享两个文件执行槽。创建／恢复返回写入凭证，普通查询与列表不返回凭证。writerId 为页面实例 UUID；刷新保留实例身份，新标签页使用独立身份。有效写入资格持续 330 秒，签发或写入时续期；其他页面在资格有效期间返回 409，到期恢复会轮换 writerToken。分片授权默认 300 秒，资格期限覆盖其最大有效期。恢复返回真实存储核对的 confirmedParts 与 confirmedBytes；客户端只调度缺失分片。
 
 ## 素材、分析与检索
 

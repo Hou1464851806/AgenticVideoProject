@@ -27,6 +27,8 @@ public class UploadService {
                 if (!existing.projectId().equals(projectId) || !existing.filename().equals(request.filename())
                         || existing.bytes() != request.sizeBytes() || !existing.sha256().equalsIgnoreCase(request.sha256()))
                     throw new ResponseStatusException(CONFLICT, "幂等键对应不同上传");
+                if (!request.writerId().equals(database.queryForObject("SELECT writer_owner FROM upload_sessions WHERE id=?", UUID.class, existing.id())))
+                    throw new ResponseStatusException(CONFLICT, "上传由另一个页面控制，不能取得写入资格");
                 return existing.id();
             }
             database.queryForObject("SELECT id FROM projects WHERE id = ? FOR UPDATE", UUID.class, projectId);
@@ -34,9 +36,10 @@ public class UploadService {
             if (request.sizeBytes() > 2L * 1024 * 1024 * 1024 || ((Number) reserved.get("bytes")).longValue() + request.sizeBytes() > 5L * 1024 * 1024 * 1024 || ((Number) reserved.get("slots")).intValue() >= 10)
                 throw new ResponseStatusException(CONFLICT, "超出素材数量或存储限额");
             UUID uploadId = UUID.randomUUID();
-            database.update("INSERT INTO upload_sessions (id,project_id,actor_user_id,idempotency_key,filename,declared_bytes,declared_sha256,part_size_bytes,expected_parts,object_key,writer_token) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            database.update("INSERT INTO upload_sessions (id,project_id,actor_user_id,idempotency_key,filename,declared_bytes,declared_sha256,part_size_bytes,expected_parts,object_key,writer_token,writer_owner) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                     uploadId, projectId, actorId, request.idempotencyKey(), request.filename(), request.sizeBytes(), request.sha256().toLowerCase(Locale.ROOT), PART_BYTES,
-                    (int) ((request.sizeBytes() + PART_BYTES - 1) / PART_BYTES), "originals/" + uploadId, UUID.randomUUID());
+                    (int) ((request.sizeBytes() + PART_BYTES - 1) / PART_BYTES), "originals/" + uploadId, UUID.randomUUID(),
+                    request.writerId());
             database.update("INSERT INTO storage_reservations (id,project_id,upload_id,bytes) VALUES (?,?,?,?)", UUID.randomUUID(), projectId, uploadId, request.sizeBytes());
             return uploadId;
         });
@@ -53,7 +56,9 @@ public class UploadService {
                 }
             }
         }
-        return view(find(id));
+        var result = view(find(id));
+        result.put("writerToken", find(id).writerToken());
+        return result;
     }
     public Upload find(UUID id) {
         return database.query("SELECT * FROM upload_sessions WHERE id=?", (row, index) -> new Upload(id,
@@ -63,9 +68,10 @@ public class UploadService {
     }
     public Map<String, Object> view(Upload upload) {
         Map<String, Object> result = new LinkedHashMap<>(Map.of("uploadId", upload.id(), "filename", upload.filename(), "status", upload.status(), "reservedBytes", upload.bytes(),
-                "partSizeBytes", PART_BYTES, "expectedParts", upload.parts(), "writerToken", upload.writerToken()));
+                "partSizeBytes", PART_BYTES, "expectedParts", upload.parts()));
         var completed = database.queryForMap("SELECT asset_id,validation_task_id,expires_at FROM upload_sessions WHERE id=?", upload.id());
-        result.put("expiresAt", completed.get("expires_at").toString());
+        result.put("expiresAt", ((java.sql.Timestamp) completed.get("expires_at")).toInstant().toString());
+        result.put("confirmedBytes", database.queryForObject("SELECT coalesce(sum(size_bytes),0) FROM upload_parts WHERE upload_id=?", Long.class, upload.id()));
         if (completed.get("asset_id") != null) {
             result.put("assetId", completed.get("asset_id"));
             result.put("validationTaskId", completed.get("validation_task_id"));
@@ -89,7 +95,52 @@ public class UploadService {
         return page;
     }
     private void requireWriter(Upload upload, UUID token) {
-        if (!upload.writerToken().equals(token)) throw new ResponseStatusException(CONFLICT, "上传执行资格已失效");
+        int renewed = database.update("UPDATE upload_sessions SET writer_lease_expires_at=now()+interval '330 seconds' WHERE id=? AND writer_token=? AND (status='COMPLETED' OR writer_lease_expires_at>now())", upload.id(), token);
+        if (renewed != 1)
+            throw new ResponseStatusException(CONFLICT, "上传执行资格已失效，请重新核对原文件");
+    }
+    public Object resume(Upload upload, UploadController.Resume request) {
+        return transactions.execute(tx -> {
+            var locked = database.queryForMap("SELECT *,writer_lease_expires_at>now() AS live FROM upload_sessions WHERE id=? FOR UPDATE", upload.id());
+            var current = find(upload.id());
+            if (current.bytes() != request.sizeBytes() || !current.sha256().equalsIgnoreCase(request.sha256()))
+                throw new ResponseStatusException(CONFLICT, "重选文件内容与原上传不一致，不能续接");
+            {
+                if (Boolean.TRUE.equals(locked.get("live")) && !request.writerId().equals(locked.get("writer_owner")))
+                    throw new ResponseStatusException(CONFLICT, "另一个页面持有上传写入资格，请在原页面继续或等待资格到期");
+                UUID token = Boolean.TRUE.equals(locked.get("live")) ? current.writerToken() : UUID.randomUUID();
+                database.update("UPDATE upload_sessions SET writer_owner=?,writer_token=?,writer_lease_expires_at=now()+interval '330 seconds' WHERE id=?", request.writerId(), token, current.id());
+                current = find(current.id());
+            }
+            if (!List.of("UPLOADING", "PAUSED").contains(current.status())) throw new ResponseStatusException(CONFLICT, "当前上传状态不能恢复");
+            var parts = storage.parts(current.key(), current.s3UploadId());
+            long confirmed = 0;
+            for (var part : parts) {
+                long expected = part.partNumber() == current.parts() ? current.bytes() - (part.partNumber()-1L)*PART_BYTES : PART_BYTES;
+                if (part.partNumber() < 1 || part.partNumber() > current.parts() || part.size() != expected)
+                    throw new ResponseStatusException(CONFLICT, "存储中的分片大小或序号不匹配");
+                confirmed += part.size();
+            }
+            database.update("DELETE FROM upload_parts WHERE upload_id=?", current.id());
+            for (var part : parts) database.update("INSERT INTO upload_parts (upload_id,part_number,etag,size_bytes) VALUES (?,?,?,?)",
+                    current.id(), part.partNumber(), part.eTag(), part.size());
+            database.update("UPDATE upload_sessions SET status='UPLOADING',last_activity_at=now(),expires_at=now()+interval '24 hours' WHERE id=?", current.id());
+            var result = view(find(current.id()));
+            result.put("writerToken", current.writerToken());
+            result.put("confirmedBytes", confirmed);
+            result.put("confirmedParts", parts.stream().map(part -> Map.of("partNumber", part.partNumber(), "sizeBytes", part.size(), "etag", part.eTag())).toList());
+            return result;
+        });
+    }
+    public Object pause(Upload upload, UUID writer) {
+        return transactions.execute(tx -> {
+            database.queryForMap("SELECT id FROM upload_sessions WHERE id=? FOR UPDATE", upload.id());
+            var current = find(upload.id());
+            requireWriter(current, writer);
+            if (!List.of("UPLOADING", "PAUSED").contains(current.status())) throw new ResponseStatusException(CONFLICT, "当前上传状态不能暂停");
+            database.update("UPDATE upload_sessions SET status='PAUSED' WHERE id=?", upload.id());
+            return view(find(upload.id()));
+        });
     }
     public Object partUrls(Upload upload, UploadController.PartUrls request) {
         requireWriter(upload, request.writerToken());
@@ -97,13 +148,13 @@ public class UploadService {
         if (request.partNumbers().stream().anyMatch(n -> n > upload.parts()) || new HashSet<>(request.partNumbers()).size() != request.partNumbers().size())
             throw new ResponseStatusException(BAD_REQUEST, "分片序号无效");
         return Map.of("parts", request.partNumbers().stream().map(number -> Map.of("partNumber", number,
-                "url", storage.partUrl(upload.key(), upload.s3UploadId(), number), "expiresAt", java.time.Instant.now().plusSeconds(300).toString(),
+                "url", storage.partUrl(upload.key(), upload.s3UploadId(), number), "expiresAt", java.time.Instant.now().plusSeconds(storage.partUrlSeconds()).toString(),
                 "sizeBytes", number == upload.parts() ? upload.bytes() - (number - 1L) * PART_BYTES : PART_BYTES,
                 "headers", Map.of())).toList());
     }
     public Object recordPart(Upload upload, int number, UploadController.PartReport report) {
         requireWriter(upload, report.writerToken());
-        if (!"UPLOADING".equals(upload.status())) throw new ResponseStatusException(CONFLICT, "当前状态不能登记分片");
+        if (!List.of("UPLOADING", "PAUSED").contains(upload.status())) throw new ResponseStatusException(CONFLICT, "当前状态不能登记分片");
         var part = storage.parts(upload.key(), upload.s3UploadId()).stream().filter(p -> p.partNumber() == number).findFirst()
                 .orElseThrow(() -> new ResponseStatusException(CONFLICT, "对象存储中没有该分片"));
         long expected = number == upload.parts() ? upload.bytes() - (number-1L)*PART_BYTES : PART_BYTES;

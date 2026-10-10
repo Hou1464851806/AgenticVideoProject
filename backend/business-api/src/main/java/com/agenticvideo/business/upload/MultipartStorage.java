@@ -20,6 +20,7 @@ public class MultipartStorage {
     private final String bucket;
     private final String origin;
     private final int listPageSize;
+    private final int partUrlSeconds;
     private boolean initialized;
 
     public MultipartStorage(@Value("${storage.endpoint:http://localhost:9000}") String endpoint,
@@ -28,11 +29,14 @@ public class MultipartStorage {
             @Value("${storage.secret-key:unconfigured}") String secretKey,
             @Value("${storage.bucket:originals}") String bucket,
             @Value("${app.allowed-origin:http://localhost:8080}") String origin,
-            @Value("${storage.list-page-size:100}") int listPageSize) {
+            @Value("${storage.list-page-size:100}") int listPageSize,
+            @Value("${storage.part-url-seconds:300}") int partUrlSeconds) {
         this.bucket = bucket;
         this.origin = origin;
         if (listPageSize < 1 || listPageSize > 1000) throw new IllegalArgumentException("Invalid S3 page size");
         this.listPageSize = listPageSize;
+        if (partUrlSeconds < 1 || partUrlSeconds > 300) throw new IllegalArgumentException("Invalid upload URL lifetime");
+        this.partUrlSeconds = partUrlSeconds;
         presigner = software.amazon.awssdk.services.s3.presigner.S3Presigner.builder()
                 .endpointOverride(URI.create(publicEndpoint)).region(Region.US_EAST_1)
                 .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey)))
@@ -90,9 +94,10 @@ public class MultipartStorage {
         return existing;
     }
     public String partUrl(String key, String uploadId, int number) {
-        return presigner.presignUploadPart(b -> b.signatureDuration(Duration.ofMinutes(5))
+        return presigner.presignUploadPart(b -> b.signatureDuration(Duration.ofSeconds(partUrlSeconds))
                 .uploadPartRequest(r -> r.bucket(bucket).key(key).uploadId(uploadId).partNumber(number))).url().toString();
     }
+    public int partUrlSeconds() { return partUrlSeconds; }
     public String playbackUrl(String key) {
         return presigner.presignGetObject(b -> b.signatureDuration(Duration.ofMinutes(5))
                 .getObjectRequest(r -> r.bucket(bucket).key(key))).url().toString();

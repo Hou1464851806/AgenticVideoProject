@@ -44,6 +44,7 @@ class UploadApiIntegrationTest {
         properties.add("storage.endpoint", PROXY::endpoint);
         properties.add("storage.public-endpoint", () -> "http://" + SILO.getHost() + ":" + SILO.getMappedPort(9000));
         properties.add("storage.list-page-size", () -> 1);
+        properties.add("storage.part-url-seconds", () -> 3);
         properties.add("storage.access-key", () -> "integration-user");
         properties.add("storage.secret-key", () -> "integration-password-strong");
     }
@@ -53,7 +54,7 @@ class UploadApiIntegrationTest {
     void createUploadPersistsOneIdentityAndReservationAcrossDuplicateRequests() throws Exception {
         BrowserApi browser = signedIn("upload-owner");
         String projectId = json(browser.post("/projects", "{\"name\":\"视频上传\"}")).path("data").path("id").asText();
-        String body = "{\"filename\":\"talk.mp4\",\"sizeBytes\":1024,\"sha256\":\"" + "a".repeat(64) + "\",\"idempotencyKey\":\"upload-create-1\"}";
+        String body = "{\"filename\":\"talk.mp4\",\"sizeBytes\":1024,\"sha256\":\"" + "a".repeat(64) + "\",\"idempotencyKey\":\"upload-create-1\",\"writerId\":\"" + browser.writerId + "\"}";
         var created = browser.post("/projects/" + projectId + "/uploads", body);
         assertEquals(201, created.statusCode(), created.body());
         String id = json(created).path("data").path("uploadId").asText();
@@ -76,7 +77,7 @@ class UploadApiIntegrationTest {
         String hash = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
         PROXY.fault.set(SiloFaultProxy.Fault.DROP_CREATE_RESPONSE);
         var created = browser.post("/projects/" + projectId + "/uploads", new ObjectMapper().writeValueAsString(java.util.Map.of(
-                "filename", "talk.mp4", "sizeBytes", bytes.length, "sha256", hash, "idempotencyKey", "multipart-one")));
+                "filename", "talk.mp4", "sizeBytes", bytes.length, "sha256", hash, "idempotencyKey", "multipart-one", "writerId", browser.writerId)));
         assertEquals(201, created.statusCode(), created.body());
         var data = json(created).path("data");
         String id = data.path("uploadId").asText();
@@ -91,6 +92,15 @@ class UploadApiIntegrationTest {
         var authorization = browser.post("/uploads/" + id + "/part-urls", "{\"partNumbers\":[1],\"writerToken\":\"" + writer + "\"}");
         assertEquals(200, authorization.statusCode(), authorization.body());
         String url = json(authorization).path("data").path("parts").get(0).path("url").asText();
+        org.junit.jupiter.api.Assertions.assertTrue(url.contains("X-Amz-Expires=3&") || url.endsWith("X-Amz-Expires=3"),
+                "The test must expire a real signed URL, without altering its signature");
+        Thread.sleep(4000);
+        var expired = HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create(url))
+                .PUT(HttpRequest.BodyPublishers.ofByteArray(bytes)).build(), HttpResponse.BodyHandlers.ofString());
+        assertEquals(403, expired.statusCode(), expired.body());
+        var renewed = browser.post("/uploads/" + id + "/part-urls", "{\"partNumbers\":[1],\"writerToken\":\"" + writer + "\"}");
+        assertEquals(200, renewed.statusCode(), renewed.body());
+        url = json(renewed).path("data").path("parts").get(0).path("url").asText();
         var uploaded = HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create(url))
                 .PUT(HttpRequest.BodyPublishers.ofByteArray(bytes)).build(), HttpResponse.BodyHandlers.ofString());
         assertEquals(200, uploaded.statusCode(), uploaded.body());
@@ -120,7 +130,7 @@ class UploadApiIntegrationTest {
         BrowserApi owner = signedIn("upload-private-owner");
         BrowserApi outsider = signedIn("upload-private-outsider");
         String projectId = json(owner.post("/projects", "{\"name\":\"私有上传\"}")).path("data").path("id").asText();
-        String body = "{\"filename\":\"private.mp4\",\"sizeBytes\":1024,\"sha256\":\"" + "b".repeat(64) + "\",\"idempotencyKey\":\"private-one\"}";
+        String body = "{\"filename\":\"private.mp4\",\"sizeBytes\":1024,\"sha256\":\"" + "b".repeat(64) + "\",\"idempotencyKey\":\"private-one\",\"writerId\":\"" + owner.writerId + "\"}";
         var data = json(owner.post("/projects/" + projectId + "/uploads", body)).path("data");
         String id = data.path("uploadId").asText();
         String writer = data.path("writerToken").asText();
@@ -134,14 +144,45 @@ class UploadApiIntegrationTest {
     }
 
     @Test
-    void completingTwoPartsReadsBothSiloPagesBeforePublishing() throws Exception {
+    void onlyOneBrowserWriterCanResumeAndReadOnlyStatusCannotGrantWritingRights() throws Exception {
+        BrowserApi browser = signedIn("upload-writer-owner");
+        String projectId = json(browser.post("/projects", "{\"name\":\"独占续传\"}")).path("data").path("id").asText();
+        String writerId = java.util.UUID.randomUUID().toString();
+        String hash = "c".repeat(64);
+        var created = json(browser.post("/projects/" + projectId + "/uploads", new ObjectMapper().writeValueAsString(java.util.Map.of(
+                "filename", "same.mp4", "sizeBytes", 1024, "sha256", hash, "idempotencyKey", "writer-one", "writerId", writerId)))).path("data");
+        String id = created.path("uploadId").asText();
+        org.junit.jupiter.api.Assertions.assertFalse(json(browser.get("/uploads/" + id)).path("data").has("writerToken"));
+        assertEquals(400, browser.post("/projects/" + projectId + "/uploads", new ObjectMapper().writeValueAsString(java.util.Map.of(
+                "filename", "same.mp4", "sizeBytes", 1024, "sha256", hash, "idempotencyKey", "writer-one"))).statusCode(),
+                "A creation replay without the original browser identity must not disclose its writer token");
+        assertEquals(400, browser.post("/uploads/" + id + "/resume", new ObjectMapper().writeValueAsString(java.util.Map.of(
+                "sizeBytes", 1024, "sha256", hash, "writerToken", created.path("writerToken").asText()))).statusCode());
+        String otherWriter = new ObjectMapper().writeValueAsString(java.util.Map.of("sizeBytes", 1024, "sha256", hash,
+                "writerId", java.util.UUID.randomUUID(), "writerToken", created.path("writerToken").asText()));
+        assertEquals(409, browser.post("/uploads/" + id + "/resume", otherWriter).statusCode());
+        var resumed = browser.post("/uploads/" + id + "/resume", otherWriter.replace(new ObjectMapper().readTree(otherWriter).path("writerId").asText(), writerId));
+        assertEquals(200, resumed.statusCode(), resumed.body());
+        assertEquals(created.path("writerToken").asText(), json(resumed).path("data").path("writerToken").asText());
+        String credential = new ObjectMapper().writeValueAsString(java.util.Map.of("writerToken", created.path("writerToken").asText()));
+        var paused = browser.post("/uploads/" + id + "/pause", credential);
+        assertEquals(200, paused.statusCode(), paused.body());
+        assertEquals("PAUSED", json(browser.get("/uploads/" + id)).path("data").path("status").asText());
+        assertEquals(409, browser.post("/uploads/" + id + "/part-urls", credential.substring(0, credential.length()-1) + ",\"partNumbers\":[1]}").statusCode());
+        var continued = browser.post("/uploads/" + id + "/resume", otherWriter.replace(new ObjectMapper().readTree(otherWriter).path("writerId").asText(), writerId));
+        assertEquals(200, continued.statusCode(), continued.body());
+        assertEquals("UPLOADING", json(continued).path("data").path("status").asText());
+    }
+
+    @Test
+    void resumingSameFileReconcilesBothRealSiloPagesWithoutDependingOnClientPartReports() throws Exception {
         BrowserApi browser = signedIn("upload-paged-owner");
         String projectId = json(browser.post("/projects", "{\"name\":\"分页列片\"}")).path("data").path("id").asText();
         byte[] bytes = new byte[8 * 1024 * 1024 + 19];
         java.util.Arrays.fill(bytes, (byte) 37);
         String hash = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
         var data = json(browser.post("/projects/" + projectId + "/uploads", new ObjectMapper().writeValueAsString(java.util.Map.of(
-                "filename", "paged.mp4", "sizeBytes", bytes.length, "sha256", hash, "idempotencyKey", "paged-upload")))).path("data");
+                "filename", "paged.mp4", "sizeBytes", bytes.length, "sha256", hash, "idempotencyKey", "paged-upload", "writerId", browser.writerId)))).path("data");
         String id = data.path("uploadId").asText();
         String writer = data.path("writerToken").asText();
         var authorization = browser.post("/uploads/" + id + "/part-urls", "{\"partNumbers\":[1,2],\"writerToken\":\"" + writer + "\"}");
@@ -154,6 +195,17 @@ class UploadApiIntegrationTest {
                     .PUT(HttpRequest.BodyPublishers.ofByteArray(part)).build(), HttpResponse.BodyHandlers.ofString());
             assertEquals(200, uploaded.statusCode(), uploaded.body());
         }
+        String resumeBody = new ObjectMapper().writeValueAsString(java.util.Map.of(
+                "sizeBytes", bytes.length, "sha256", hash, "writerId", browser.writerId));
+        assertEquals(409, browser.post("/uploads/" + id + "/resume", resumeBody.replace(hash, "0".repeat(64))).statusCode());
+        PROXY.partPages.set(0);
+        var resumed = browser.post("/uploads/" + id + "/resume", resumeBody);
+        assertEquals(200, resumed.statusCode(), resumed.body());
+        assertEquals(id, json(resumed).path("data").path("uploadId").asText());
+        assertEquals(2, json(resumed).path("data").path("confirmedParts").size());
+        assertEquals(bytes.length, json(resumed).path("data").path("confirmedBytes").asLong());
+        assertEquals(2, PROXY.partPages.get(), "Resume must reconcile every actual Silo page");
+        assertEquals(1, json(browser.get("/projects/" + projectId + "/uploads")).path("data").path("items").size());
         PROXY.partPages.set(0);
         var completed = browser.post("/uploads/" + id + "/complete", "{\"writerToken\":\"" + writer + "\"}");
         assertEquals(202, completed.statusCode(), completed.body());
@@ -173,6 +225,7 @@ class UploadApiIntegrationTest {
     }
 
     private final class BrowserApi {
+        final java.util.UUID writerId = java.util.UUID.randomUUID();
         final HttpClient client = HttpClient.newBuilder().cookieHandler(new CookieManager(null, CookiePolicy.ACCEPT_ALL)).build();
         HttpResponse<String> get(String path) throws Exception {
             return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path)).GET().build(), HttpResponse.BodyHandlers.ofString());

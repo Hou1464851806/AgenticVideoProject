@@ -1,10 +1,15 @@
 import { reactive } from 'vue';
 import { ApiFailure, request } from './api';
 
-type Upload = { uploadId: string; filename: string; status: string; reservedBytes: number; partSizeBytes: number; expectedParts: number; writerToken: string; validationStatus?: string; error?: { code: string; message: string }; cleanupStatus?: string };
-type Row = { key: string; projectId: string; filename: string; size: number; confirmed: number; hashing: number; state: string; error: string; upload?: Upload };
+type Upload = { uploadId: string; filename: string; status: string; reservedBytes: number; partSizeBytes: number; expectedParts: number; expiresAt: string; writerToken?: string; confirmedBytes?: number; confirmedParts?: Array<{ partNumber: number; sizeBytes: number }>; validationStatus?: string; error?: { code: string; message: string }; cleanupStatus?: string };
+type Row = { key: string; projectId: string; filename: string; size: number; confirmed: number; hashing: number; state: string; error: string; hasFile?: boolean; paused?: boolean; running?: boolean; upload?: Upload };
 export const uploadRows = reactive<Row[]>([]);
 const queue: Array<{ file: File; row: Row }> = [];
+const selectedFiles = new Map<string, File>();
+const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+const savedWriter = sessionStorage.getItem('upload-writer-id');
+const writerId = savedWriter && (navigation?.type === 'reload' || navigation?.type === 'back_forward') ? savedWriter : crypto.randomUUID();
+sessionStorage.setItem('upload-writer-id', writerId);
 let active = 0;
 
 function hashFile(file: File, row: Row): Promise<string> {
@@ -34,47 +39,117 @@ async function transfer(file: File, row: Row) {
   try {
     row.state = '正在计算文件校验值';
     const sha256 = await hashFile(file, row);
-    const upload = await retryWrite<Upload>(`/projects/${row.projectId}/uploads`, 'POST', {
-      filename: file.name, sizeBytes: file.size, sha256, idempotencyKey: row.key,
-    });
+    if (row.paused) { row.state = '已暂停'; return; }
+    let upload = row.upload
+      ? await retryWrite<Upload>(`/uploads/${row.upload.uploadId}/resume`, 'POST', { sizeBytes: file.size, sha256, writerId })
+      : await retryWrite<Upload>(`/projects/${row.projectId}/uploads`, 'POST', {
+          filename: file.name, sizeBytes: file.size, sha256, idempotencyKey: row.key, writerId,
+        });
     row.upload = upload;
+    if (upload.status === 'COMPLETED') { row.state = completedState(upload); return; }
     if (upload.status !== 'UPLOADING') throw new Error('上传初始化正在核对，请稍后重试');
+    row.confirmed = upload.confirmedBytes ?? 0;
+    const successful = new Set(upload.confirmedParts?.map(part => part.partNumber) ?? []);
     row.state = '正在传输';
     // Every file shares these two slots. Only one bounded part per slot is in flight.
     for (let number = 1; number <= upload.expectedParts; number++) {
-      const authorization = await request<{ parts: Array<{ url: string; headers: Record<string, string>; sizeBytes: number }> }>(
-        `/uploads/${upload.uploadId}/part-urls`, 'POST', { partNumbers: [number], writerToken: upload.writerToken });
-      const part = authorization.parts[0]!;
-      const offset = (number - 1) * upload.partSizeBytes;
-      const response = await fetch(part.url, { method: 'PUT', headers: part.headers, body: file.slice(offset, offset + part.sizeBytes) });
-      if (!response.ok || !response.headers.get('ETag')) throw new Error('分片传输失败或无法读取 ETag');
-      await request(`/uploads/${upload.uploadId}/parts/${number}`, 'PUT', {
-        writerToken: upload.writerToken, etag: response.headers.get('ETag'), sizeBytes: part.sizeBytes,
-      });
-      row.confirmed += part.sizeBytes;
+      if (row.paused) { await settlePause(row); return; }
+      if (successful.has(number)) continue;
+      for (let attempt = 0; ; attempt++) {
+        try {
+          const authorization = await request<{ parts: Array<{ url: string; headers: Record<string, string>; sizeBytes: number }> }>(
+            `/uploads/${upload.uploadId}/part-urls`, 'POST', { partNumbers: [number], writerToken: upload.writerToken });
+          if (row.paused) { await settlePause(row); return; }
+          const part = authorization.parts[0]!;
+          const offset = (number - 1) * upload.partSizeBytes;
+          const response = await fetch(part.url, { method: 'PUT', headers: part.headers, body: file.slice(offset, offset + part.sizeBytes) });
+          if (!response.ok) throw new ApiFailure('分片传输失败，请继续上传或重新选择原文件', response.status === 403 || response.status === 408 || response.status === 429 || response.status >= 500);
+          if (!response.headers.get('ETag')) throw new ApiFailure('无法读取分片确认信息', true);
+          await retryWrite(`/uploads/${upload.uploadId}/parts/${number}`, 'PUT', {
+            writerToken: upload.writerToken, etag: response.headers.get('ETag'), sizeBytes: part.sizeBytes,
+          });
+          row.confirmed += part.sizeBytes;
+          break;
+        } catch (failure) {
+          if (row.paused) { await settlePause(row); return; }
+          if (!(failure instanceof TypeError || failure instanceof ApiFailure && failure.retryable)) throw failure;
+          if (attempt >= 2) throw new Error(`第 ${number} 片自动重试已用尽，成功分片已保留，请稍后继续上传`);
+          row.state = `正在重试第 ${number} 片（${attempt + 1}/2）`;
+          await new Promise(resolve => setTimeout(resolve, 250 * 2 ** attempt));
+          if (row.paused) { await settlePause(row); return; }
+          upload = await retryWrite<Upload>(`/uploads/${upload.uploadId}/resume`, 'POST', { sizeBytes: file.size, sha256, writerId });
+          row.upload = upload;
+          row.confirmed = upload.confirmedBytes ?? 0;
+          if (upload.confirmedParts?.some(part => part.partNumber === number)) break;
+          row.state = '正在传输';
+        }
+      }
     }
+    if (row.paused) { await settlePause(row); return; }
     row.state = '正在确认上传';
     const completed = await retryWrite<Upload>(`/uploads/${upload.uploadId}/complete`, 'POST', { writerToken: upload.writerToken });
     if (completed.status !== 'COMPLETED') throw new Error('上传完成状态正在核对');
     row.upload = completed;
     row.state = '传输完成，待媒体验证';
+    selectedFiles.delete(row.key);
+    row.hasFile = false;
   } catch (failure) {
     row.state = '上传失败';
-    row.error = failure instanceof Error ? failure.message : '上传暂时不可用';
+    row.error = failure instanceof TypeError ? '网络连接不可用，自动重试已用尽；请恢复网络后继续上传' : failure instanceof Error ? failure.message : '上传暂时不可用';
+  } finally { row.running = false; }
+}
+async function settlePause(row: Row) {
+  if (row.upload?.writerToken) {
+    const paused = await request<Upload>(`/uploads/${row.upload.uploadId}/pause`, 'POST', { writerToken: row.upload.writerToken });
+    row.upload = { ...row.upload, ...paused };
   }
+  row.state = '已暂停';
+}
+export function pauseUpload(key: string) {
+  const row = uploadRows.find(value => value.key === key);
+  if (!row) return;
+  row.paused = true;
+  row.state = row.running ? '正在暂停' : '已暂停';
+}
+export function continueUpload(key: string) {
+  const row = uploadRows.find(value => value.key === key);
+  const file = selectedFiles.get(key);
+  if (!row || !file || row.running) return;
+  row.paused = false;
+  row.error = '';
+  row.state = '等待继续';
+  if (!queue.some(value => value.row.key === key)) queue.push({ file, row });
+  drain();
+}
+export function reselectFile(key: string, file: File) {
+  const row = uploadRows.find(value => value.key === key);
+  if (!row || row.running || row.upload?.status === 'COMPLETED') return;
+  const queued = queue.findIndex(value => value.row.key === key);
+  if (queued >= 0) queue.splice(queued, 1);
+  selectedFiles.set(key, file);
+  row.hasFile = true;
+  row.paused = false;
+  row.error = '';
+  row.hashing = 0;
+  row.state = '等待继续';
+  queue.push({ file, row });
+  drain();
 }
 function drain() {
   while (active < 2 && queue.length) {
     const next = queue.shift()!;
+    if (next.row.paused) continue;
     active++;
+    next.row.running = true;
     void transfer(next.file, next.row).finally(() => { active--; drain(); });
   }
 }
 export function enqueueFiles(projectId: string, files: File[]) {
   for (const file of files) {
     const row: Row = reactive({ key: crypto.randomUUID(), projectId, filename: file.name, size: file.size,
-      confirmed: 0, hashing: 0, state: '等待上传', error: '' });
+      confirmed: 0, hashing: 0, state: '等待上传', error: '', hasFile: true });
     uploadRows.push(row);
+    selectedFiles.set(row.key, file);
     queue.push({ file, row });
   }
   drain();
@@ -92,7 +167,7 @@ export async function loadUploads(projectId: string) {
     for (const upload of page.items) {
       const existing = uploadRows.find(row => row.upload?.uploadId === upload.uploadId);
       if (existing) {
-        existing.upload = upload;
+        existing.upload = { ...existing.upload, ...upload };
         if (upload.status === 'COMPLETED') {
           existing.confirmed = upload.reservedBytes;
           existing.state = completedState(upload);
@@ -101,8 +176,9 @@ export async function loadUploads(projectId: string) {
         continue;
       }
       uploadRows.push({ key: upload.uploadId, projectId, filename: upload.filename, size: upload.reservedBytes,
-        confirmed: upload.status === 'COMPLETED' ? upload.reservedBytes : 0, hashing: 0, error: upload.error?.message ?? '', upload,
-        state: upload.status === 'COMPLETED' ? completedState(upload) : '上传尚未完成' });
+        confirmed: upload.status === 'COMPLETED' ? upload.reservedBytes : upload.confirmedBytes ?? 0, hashing: 0, error: upload.error?.message ?? '', upload,
+        hasFile: false, paused: upload.status === 'PAUSED',
+        state: upload.status === 'COMPLETED' ? completedState(upload) : '重选原文件后继续上传' });
     }
     cursor = page.nextCursor;
   } while (cursor);

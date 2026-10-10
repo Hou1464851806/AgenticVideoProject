@@ -45,6 +45,20 @@ public class UploadController {
         return envelope(uploads.recordPart(upload, number, request));
     }
     public record PartReport(@NotNull UUID writerToken, @NotBlank String etag, @Positive long sizeBytes) {}
+    @PostMapping("/uploads/{id}/resume")
+    Map<String, Object> resume(@PathVariable UUID id, @Valid @RequestBody Resume request, Authentication account) {
+        var upload = uploads.find(id);
+        access.requireOwned(upload.projectId(), account);
+        return envelope(uploads.resume(upload, request));
+    }
+    public record Resume(@Positive long sizeBytes, @NotNull @Pattern(regexp="[a-fA-F0-9]{64}") String sha256,
+            @NotNull UUID writerId) {}
+    @PostMapping("/uploads/{id}/pause")
+    Map<String, Object> pause(@PathVariable UUID id, @Valid @RequestBody Writer request, Authentication account) {
+        var upload = uploads.find(id);
+        access.requireOwned(upload.projectId(), account);
+        return envelope(uploads.pause(upload, request.writerToken()));
+    }
     @PostMapping("/uploads/{id}/complete")
     ResponseEntity<?> complete(@PathVariable UUID id, @Valid @RequestBody Writer request, Authentication account) {
         var upload = uploads.find(id);
@@ -61,5 +75,5 @@ public class UploadController {
     static Map<String, Object> envelope(Object data) { return Map.of("data", data, "requestId", UUID.randomUUID().toString()); }
     public record CreateUpload(@NotBlank @Size(max = 255) String filename, @Positive long sizeBytes,
             @Pattern(regexp = "[a-fA-F0-9]{64}") @NotNull String sha256,
-            @NotBlank @Size(max = 120) String idempotencyKey) {}
+            @NotBlank @Size(max = 120) String idempotencyKey, @NotNull UUID writerId) {}
 }

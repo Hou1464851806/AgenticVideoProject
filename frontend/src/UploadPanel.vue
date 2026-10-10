@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
-import { enqueueFiles, loadUploads, uploadRows } from './uploads';
+import { enqueueFiles, loadUploads, uploadRows, pauseUpload, continueUpload, reselectFile } from './uploads';
 const props = defineProps<{ projectId: string }>();
 const error = ref('');
 const rows = computed(() => uploadRows.filter(row => row.projectId === props.projectId));
@@ -21,6 +21,12 @@ function select(event: Event) {
   enqueueFiles(props.projectId, Array.from(input.files ?? []));
   input.value = '';
 }
+function reselect(event: Event, key: string) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (file) reselectFile(key, file);
+  input.value = '';
+}
 </script>
 <template>
   <div class="upload-panel">
@@ -30,6 +36,13 @@ function select(event: Event) {
     <article v-for="row in rows" :key="row.key">
       <strong>{{ row.filename }}</strong>
       <p>{{ row.state }}</p>
+      <button v-if="row.hasFile && !row.paused && row.upload?.status !== 'COMPLETED'" type="button" :aria-label="`${row.filename} 暂停上传`" @click="pauseUpload(row.key)">暂停</button>
+      <button v-if="row.hasFile && (row.paused || row.state === '上传失败') && !row.running" type="button" :aria-label="`${row.filename} 继续上传`" @click="continueUpload(row.key)">继续上传</button>
+      <template v-if="row.upload && row.upload.status !== 'COMPLETED' && !row.running">
+        <label :for="`resume-file-${row.key}`">{{ row.filename }} 重选原文件继续</label>
+        <input :id="`resume-file-${row.key}`" type="file" accept="video/*" @change="reselect($event, row.key)">
+        <small>可恢复至 {{ new Date(row.upload.expiresAt).toLocaleString() }}</small>
+      </template>
       <progress :value="row.confirmed" :max="row.size" :aria-label="`${row.filename} 上传进度`"></progress>
       <small>{{ Math.floor(row.confirmed / Math.max(1, row.size) * 100) }}% 已确认</small>
       <small v-if="row.state === '正在计算文件校验值'">校验 {{ Math.floor(row.hashing / Math.max(1, row.size) * 100) }}%</small>

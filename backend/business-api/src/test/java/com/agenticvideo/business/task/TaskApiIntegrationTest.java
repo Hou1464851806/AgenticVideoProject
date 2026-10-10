@@ -73,7 +73,7 @@ class TaskApiIntegrationTest {
         byte[] bytes = "task-claim-file".getBytes(java.nio.charset.StandardCharsets.UTF_8);
         String hash = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
         var upload = json(browser.post("/projects/" + projectId + "/uploads", new ObjectMapper().writeValueAsString(java.util.Map.of(
-                "filename", "claim.mp4", "sizeBytes", bytes.length, "sha256", hash, "idempotencyKey", "claim-upload")))).path("data");
+                "filename", "claim.mp4", "sizeBytes", bytes.length, "sha256", hash, "idempotencyKey", "claim-upload", "writerId", browser.writerId)))).path("data");
         String id = upload.path("uploadId").asText();
         String writer = upload.path("writerToken").asText();
         var urls = json(browser.post("/uploads/" + id + "/part-urls", "{\"partNumbers\":[1],\"writerToken\":\"" + writer + "\"}")).path("data");
@@ -147,7 +147,7 @@ class TaskApiIntegrationTest {
         String projectId=json(browser.post("/projects","{\"name\":\"结果发布\"}")).path("data").path("id").asText();
         byte[] bytes=java.nio.file.Files.readAllBytes(java.nio.file.Path.of("../../frontend/e2e/fixtures/short-video.mp4"));
         String hash=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
-        var upload=json(browser.post("/projects/"+projectId+"/uploads",new ObjectMapper().writeValueAsString(java.util.Map.of("filename","valid.mp4","sizeBytes",bytes.length,"sha256",hash,"idempotencyKey","publish-upload")))).path("data");
+        var upload=json(browser.post("/projects/"+projectId+"/uploads",new ObjectMapper().writeValueAsString(java.util.Map.of("filename","valid.mp4","sizeBytes",bytes.length,"sha256",hash,"idempotencyKey","publish-upload","writerId",browser.writerId)))).path("data");
         String id=upload.path("uploadId").asText();
         String writer=upload.path("writerToken").asText();
         var urls=json(browser.post("/uploads/"+id+"/part-urls","{\"partNumbers\":[1],\"writerToken\":\""+writer+"\"}")).path("data");
@@ -192,6 +192,7 @@ class TaskApiIntegrationTest {
     }
 
     private final class BrowserApi {
+        final java.util.UUID writerId = java.util.UUID.randomUUID();
         final HttpClient client = HttpClient.newBuilder().cookieHandler(new CookieManager(null, CookiePolicy.ACCEPT_ALL)).build();
         HttpResponse<String> get(String path) throws Exception {
             return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path)).GET().build(), HttpResponse.BodyHandlers.ofString());
