@@ -33,6 +33,9 @@ stateDiagram-v2
     PENDING --> CANCELLED: 开始前取消
     RUNNING --> SUCCEEDED: 校验并提交结果
     RUNNING --> RETRY_WAIT: 可恢复故障
+    RUNNING --> WAITING_INPUT: 保存澄清状态并释放执行占用
+    WAITING_INPUT --> PENDING: 收到回答后核对目标并重新派发
+    WAITING_INPUT --> CANCELLED: 等待时取消
     RETRY_WAIT --> PENDING: 到达重试时间
     RETRY_WAIT --> CANCELLED: 等待时取消
     RUNNING --> FAILED: 不可恢复或次数耗尽
@@ -44,6 +47,8 @@ stateDiagram-v2
 ```
 
 PENDING 表示数据库中存在待执行任务，不代表消息一定已进入 Broker。终态不被迟到消息回退。执行权过期触发恢复检查，不能仅凭缺少一次心跳就立即启动第二个本地进程。
+
+Agent 等待用户澄清时使用 WAITING_INPUT，保存 checkpoint 和可见问题后释放当前尝试及方案编辑占用；恢复检查不将它当成崩溃的 RUNNING 任务。回答后重新核对用户希望操作的版本与权限，领取新尝试；如用户改为操作不同基准，结束原等待任务并创建关联的新任务。中断节点恢复可能重执行，持久化问题、模型请求与业务回报需幂等。
 
 FAILED 后用户显式重试可创建关联原任务的新任务；系统自动重试保持 task_id，并创建新的 attempt_id。对相同预览输入，业务层复用已有成功产物或有效任务。已经删除的预览记录不再作为可用结果返回。
 
@@ -91,6 +96,8 @@ CANCELLED 表示系统不再发布该任务后续结果，本地执行已停止�
 | GET /internal/tasks/{id}/control | 返回取消等控制状态；轮询可作为通知失效后的保障 |
 | POST /internal/tasks/{id}/complete | 校验当前尝试，幂等提交 manifest／分析／方案提议 |
 | POST /internal/tasks/{id}/fail | 记录结构化错误，决定重试或终止 |
+| POST /internal/tasks/{id}/await-input | 保存待续 checkpoint 引用与澄清问题，释放当前执行及编辑占用 |
+| POST /api/tasks/{id}/resume | 鉴权、记录回答并核对操作对象，重新派发或创建关联新任务 |
 | POST /api/tasks/{id}/cancel | 验证用户归属并请求取消 |
 | GET /api/tasks/{id} | 返回用户可见持久化状态 |
 | GET /api/projects/{id}/events | 鉴权后的 SSE；重连时先校准当前状态 |
