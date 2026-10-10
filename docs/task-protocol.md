@@ -1,0 +1,111 @@
+# 任务、消息与恢复协议
+
+本文件细化已确认的 PostgreSQL 权威任务状态、事务 Outbox、RabbitMQ 派发、内部 HTTP 结果回报与 SSE 展示。字段和接口命名是实现基线，尚未编码或集成测试。
+
+## 权威状态与执行边界
+
+- Spring Boot 业务后端管理任务生命周期及结果发布；Worker 和 Agent 通过内部接口操作业务状态。
+- RabbitMQ 消息是执行通知；消息存在、被确认或被移除均不能独立代表业务任务成功。
+- 单次执行由 task_id、attempt_id 和执行权凭证确定，领取及状态变更须原子校验。旧尝试的结果不得覆盖新尝试或取消状态。
+- 对外部模型保存提供方任务标识与调用用量；本地超时不代表提供方未执行或未收费。
+- SSE 用于及时展示；重连后可重新读取持久化任务状态，不把连接存活作为任务存活依据。
+
+## 任务类型
+
+| 类型 | 执行者 | 固定输入 |
+| --- | --- | --- |
+| MEDIA_PREPARE | Java Worker | 不可变素材对象与探测／提取规则 |
+| CONTENT_ANALYZE | Python Agent 服务的固定流程 | 素材及准备产物、分析规则、模型配置版本 |
+| CONTENT_REFINE | Python Agent 服务 | 指定候选时间范围与补充分析要求 |
+| AGENT_EDIT | Python Agent 服务 | 会话、方案、基准版本、用户指令和权限上下文 |
+| PREVIEW_RENDER | Java Worker | 方案版本、单条输出与预览配置 |
+| FINAL_RENDER | Java Worker | 已确认方案版本、单条输出与正式配置 |
+| INDEX_SYNC | 业务后端 | 已持久化证据、向量、索引版本与权限范围 |
+
+任务输入固定后不受前端切换版本影响。媒体准备与内容分析是不同步骤，索引失败可单独恢复，不必重做已经成功的模型调用。详细分析不让模型绕过后端任意创建或调度任务。
+
+## 状态机
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING
+    PENDING --> RUNNING: 原子领取执行权
+    PENDING --> CANCELLED: 开始前取消
+    RUNNING --> SUCCEEDED: 校验并提交结果
+    RUNNING --> RETRY_WAIT: 可恢复故障
+    RETRY_WAIT --> PENDING: 到达重试时间
+    RETRY_WAIT --> CANCELLED: 等待时取消
+    RUNNING --> FAILED: 不可恢复或次数耗尽
+    RUNNING --> CANCEL_REQUESTED: 请求取消
+    CANCEL_REQUESTED --> CANCELLED: 停止接收结果并完成本地清理
+    SUCCEEDED --> [*]
+    FAILED --> [*]
+    CANCELLED --> [*]
+```
+
+PENDING 表示数据库中存在待执行任务，不代表消息一定已进入 Broker。终态不被迟到消息回退。执行权过期触发恢复检查，不能仅凭缺少一次心跳就立即启动第二个本地进程。
+
+FAILED 后用户显式重试可创建关联原任务的新任务；系统自动重试保持 task_id，并创建新的 attempt_id。对相同预览输入，业务层复用已有成功产物或有效任务。已经删除的预览记录不再作为可用结果返回。
+
+CANCELLED 表示系统不再发布该任务后续结果，本地执行已停止并清理；外部模型服务是否支持停止、是否继续收费由提供方决定。终态提交与取消请求原子竞争，已成功提交的任务不能再改写成取消。
+
+## 事务 Outbox
+
+1. 在一个 PostgreSQL 事务内写入任务、必要业务约束和 outbox_events。
+2. 发布器领取待发送事件，发布持久消息，并等待 RabbitMQ publisher confirm。
+3. 收到确认后标记事件已发送；确认丢失时允许重发同一个 event_id。
+4. 消费者用 task_id 领取业务执行权，处理重复通知、已完成任务与当前已有执行者的情况。
+5. 内部结果提交按 task_id／attempt_id 幂等，产物只有通过当前执行权校验后才能对用户发布。
+
+初期发布器可在业务应用内运行，扩容后用数据库领取机制防止多个发布器重复抢占；重复投递本身仍按协议容忍。Outbox 不与 RabbitMQ 建立一个跨系统 ACID 事务，也不能保证外部模型只调用一次。
+
+消费者 ack 时机与执行权、恢复扫描配套实现：若领取持久化执行权后确认消息，恢复依赖数据库租约检查；若完成后确认，则需处理长任务的消费者确认超时。实现时选定并验证一种方式，业务状态机不依赖这两种策略的差异。
+
+## 执行、取消与产物提交
+
+- Java Worker 使用 FFmpeg 参数列表启动进程，命令由受控渲染编译器产生，不执行模型生成的 shell。持续读取或重定向 stdout／stderr，避免管道阻塞。
+- 执行者定期发送心跳及阶段进度，短暂网络故障应重试回报。恢复检查结合任务租约与执行器状态，不把数据库恢复简单等同于重新发送所有任务。
+- 取消先撤销结果提交资格，通知执行器；本地进程先尝试正常结束，超时后强制停止并确认退出，再清理工作目录。失败／取消不删除输入素材或已有成功成片。
+- 每次尝试在独立临时目录和对象空间工作；校验产物可播放性、时长、尺寸及音轨后提交 manifest，业务后端校验执行权并发布引用。
+- 已上传但未成功提交的文件成为待清理候选；不能误删已经被成功产物记录引用的文件。
+- Agent 修改任务启动时取得方案编辑占用，基准版本固定。版本追加、任务完成和释放占用应在业务事务中协调；失败、取消和过期恢复也需释放有效占用，旧执行者不得释放后续任务的锁。
+
+## 重试分类
+
+| 情况 | 处理 |
+| --- | --- |
+| 网络暂时失败、限流、服务暂不可用 | 有限退避重试；遵守提供方要求并记录调用 |
+| 外部异步任务请求后状态不明 | 先使用已保存任务标识查询／恢复；无可查询标识时记录不确定性，避免无上限重复请求 |
+| 素材缺失、越界片段、无法解码、无效配置 | 报告可解释错误，不无限自动重试 |
+| 任务已完成而消息或回报重复 | 返回既有业务结果，不再次发布 |
+| 租约过期、容器退出、本机重启 | 检查执行者与已有产物，恢复或重试未完成步骤，阻止迟到尝试提交 |
+
+具体超时、退避、次数和并发限制配置化，通过实施阶段故障验证固定。首期正式渲染并发 1；预览与其他媒体处理也需要独立的资源限额，避免挤占整个 Docker 虚拟机。
+
+## 内部接口基线
+
+| 接口 | 核心语义 |
+| --- | --- |
+| POST /internal/tasks/{id}/claim | 认证执行服务，原子领取，返回固定输入与执行凭证 |
+| POST /internal/tasks/{id}/heartbeat | 仅当前有效尝试续期，记录进度 |
+| GET /internal/tasks/{id}/control | 返回取消等控制状态；轮询可作为通知失效后的保障 |
+| POST /internal/tasks/{id}/complete | 校验当前尝试，幂等提交 manifest／分析／方案提议 |
+| POST /internal/tasks/{id}/fail | 记录结构化错误，决定重试或终止 |
+| POST /api/tasks/{id}/cancel | 验证用户归属并请求取消 |
+| GET /api/tasks/{id} | 返回用户可见持久化状态 |
+| GET /api/projects/{id}/events | 鉴权后的 SSE；重连时先校准当前状态 |
+
+消息示意只携带协议版本、event_id、task_id、task_type 和关联标识；执行所需授权由领取接口短期下发。内部凭证不对浏览器暴露，模型工具也不能任意声明用户身份或提升任务权限。
+
+## 数据基线
+
+业务后端管理 users、projects、assets、asset_analysis_revisions、evidence_segments、editing_sessions、messages、edit_plans、plan_revisions、plan_confirmations、tasks、task_attempts、artifacts、outbox_events 与 model_usage。表名为设计基线，迁移时可调整；不可变媒体引用、不可变方案版本、修改来源、任务执行权与原子提交语义必须保留。
+
+素材的媒体准备、内容分析和索引就绪分开记录，允许显示“可以播放但仍在分析”，也允许对已准备好的素材直接播放。索引最终一致，不能把尚未同步的证据当作检索可用。LangGraph 运行数据独立 schema／权限，不能用 checkpoint 覆盖业务表。
+
+## 事实来源
+
+- [RabbitMQ confirms](https://www.rabbitmq.com/docs/confirms)：publisher confirm、consumer ack 与重投递。
+- [RabbitMQ reliability](https://www.rabbitmq.com/docs/reliability)：可靠投递仍需消费者幂等。
+- [Outbox 原理](https://debezium.io/blog/2019/02/19/reliable-microservices-data-exchange-with-the-outbox-pattern/)：数据库事务与消息发送缺口。
+- [LangGraph persistence](https://docs.langchain.com/oss/python/langgraph/persistence)：运行状态、thread 与 checkpoint。
