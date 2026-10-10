@@ -1,0 +1,7 @@
+CREATE TABLE users (
+    id UUID PRIMARY KEY,
+    normalized_username VARCHAR(64) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'DISABLED')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
