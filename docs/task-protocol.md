@@ -1,6 +1,6 @@
 # 任务、消息与恢复协议
 
-本文件细化已确认的 PostgreSQL 权威任务状态、事务 Outbox、RabbitMQ 派发、内部 HTTP 结果回报与 SSE 展示。字段和接口命名是实现基线，尚未编码或集成测试。
+本文件细化 Q58 整体确认后的 PostgreSQL 权威任务状态、事务 Outbox、RabbitMQ 派发、内部 HTTP 结果回报与 SSE。具体表与 HTTP 命名以 database-design.md／api-contract.md 为准，公开事件与消费策略见 event-protocol.md；尚未编码或集成测试。
 
 ## 权威状态与执行边界
 
@@ -14,15 +14,17 @@
 
 | 类型 | 执行者 | 固定输入 |
 | --- | --- | --- |
-| MEDIA_PREPARE | Java Worker | 不可变素材对象与探测／提取规则 |
+| MEDIA_PREPARE | Java Worker | 待验证不可变素材对象、声明大小／哈希与探测／提取规则 |
 | CONTENT_ANALYZE | Python Agent 服务的固定流程 | 素材及准备产物、分析规则、模型配置版本 |
 | CONTENT_REFINE | Python Agent 服务 | 指定候选时间范围与补充分析要求 |
-| AGENT_EDIT | Python Agent 服务 | 会话、方案、基准版本、用户指令和权限上下文 |
+| AGENT_TURN | Python Agent 服务 | 会话、轮次、用户消息、明确操作对象、权限与预算；查询不必关联方案，编辑固定目标与基准 |
 | PREVIEW_RENDER | Java Worker | 方案版本、单条输出与预览配置 |
 | FINAL_RENDER | Java Worker | 已确认方案版本、单条输出与正式配置 |
 | INDEX_SYNC | 业务后端 | 已持久化证据、向量、索引版本与权限范围 |
 
 任务输入固定后不受前端切换版本影响。媒体准备与内容分析是不同步骤，索引失败可单独恢复，不必重做已经成功的模型调用。详细分析不让模型绕过后端任意创建或调度任务。
+
+AGENT_TURN 是 Q53 后的统一命名基线，取代此前 AGENT_EDIT 示意，既有编辑执行权与版本提交语义保留。用户消息／轮次／任务／Outbox 同事务接纳，按会话和客户端幂等键防重复；查询也有持久运行身份，进入编辑阶段才取得方案编辑占用。首次新建方案的目标由业务后端分配，不能用模型生成的 ID 当作授权。
 
 ## 状态机
 
@@ -52,6 +54,8 @@ Agent 等待用户澄清时使用 WAITING_INPUT，保存 checkpoint 和可见问
 
 FAILED 后用户显式重试可创建关联原任务的新任务；系统自动重试保持 task_id，并创建新的 attempt_id。对相同预览输入，业务层复用已有成功产物或有效任务。已经删除的预览记录不再作为可用结果返回。
 
+每个制作会话只允许一个活动逻辑轮次；WAITING_INPUT 不占执行槽或方案锁，但仍保留会话中的等待关系。回答关联 question_id，取消／开始新需求显式结束原等待；失败重试关联原轮次和输入并重新取得会话活动资格，不添加重复用户消息，已提交结果直接返回。会话串行不替代方案互斥，公开消息／问题／版本结果与任务状态协调提交。
+
 CANCELLED 表示系统不再发布该任务后续结果，本地执行已停止并清理；外部模型服务是否支持停止、是否继续收费由提供方决定。终态提交与取消请求原子竞争，已成功提交的任务不能再改写成取消。
 
 ## 事务 Outbox
@@ -64,7 +68,7 @@ CANCELLED 表示系统不再发布该任务后续结果，本地执行已停止�
 
 初期发布器可在业务应用内运行，扩容后用数据库领取机制防止多个发布器重复抢占；重复投递本身仍按协议容忍。Outbox 不与 RabbitMQ 建立一个跨系统 ACID 事务，也不能保证外部模型只调用一次。
 
-消费者 ack 时机与执行权、恢复扫描配套实现：若领取持久化执行权后确认消息，恢复依赖数据库租约检查；若完成后确认，则需处理长任务的消费者确认超时。实现时选定并验证一种方式，业务状态机不依赖这两种策略的差异。
+详细规格选定领取并提交持久化执行权后 ACK，恢复依赖数据库租约检查与执行器核对，避免长媒体任务持续占用未确认消息。执行权、ACK、启动和恢复之间的中断窗口必须验证；不能因消息已 ACK 就把业务任务当成成功，见 event-protocol.md。
 
 ## 执行、取消与产物提交
 
@@ -73,7 +77,7 @@ CANCELLED 表示系统不再发布该任务后续结果，本地执行已停止�
 - 取消先撤销结果提交资格，通知执行器；本地进程先尝试正常结束，超时后强制停止并确认退出，再清理工作目录。失败／取消不删除输入素材或已有成功成片。
 - 每次尝试在独立临时目录和对象空间工作；校验产物可播放性、时长、尺寸及音轨后提交 manifest，业务后端校验执行权并发布引用。
 - 已上传但未成功提交的文件成为待清理候选；不能误删已经被成功产物记录引用的文件。
-- Agent 修改任务启动时取得方案编辑占用，基准版本固定。版本追加、任务完成和释放占用应在业务事务中协调；失败、取消和过期恢复也需释放有效占用，旧执行者不得释放后续任务的锁。
+- Agent 轮次进入编辑阶段时取得方案编辑占用，执行基准固定；明确为编辑的请求可在接纳时提前取得占用，纯查询不占锁。版本追加、任务完成和释放占用应在业务事务中协调；失败、取消和过期恢复也需释放有效占用，旧执行者不得释放后续任务的锁。
 
 ## 重试分类
 
@@ -100,13 +104,21 @@ CANCELLED 表示系统不再发布该任务后续结果，本地执行已停止�
 | POST /api/tasks/{id}/resume | 鉴权、记录回答并核对操作对象，重新派发或创建关联新任务 |
 | POST /api/tasks/{id}/cancel | 验证用户归属并请求取消 |
 | GET /api/tasks/{id} | 返回用户可见持久化状态 |
-| GET /api/projects/{id}/events | 鉴权后的 SSE；重连时先校准当前状态 |
+| POST /api/conversations/{id}/turns | 幂等接纳消息、操作对象和轮次／任务，忙碌时拒绝新需求而非隐式排队 |
+| GET /api/conversations/{id}/snapshot | 返回分页历史、活动轮次／问题和一致事件游标 |
+| GET /api/projects/{id}/events | 鉴权后的 SSE；按游标重放，过期时要求重载快照 |
+
+上述是能力路径示意；正式命名以 api-contract.md 的 `/api/v1` 与 `/internal/v1` 为准，澄清恢复使用 questionId 答案入口，不能绕过原问题关联直接改变任务输入。
 
 消息示意只携带协议版本、event_id、task_id、task_type 和关联标识；执行所需授权由领取接口短期下发。内部凭证不对浏览器暴露，模型工具也不能任意声明用户身份或提升任务权限。
 
+SSE 断开不取消持久任务，前端通过显式取消接口停止运行。关键公开事件持久化后推送，文字增量合批并保留草稿快照，按尝试隔离；快照游标与重放遵循作用域内提交顺序，过期游标重载。事件、认证与前端恢复详见 conversation-design.md。
+
 ## 数据基线
 
-业务后端管理 users、projects、assets、asset_analysis_revisions、evidence_segments、retrieval_units、asset_summaries、asset_index_generations、editing_sessions、messages、edit_plans、plan_revisions、plan_confirmations、tasks、task_attempts、artifacts、outbox_events 与 model_usage。表名为设计基线，迁移时可调整；不可变媒体引用、不可变方案版本、修改来源、任务执行权与原子提交语义必须保留。
+业务后端管理 users、projects、upload_sessions、upload_parts、storage_reservations、assets、asset_analysis_revisions、evidence_segments、retrieval_units、asset_summaries、asset_index_generations、editing_sessions、messages、conversation_turns、clarification_questions、public_events、edit_plans、plan_revisions、plan_confirmations、tasks、task_attempts、artifacts、outbox_events 与 model_usage。表名为设计基线，迁移时可调整；不可变媒体引用、不可变方案版本、修改来源、任务执行权与原子提交语义必须保留。
+
+上传会话独立于执行任务状态机，分片不经 RabbitMQ 搬运；对象完成后保存待验证素材与 MEDIA_PREPARE 任务／Outbox，验证通过才发布可用素材。multipart 创建、完成与取消的跨库恢复、过期残留和容量释放详见 upload-design.md。
 
 素材的媒体准备、内容分析和索引就绪分开记录，允许显示“可以播放但仍在分析”，也允许对已准备好的素材直接播放。索引最终一致，不能把尚未同步的证据当作检索可用。LangGraph 运行数据独立 schema／权限，不能用 checkpoint 覆盖业务表。
 
