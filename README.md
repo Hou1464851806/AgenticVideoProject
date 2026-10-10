@@ -10,9 +10,9 @@
 ./scripts/start.sh
 ```
 
-脚本首次生成权限为 600 的 `.env`，其中数据库密码随机生成。打开 `http://localhost:8080` 创建账号、登录和退出。登录后可创建私有项目并打开素材、对话、播放器与结果工作区；刷新保留当前项目。修改端口时，同时修改 `.env` 中 `APP_PORT` 和 `APP_ALLOWED_ORIGIN`，后者须与浏览器使用的完整 Origin 一致。
+脚本首次生成权限为 600 的 `.env`，其中数据库密码随机生成。打开 `http://localhost:8080` 创建账号、登录和退出。登录后可创建私有项目并打开素材、对话、播放器与结果工作区；刷新保留当前项目。在素材库选择多个视频，浏览器直接分片上传到 Silo；传输完成后显示待媒体验证状态。修改端口时，同时修改 `.env` 中 `APP_PORT` 和 `APP_ALLOWED_ORIGIN`，后者须与浏览器使用的完整 Origin 一致。
 
-PostgreSQL 使用 `postgres_data` 持久卷。`docker compose restart` 保留账号；业务服务重启后需要重新登录。数据库没有发布到宿主端口。
+PostgreSQL 使用 `postgres_data` 持久卷。`docker compose restart` 保留账号；业务服务重启后需要重新登录。数据库没有发布到宿主端口。Silo 的 S3 入口仅绑定本机 9000 端口，原始对象保存在 `silo_data` 持久卷；存储密码同样由启动脚本随机生成。
 
 ## 开发验证
 
@@ -26,7 +26,7 @@ npm run build
 npm run test:e2e
 ```
 
-Java 集成测试启动独立的真实 PostgreSQL 18.6 容器。浏览器测试使用已安装的 Google Chrome，并要求 Compose 服务先启动；它通过浏览器创建账号，然后重建数据库和业务容器并验证登录、退出，同时验证两账号项目隔离和窄屏工作区入口。如果测试进程的 PATH 中没有 Docker，可通过 `DOCKER_BIN=/usr/local/bin/docker npm run test:e2e` 指定 CLI。
+Java 集成测试启动独立的真实 PostgreSQL 18.6 容器。浏览器测试使用已安装的 Google Chrome，并要求 Compose 服务先启动；它通过浏览器创建账号，然后重建数据库和业务容器并验证登录、退出，同时验证两账号项目隔离、窄屏工作区入口、多文件真实直传和创建／完成响应丢失恢复。如果测试进程的 PATH 中没有 Docker，可通过 `DOCKER_BIN=/usr/local/bin/docker npm run test:e2e` 指定 CLI。
 
 ## 当前固定版本与资源
 
@@ -36,6 +36,8 @@ Java 集成测试启动独立的真实 PostgreSQL 18.6 容器。浏览器测试�
 | Java 字节码 | 17 |
 | 构建镜像 | Maven 3.9.9 / Temurin 17，固定 manifest digest |
 | 运行镜像 | Temurin 17.0.20.1_1 JRE Noble，固定 manifest digest |
+| Silo | RELEASE.2026-09-16T00-00-00Z，固定 manifest digest |
+| AWS S3 Java SDK / hash-wasm | 2.55.14 / 4.12.0 |
 | PostgreSQL | 18.6 Bookworm，固定 manifest digest |
 | Node 构建镜像 | Node 24 Bookworm Slim，固定 manifest digest |
 | Vue / Vite / TypeScript | 3.5.43 / 8.3.4 / 5.9.3 |

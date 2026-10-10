@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue';
 import { request } from './api';
+import UploadPanel from './UploadPanel.vue';
 
 type Project = { id: string; name: string; rowVersion: number };
 type ProjectPage = { items: Project[]; nextCursor: string | null };
@@ -100,7 +101,7 @@ onUnmounted(() => window.removeEventListener('popstate', restoreSelection));
         <button id="tab-results" role="tab" :aria-selected="activePane === 'results'" aria-controls="panel-results" @click="activePane = 'results'">播放器与结果</button>
       </div>
       <div class="workspace">
-        <section id="panel-assets" class="panel" :class="{ active: activePane === 'assets' }" role="tabpanel" aria-labelledby="tab-assets"><h2>素材库</h2><p class="empty">暂无素材。</p></section>
+        <section id="panel-assets" class="panel" :class="{ active: activePane === 'assets' }" role="tabpanel" aria-labelledby="tab-assets"><h2>素材库</h2><UploadPanel :project-id="selected.id" /></section>
         <section id="panel-conversation" class="panel" :class="{ active: activePane === 'conversation' }" role="tabpanel" aria-labelledby="tab-conversation"><h2>对话</h2><p class="empty">还没有制作会话。</p></section>
         <section id="panel-results" class="panel" :class="{ active: activePane === 'results' }" role="tabpanel" aria-labelledby="tab-results"><h2>播放器与结果</h2><div class="player-empty">选择素材或结果即可播放</div><p class="empty">暂无方案或成片。</p></section>
       </div>
