@@ -18,6 +18,7 @@
 
     <modules>
         <module>backend/business-api</module>
+        <module>backend/media-worker</module>
     </modules>
 
     <properties>

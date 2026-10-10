@@ -1,7 +1,7 @@
 import { reactive } from 'vue';
 import { ApiFailure, request } from './api';
 
-type Upload = { uploadId: string; filename: string; status: string; reservedBytes: number; partSizeBytes: number; expectedParts: number; writerToken: string; validationStatus?: string };
+type Upload = { uploadId: string; filename: string; status: string; reservedBytes: number; partSizeBytes: number; expectedParts: number; writerToken: string; validationStatus?: string; error?: { code: string; message: string }; cleanupStatus?: string };
 type Row = { key: string; projectId: string; filename: string; size: number; confirmed: number; hashing: number; state: string; error: string; upload?: Upload };
 export const uploadRows = reactive<Row[]>([]);
 const queue: Array<{ file: File; row: Row }> = [];
@@ -79,16 +79,30 @@ export function enqueueFiles(projectId: string, files: File[]) {
   }
   drain();
 }
+function completedState(upload: Upload): string {
+  if (upload.validationStatus === 'VALID') return '传输完成，媒体验证通过';
+  if (upload.validationStatus === 'INVALID') return '传输完成，媒体验证失败';
+  return '传输完成，待媒体验证';
+}
 export async function loadUploads(projectId: string) {
   let cursor: string | null = null;
   do {
     const suffix: string = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
     const page: { items: Upload[]; nextCursor: string | null } = await request(`/projects/${projectId}/uploads${suffix}`);
     for (const upload of page.items) {
-      if (uploadRows.some(row => row.upload?.uploadId === upload.uploadId)) continue;
+      const existing = uploadRows.find(row => row.upload?.uploadId === upload.uploadId);
+      if (existing) {
+        existing.upload = upload;
+        if (upload.status === 'COMPLETED') {
+          existing.confirmed = upload.reservedBytes;
+          existing.state = completedState(upload);
+          existing.error = upload.error?.message ?? '';
+        }
+        continue;
+      }
       uploadRows.push({ key: upload.uploadId, projectId, filename: upload.filename, size: upload.reservedBytes,
-        confirmed: upload.status === 'COMPLETED' ? upload.reservedBytes : 0, hashing: 0, error: '', upload,
-        state: upload.status === 'COMPLETED' ? '传输完成，待媒体验证' : '上传尚未完成' });
+        confirmed: upload.status === 'COMPLETED' ? upload.reservedBytes : 0, hashing: 0, error: upload.error?.message ?? '', upload,
+        state: upload.status === 'COMPLETED' ? completedState(upload) : '上传尚未完成' });
     }
     cursor = page.nextCursor;
   } while (cursor);

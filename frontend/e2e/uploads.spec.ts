@@ -22,11 +22,10 @@ test('browser directly uploads two videos and distinguishes transferred from med
   await page.getByLabel('选择视频', { exact: true }).setInputFiles([
     'e2e/fixtures/short-video.mp4', 'e2e/fixtures/short-video.mp4',
   ]);
-  await expect(page.getByText('传输完成，待媒体验证', { exact: true })).toHaveCount(2, { timeout: 30000 });
+  await expect(page.getByText(/^传输完成，(待媒体验证|媒体验证通过)$/)).toHaveCount(2, { timeout: 30000 });
   expect(directRequests).toHaveLength(2);
-  await expect(page.getByText('可用素材', { exact: true })).toHaveCount(0);
   await page.reload();
-  await expect(page.getByText('传输完成，待媒体验证', { exact: true })).toHaveCount(2);
+  await expect(page.getByText(/^传输完成，(待媒体验证|媒体验证通过)$/)).toHaveCount(2);
   await page.screenshot({ path: 'test-results/upload-pending.png', fullPage: true });
 });
 
@@ -47,9 +46,9 @@ test('lost create and complete responses reuse the same upload and pending asset
     } else await route.continue();
   });
   await page.getByLabel('选择视频', { exact: true }).setInputFiles('e2e/fixtures/short-video.mp4');
-  await expect(page.getByText('传输完成，待媒体验证', { exact: true })).toHaveCount(1, { timeout: 30000 });
+  await expect(page.getByText(/^传输完成，(待媒体验证|媒体验证通过)$/)).toHaveCount(1, { timeout: 30000 });
   expect(lostCreate).toBe(true);
   expect(lostComplete).toBe(true);
   await page.reload();
-  await expect(page.getByText('传输完成，待媒体验证', { exact: true })).toHaveCount(1);
+  await expect(page.getByText(/^传输完成，(待媒体验证|媒体验证通过)$/)).toHaveCount(1);
 });

@@ -52,9 +52,9 @@ public class UploadController {
         return ResponseEntity.accepted().body(envelope(uploads.complete(upload, request.writerToken())));
     }
     @GetMapping("/projects/{projectId}/assets")
-    Map<String, Object> assets(@PathVariable UUID projectId, Authentication account) {
+    Map<String, Object> assets(@PathVariable UUID projectId, @RequestParam(defaultValue="false") boolean includePending, Authentication account) {
         access.requireOwned(projectId, account);
-        return envelope(uploads.assets(projectId));
+        return envelope(uploads.assets(projectId, includePending));
     }
     public record PartUrls(@NotEmpty @Size(max=3) java.util.List<@Min(1) Integer> partNumbers, @NotNull UUID writerToken) {}
     public record Writer(@NotNull UUID writerToken) {}

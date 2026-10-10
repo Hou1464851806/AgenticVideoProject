@@ -101,7 +101,7 @@ class UploadApiIntegrationTest {
         assertEquals(503, embeddedError.statusCode());
         assertEquals("STORAGE_UNAVAILABLE", json(embeddedError).path("error").path("code").asText());
         org.junit.jupiter.api.Assertions.assertTrue(json(embeddedError).path("error").path("retryable").asBoolean());
-        assertEquals(0, json(browser.get("/projects/" + projectId + "/assets")).path("data").path("items").size());
+        assertEquals(0, json(browser.get("/projects/" + projectId + "/assets?includePending=true")).path("data").path("items").size());
         PROXY.fault.set(SiloFaultProxy.Fault.DROP_COMPLETE_RESPONSE);
         var completed = browser.post("/uploads/" + id + "/complete", input);
         assertEquals(202, completed.statusCode(), completed.body());
@@ -110,7 +110,7 @@ class UploadApiIntegrationTest {
         assertEquals(json(completed).path("data").path("assetId").asText(), json(duplicate).path("data").path("assetId").asText());
         assertEquals(json(completed).path("data").path("validationTaskId").asText(), json(duplicate).path("data").path("validationTaskId").asText());
         assertEquals("VALIDATING", json(browser.get("/uploads/" + id)).path("data").path("validationStatus").asText());
-        var assets = browser.get("/projects/" + projectId + "/assets");
+        var assets = browser.get("/projects/" + projectId + "/assets?includePending=true");
         assertEquals(200, assets.statusCode(), assets.body());
         assertEquals(1, json(assets).path("data").path("items").size());
     }
@@ -129,7 +129,7 @@ class UploadApiIntegrationTest {
         assertEquals(404, outsider.post("/uploads/" + id + "/part-urls", "{\"partNumbers\":[1],\"writerToken\":\"" + writer + "\"}").statusCode());
         assertEquals(404, outsider.post("/uploads/" + id + "/complete", "{\"writerToken\":\"" + writer + "\"}").statusCode());
         assertEquals(409, owner.post("/uploads/" + id + "/complete", "{\"writerToken\":\"" + writer + "\"}").statusCode());
-        assertEquals(0, json(owner.get("/projects/" + projectId + "/assets")).path("data").path("items").size());
+        assertEquals(0, json(owner.get("/projects/" + projectId + "/assets?includePending=true")).path("data").path("items").size());
         assertEquals("UPLOADING", json(owner.get("/uploads/" + id)).path("data").path("status").asText());
     }
 

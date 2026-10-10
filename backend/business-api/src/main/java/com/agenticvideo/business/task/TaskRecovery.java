@@ -1,0 +1,72 @@
+package com.agenticvideo.business.task;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+
+@Component
+@ConditionalOnProperty(name="tasks.dispatch-enabled",havingValue="true")
+class TaskRecovery {
+    private final JdbcTemplate database;
+    private final TransactionTemplate transactions;
+    private final ObjectMapper json;
+    private final String workerUrl,token;
+    private final HttpClient http=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2)).build();
+    TaskRecovery(JdbcTemplate database,PlatformTransactionManager manager,ObjectMapper json,
+            @Value("${worker.control-url:http://media-worker:8081}") String workerUrl,
+            @Value("${internal.worker-token:}") String token) {
+        this.database=database;transactions=new TransactionTemplate(manager);this.json=json;this.workerUrl=workerUrl;this.token=token;
+    }
+    @Scheduled(fixedDelay=2000,initialDelay=2000)
+    public void recover() {
+        var expired=database.queryForList("SELECT t.id,t.current_attempt_id FROM tasks t JOIN task_attempts a ON a.id=t.current_attempt_id WHERE t.status IN ('RUNNING','CANCEL_REQUESTED') AND a.lease_expires_at<now() ORDER BY a.lease_expires_at LIMIT 20");
+        for(var candidate:expired) {
+            UUID attempt=(UUID)candidate.get("current_attempt_id");
+            try {
+                String path=workerUrl+"/internal/v1/executions/"+attempt;
+                var reply=http.send(HttpRequest.newBuilder(URI.create(path)).timeout(Duration.ofSeconds(3)).header("Authorization","Bearer "+token).GET().build(),HttpResponse.BodyHandlers.ofString());
+                if(reply.statusCode()!=200) continue;
+                String state=json.readTree(reply.body()).path("state").asText();
+                if("RUNNING".equals(state) || "STOPPING".equals(state)) {
+                    http.send(HttpRequest.newBuilder(URI.create(path+"/stop")).timeout(Duration.ofSeconds(3)).header("Authorization","Bearer "+token).POST(HttpRequest.BodyPublishers.noBody()).build(),HttpResponse.BodyHandlers.discarding());
+                    continue;
+                }
+                if(!"NOT_FOUND".equals(state)) continue;
+                transactions.executeWithoutResult(tx -> {
+                    var rows=database.queryForList("SELECT t.*,a.attempt_number,a.lease_expires_at<now() AS expired FROM tasks t JOIN task_attempts a ON a.id=t.current_attempt_id WHERE t.id=? FOR UPDATE OF t,a",candidate.get("id"));
+                    if(rows.isEmpty()) return;
+                    var task=rows.get(0);
+                    if(!attempt.equals(task.get("current_attempt_id")) || !Boolean.TRUE.equals(task.get("expired")) || !java.util.List.of("RUNNING","CANCEL_REQUESTED").contains(task.get("status"))) return;
+                    if("CANCEL_REQUESTED".equals(task.get("status"))) {
+                        database.update("UPDATE tasks SET status='CANCELLED' WHERE id=?",task.get("id"));
+                        database.update("UPDATE task_attempts SET status='CANCELLED' WHERE id=?",attempt);
+                        return;
+                    }
+                    database.update("UPDATE task_attempts SET status='EXPIRED' WHERE id=?",attempt);
+                    if(((Number)task.get("attempt_number")).intValue()>=3) {
+                        String error="{\"code\":\"EXECUTION_RECOVERY_EXHAUSTED\",\"message\":\"媒体执行中断，恢复次数已耗尽\"}";
+                        database.update("UPDATE tasks SET status='FAILED',result_json=?::jsonb WHERE id=?",error,task.get("id"));
+                        database.update("UPDATE assets SET validation_status='INVALID',error_json=?::jsonb WHERE id=(SELECT (input_json->>'assetId')::uuid FROM tasks WHERE id=?) AND validation_status='VALIDATING'",error,task.get("id"));
+                        return;
+                    }
+                    database.update("UPDATE tasks SET status='PENDING',current_attempt_id=NULL WHERE id=?",task.get("id"));
+                    UUID event=UUID.randomUUID();
+                    database.update("INSERT INTO outbox_events (id,task_id,type,payload_json) VALUES (?,?,'MEDIA_PREPARE',jsonb_build_object('schemaVersion','1.0','eventId',?::text,'taskId',?::text,'taskType','MEDIA_PREPARE','projectId',?::text,'occurredAt',now()))",event,task.get("id"),event,task.get("id"),task.get("project_id"));
+                });
+            } catch(Exception unavailable) {
+                // An unreachable executor is not evidence that its process has exited.
+            }
+        }
+    }
+}

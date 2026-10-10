@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
 import { enqueueFiles, loadUploads, uploadRows } from './uploads';
 const props = defineProps<{ projectId: string }>();
 const error = ref('');
@@ -7,6 +7,15 @@ const rows = computed(() => uploadRows.filter(row => row.projectId === props.pro
 watch(() => props.projectId, async id => {
   try { await loadUploads(id); } catch (failure) { error.value = failure instanceof Error ? failure.message : '无法查询上传'; }
 }, { immediate: true });
+let timer: ReturnType<typeof setInterval> | undefined;
+onMounted(() => {
+  timer = setInterval(() => {
+    if (rows.value.some(row => row.upload?.status === 'COMPLETED' && (row.upload.validationStatus === 'VALIDATING' || row.upload.cleanupStatus && row.upload.cleanupStatus !== 'CLEANED'))) {
+      void loadUploads(props.projectId).catch(failure => { error.value = failure instanceof Error ? failure.message : '无法更新验证状态'; });
+    }
+  }, 1000);
+});
+onUnmounted(() => clearInterval(timer));
 function select(event: Event) {
   const input = event.target as HTMLInputElement;
   enqueueFiles(props.projectId, Array.from(input.files ?? []));
@@ -24,6 +33,8 @@ function select(event: Event) {
       <progress :value="row.confirmed" :max="row.size" :aria-label="`${row.filename} 上传进度`"></progress>
       <small>{{ Math.floor(row.confirmed / Math.max(1, row.size) * 100) }}% 已确认</small>
       <small v-if="row.state === '正在计算文件校验值'">校验 {{ Math.floor(row.hashing / Math.max(1, row.size) * 100) }}%</small>
+      <small v-if="row.upload?.cleanupStatus === 'CLEANED'">失败对象已清理</small>
+      <small v-else-if="row.upload?.cleanupStatus">失败对象正在清理，占用尚未释放</small>
       <p v-if="row.error" role="alert">{{ row.error }}</p>
     </article>
     <p v-if="rows.length === 0" class="empty">暂无素材。</p>

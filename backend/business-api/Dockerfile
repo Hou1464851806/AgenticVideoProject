@@ -9,6 +9,7 @@ FROM maven:3.9.9-eclipse-temurin-17@sha256:f58d59b6273e785ac0a4477f6e9b5ba1d7731
 WORKDIR /workspace
 COPY pom.xml ./
 COPY backend/business-api/pom.xml backend/business-api/pom.xml
+COPY backend/media-worker/pom.xml backend/media-worker/pom.xml
 COPY backend/business-api/src backend/business-api/src
 COPY --from=frontend /frontend/dist backend/business-api/src/main/resources/static
 RUN --mount=type=cache,target=/root/.m2 mvn -B -ntp -pl backend/business-api -am package -DskipTests

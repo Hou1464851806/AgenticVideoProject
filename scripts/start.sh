@@ -9,4 +9,10 @@ if ! grep -q '^STORAGE_SECRET_KEY=' .env; then
   umask 077
   printf 'STORAGE_SECRET_KEY=%s\n' "$(openssl rand -hex 32)" >> .env
 fi
+for task_config_key in RABBITMQ_PASSWORD INTERNAL_WORKER_TOKEN; do
+  if ! grep -q "^${task_config_key}=" .env; then
+    umask 077
+    printf '%s=%s\n' "$task_config_key" "$(openssl rand -hex 32)" >> .env
+  fi
+done
 docker compose up --build -d

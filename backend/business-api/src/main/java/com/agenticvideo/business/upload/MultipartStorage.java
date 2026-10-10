@@ -93,6 +93,10 @@ public class MultipartStorage {
         return presigner.presignUploadPart(b -> b.signatureDuration(Duration.ofMinutes(5))
                 .uploadPartRequest(r -> r.bucket(bucket).key(key).uploadId(uploadId).partNumber(number))).url().toString();
     }
+    public String playbackUrl(String key) {
+        return presigner.presignGetObject(b -> b.signatureDuration(Duration.ofMinutes(5))
+                .getObjectRequest(r -> r.bucket(bucket).key(key))).url().toString();
+    }
     public List<Part> parts(String key, String uploadId) {
         List<Part> parts = new ArrayList<>();
         Integer marker = null;
@@ -110,6 +114,7 @@ public class MultipartStorage {
         try { return client.headObject(b -> b.bucket(bucket).key(key)).contentLength(); }
         catch (S3Exception failure) { if (failure.statusCode() == 404) return null; throw failure; }
     }
+    public void deleteObject(String key) { client.deleteObject(b -> b.bucket(bucket).key(key)); }
     public void complete(String key, String uploadId, List<Part> parts) {
         var completed = parts.stream().map(p -> CompletedPart.builder().partNumber(p.partNumber()).eTag(p.eTag()).build()).toList();
         client.completeMultipartUpload(b -> b.bucket(bucket).key(key).uploadId(uploadId)

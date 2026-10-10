@@ -30,6 +30,45 @@ services:
       - silo_data:/data
     mem_limit: 512m
     cpus: 1
+  rabbitmq:
+    image: rabbitmq:4.3.6-management@sha256:8dd6e3570ddaa2ef82a6c3a8950e79c1f73893adfbdddbc374fc1f1ac8a0f5dd
+    platform: linux/arm64
+    environment:
+      RABBITMQ_DEFAULT_USER: agentic-worker
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Run scripts/start.sh to configure messaging}
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: '+S 2:2'
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    mem_limit: 512m
+    cpus: 1
+    healthcheck:
+      test: [CMD, rabbitmq-diagnostics, -q, ping]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  media-worker:
+    build:
+      context: .
+      dockerfile: backend/media-worker/Dockerfile
+    platform: linux/arm64
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: agentic-worker
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      INTERNAL_WORKER_TOKEN: ${INTERNAL_WORKER_TOKEN}
+      STORAGE_ENDPOINT: http://silo:9000
+      STORAGE_ACCESS_KEY: agentic-storage
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=65
+    volumes:
+      - worker_work:/work
+    depends_on:
+      business-api:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    mem_limit: 512m
+    cpus: 1
   business-api:
     build:
       context: .
@@ -41,6 +80,11 @@ services:
       DATABASE_URL: jdbc:postgresql://postgres:5432/agentic_video
       DATABASE_USER: agentic_video
       DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: agentic-worker
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      INTERNAL_WORKER_TOKEN: ${INTERNAL_WORKER_TOKEN}
+      TASKS_DISPATCH_ENABLED: 'true'
       APP_ALLOWED_ORIGIN: ${APP_ALLOWED_ORIGIN:-http://localhost:8080}
       STORAGE_ENDPOINT: http://silo:9000
       STORAGE_PUBLIC_ENDPOINT: http://localhost:9000
@@ -50,8 +94,15 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: [CMD, curl, -fsS, http://localhost:8080/api/v1/auth/csrf]
+      interval: 3s
+      timeout: 3s
+      retries: 30
     mem_limit: 768m
     cpus: 1.5
 volumes:
   postgres_data:
   silo_data:
+  rabbitmq_data:
+  worker_work:

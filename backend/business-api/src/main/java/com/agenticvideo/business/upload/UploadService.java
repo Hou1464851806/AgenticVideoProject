@@ -69,7 +69,14 @@ public class UploadService {
         if (completed.get("asset_id") != null) {
             result.put("assetId", completed.get("asset_id"));
             result.put("validationTaskId", completed.get("validation_task_id"));
-            result.put("validationStatus", database.queryForObject("SELECT validation_status FROM assets WHERE id=?", String.class, completed.get("asset_id")));
+            var asset=database.queryForMap("SELECT validation_status,error_json FROM assets WHERE id=?",completed.get("asset_id"));
+            result.put("validationStatus",asset.get("validation_status"));
+            if(asset.get("error_json")!=null) {
+                try { result.put("error",new com.fasterxml.jackson.databind.ObjectMapper().readTree(asset.get("error_json").toString())); }
+                catch(java.io.IOException invalid) { throw new IllegalStateException(invalid); }
+            }
+            var cleanup=database.queryForList("SELECT status FROM object_cleanup_jobs WHERE asset_id=?",completed.get("asset_id"));
+            if(!cleanup.isEmpty()) result.put("cleanupStatus",cleanup.get(0).get("status"));
         }
         return result;
     }
@@ -156,8 +163,8 @@ public class UploadService {
         }
         return view(find(upload.id()));
     }
-    public Object assets(UUID projectId) {
-        return Map.of("items", database.query("SELECT id,filename,validation_status FROM assets WHERE project_id=? ORDER BY id LIMIT 100", (row,index) -> Map.of("id", row.getObject("id"), "filename", row.getString("filename"), "validationStatus", row.getString("validation_status")), projectId));
+    public Object assets(UUID projectId, boolean includePending) {
+        return Map.of("items", database.query("SELECT id,filename,validation_status FROM assets WHERE project_id=? AND (validation_status='VALID' OR ?) ORDER BY id LIMIT 100", (row,index) -> Map.of("id", row.getObject("id"), "filename", row.getString("filename"), "validationStatus", row.getString("validation_status")), projectId, includePending));
     }
     public record Upload(UUID id, UUID projectId, String filename, long bytes, String sha256, String key,
             String s3UploadId, String status, UUID writerToken, int parts) {}
