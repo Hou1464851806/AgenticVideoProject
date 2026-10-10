@@ -1,6 +1,6 @@
 # Agent 视频工作区
 
-使用 Vue 3 和 Spring Boot 提供同源浏览器入口。业务数据保存在 PostgreSQL；独立 Java 媒体 Worker 通过 RabbitMQ 领取任务，使用 FFmpeg 验证视频。后续 Python Agent 服务遵循 [架构设计](docs/architecture.md)。
+使用 Vue 3 和 Spring Boot 提供同源浏览器入口。业务数据保存在 PostgreSQL；独立 Java 媒体 Worker 通过 RabbitMQ 领取任务，使用 FFmpeg 验证视频与提取音频；独立 Python Agent 服务调用百炼异步语音识别。服务划分遵循 [架构设计](docs/architecture.md)。
 
 ## 本机启动
 
@@ -16,6 +16,12 @@ PostgreSQL 使用 `postgres_data` 持久卷。`docker compose restart` 保留账
 
 上传可暂停或继续，网络失败只有限重试当前分片。刷新后在原上传条目重选原文件，增量 SHA-256 校验通过后只补传存储中缺失的分片；同名同大小的不同文件不能续接。同一上传被另一页面控制时显示冲突原因，可回到原页面继续或等待写入资格到期。
 
+## 语音证据
+
+在 `.env` 配置北京区域的 `DASHSCOPE_API_KEY`，重新启动后，新上传的有音轨视频验证通过即自动分析。播放器显示媒体、语音和索引阶段，语音就绪后可点击句段核查原素材时间；字词同时保留音频时间与原素材时间。无音轨明确显示不适用，缺少凭据显示未验证及原因。原文提要用于导航。
+
+默认原生异步模型为 `qwen3-asr-flash-filetrans`，北京接口为 `https://dashscope.aliyuncs.com/api/v1`；`DASHSCOPE_BASE_URL` 可配置完整原生 API 前缀。派生音频经官方私有临时上传传给百炼，服务保存提供方任务 ID 与用量；查询失败或执行器重启后查询原任务，提交回执丢失时标记结果不明确并停止自动重新提交。
+
 ## 开发验证
 
 安装 JDK 17、Maven 3.9.9 和 Node.js 24，保持 Docker Desktop 运行：
@@ -27,6 +33,8 @@ npm ci
 npm run build
 npm run test:e2e
 ```
+
+Compose 镜像构建完成并配置模型凭据后，在仓库根目录运行 `node scripts/test-models.mjs`，从固定视频提取测试音频并验证真实百炼句／字词响应。测试会调用付费接口，并保留测试任务标识供重复查询。完整浏览器套件也包含真实模型与网络故障验证。
 
 Java 集成测试启动独立的真实 PostgreSQL、Silo 和 RabbitMQ 容器。浏览器测试使用已安装的 Google Chrome，并要求 Compose 服务先启动；它验证登录持久性、两账号项目隔离、窄屏入口、多文件直传、响应丢失恢复、真实媒体校验及 Range 播放。恢复测试会强制中断媒体 Worker，再验证任务恢复、临时目录清理、重复通知和进程取消。如果测试进程的 PATH 中没有 Docker，可通过 `DOCKER_BIN=/usr/local/bin/docker npm run test:e2e` 指定 CLI。
 

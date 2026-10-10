@@ -106,6 +106,8 @@
 | POST /api/v1/projects/{projectId}/search | query、assetIds、sourceKinds、timeRange、literalPhrase、limit；服务端强制范围并执行混合检索 |
 | GET /api/v1/evidence/{evidenceId}/context | boundedWindowMs；原始上下文与观察帧引用，受权限与长度限制 |
 
+当前 #9 已实现 `GET /api/v1/assets/{assetId}/evidence`：只返回当前有效分析版本的 observations、units、navigation summary 和安全的 providerCalls。observations 包含句段及字词的音频时间与原素材时间；模型调用记录包含提供方任务 ID、模型、状态、实际返回用量或明确失败码。不存在权限的素材返回 404。`GET /api/v1/assets/{assetId}` 的 analysis.stages／errors 独立表示媒体、语音、检索单元与索引；无音轨为 NOT_APPLICABLE，缺凭据或提交是否接纳不明确为 UNVERIFIED，明确提供方失败为 FAILED。语音完成尚不表示语义索引就绪。
+
 深度检索由 Agent 的受控 CONTENT_REFINE 工具在预算内请求；超预算澄清，不开放任意模型参数／全素材高密度调用给浏览器。普通查询 API 也限制查询长度、返回量与频率。
 
 SearchHit 基线：assetId、retrievalUnitId、evidenceIds、sourceKind、text、observedAtMs 或 startMs／endMs、temporalPrecision、candidateWindow、contextAvailable、coverage。`candidateWindow` 不能代替观察时间；排名分数不是事实置信度，返回阶段缺口供 Agent 解释未命中。播放授权单独按需获取，不把大量临时 URL 塞入模型上下文。

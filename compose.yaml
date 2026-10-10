@@ -69,6 +69,35 @@ services:
         condition: service_healthy
     mem_limit: 512m
     cpus: 1
+  agent-service:
+    build:
+      context: .
+      dockerfile: agent-service/Dockerfile
+    platform: linux/arm64
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: agentic-worker
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      INTERNAL_WORKER_TOKEN: ${INTERNAL_WORKER_TOKEN}
+      STORAGE_ENDPOINT: http://silo:9000
+      STORAGE_ACCESS_KEY: agentic-storage
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      DASHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/api/v1}
+    volumes:
+      - agent_work:/work
+    depends_on:
+      business-api:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    mem_limit: 512m
+    cpus: 1
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8082/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
   business-api:
     build:
       context: .
@@ -107,3 +136,4 @@ volumes:
   silo_data:
   rabbitmq_data:
   worker_work:
+  agent_work:

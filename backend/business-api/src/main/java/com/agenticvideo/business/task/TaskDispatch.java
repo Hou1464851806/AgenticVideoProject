@@ -30,25 +30,27 @@ class TaskDispatch {
     @Bean Queue mediaQueue() { return new Queue("media.v1", true, false, false, java.util.Map.of("x-dead-letter-exchange", "", "x-dead-letter-routing-key", "media.dead.v1")); }
 
     @Bean Queue mediaDeadQueue() { return new Queue("media.dead.v1", true); }
+    @Bean Queue analysisQueue() { return new Queue("analysis.v1",true,false,false,java.util.Map.of("x-dead-letter-exchange","","x-dead-letter-routing-key","analysis.dead.v1")); }
+    @Bean Queue analysisDeadQueue() { return new Queue("analysis.dead.v1",true); }
 
     @Scheduled(fixedDelayString="${tasks.dispatch-interval-ms:1000}", initialDelay=500)
     public void publish() {
         // RabbitMQ is a wake-up channel; a successful publish does not prove a task was claimed.
         database.update("""
                 UPDATE outbox_events e SET status='PENDING',available_at=now(),published_at=NULL
-                FROM tasks t WHERE e.task_id=t.id AND t.status='PENDING' AND e.type='MEDIA_PREPARE'
+                FROM tasks t WHERE e.task_id=t.id AND t.status='PENDING' AND e.type IN ('MEDIA_PREPARE','CONTENT_ANALYZE')
                 AND e.status='PUBLISHED' AND e.published_at < now()-make_interval(secs => ?)
                 """, pendingRenotifySeconds);
         UUID claim = UUID.randomUUID();
         var events = database.queryForList("""
                 WITH candidates AS (
                     SELECT id FROM outbox_events
-                    WHERE type='MEDIA_PREPARE' AND available_at<=now()
+                    WHERE type IN ('MEDIA_PREPARE','CONTENT_ANALYZE') AND available_at<=now()
                     AND (status='PENDING' OR status='PUBLISHING' AND lease_expires_at<now())
                     ORDER BY available_at FOR UPDATE SKIP LOCKED LIMIT 10
                 )
                 UPDATE outbox_events e SET status='PUBLISHING',publisher_claim_id=?,lease_expires_at=now()+interval '60 seconds'
-                FROM candidates c WHERE e.id=c.id RETURNING e.id,e.payload_json
+                FROM candidates c WHERE e.id=c.id RETURNING e.id,e.type,e.payload_json
                 """, claim);
         for (var event : events) {
             try {
@@ -58,7 +60,7 @@ class TaskDispatch {
                 properties.setMessageId(event.get("id").toString());
                 Message message = new Message(event.get("payload_json").toString().getBytes(StandardCharsets.UTF_8), properties);
                 broker.invoke(channel -> {
-                    channel.send("", "media.v1", message);
+                    channel.send("", "CONTENT_ANALYZE".equals(event.get("type"))?"analysis.v1":"media.v1", message);
                     channel.waitForConfirmsOrDie(5000);
                     return null;
                 });

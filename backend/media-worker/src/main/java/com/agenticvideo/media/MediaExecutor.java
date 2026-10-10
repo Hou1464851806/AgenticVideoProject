@@ -79,8 +79,17 @@ public class MediaExecutor {
                 }
             }
             var result=inspection.inspect(source,execution.input.path("sizeBytes").asLong(),execution.input.path("sha256").asText(),execution::stopped);
+            var published=new java.util.LinkedHashMap<String,Object>(result);
+            @SuppressWarnings("unchecked") var mapping=(Map<String,Object>)result.get("timeMapping");
+            if(Boolean.TRUE.equals(mapping.get("hasAudio"))) {
+                var audio=new java.util.LinkedHashMap<String,Object>(inspection.prepareAudio(source,mapping,execution::stopped));
+                String key="derived/audio/"+execution.input.path("assetId").asText()+"/"+execution.attemptId+".wav";
+                if(execution.stopped()) throw new InterruptedException("Execution stopped");
+                storage.putObject(b -> b.bucket(bucket).key(key).contentType("audio/wav"),software.amazon.awssdk.core.sync.RequestBody.fromFile(directory.resolve("audio.wav")));
+                audio.put("objectKey",key);published.put("derivedAudio",audio);
+            }
             if(execution.stopped()) throw new InterruptedException("Execution stopped");
-            report(execution,"complete",Map.of("attemptId",execution.attemptId,"leaseToken",execution.token,"producerKey","media-prepared","resultType","MEDIA_PREPARED","result",result));
+            report(execution,"complete",Map.of("attemptId",execution.attemptId,"leaseToken",execution.token,"producerKey","media-prepared","resultType","MEDIA_PREPARED","result",published));
         } catch(InterruptedException stopped) {
             // Inspection has waited for the local process to exit. Report after cleanup below.
         } catch(Exception failed) {

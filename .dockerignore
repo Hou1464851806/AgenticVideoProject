@@ -6,3 +6,5 @@
 .env
 **/test-results
 **/playwright-report
+**/.venv
+**/__pycache__

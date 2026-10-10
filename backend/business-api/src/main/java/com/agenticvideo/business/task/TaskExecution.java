@@ -22,9 +22,10 @@ public class TaskExecution {
     private final TransactionTemplate transactions;
     private final ObjectMapper json;
     private final String secret;
+    private final com.agenticvideo.business.analysis.SpeechAnalysis speech;
     TaskExecution(JdbcTemplate database, PlatformTransactionManager manager, ObjectMapper json,
-            @Value("${internal.worker-token:}") String secret) {
-        this.database = database; this.transactions = new TransactionTemplate(manager); this.json = json; this.secret = secret;
+            @Value("${internal.worker-token:}") String secret, com.agenticvideo.business.analysis.SpeechAnalysis speech) {
+        this.database = database; this.transactions = new TransactionTemplate(manager); this.json = json; this.secret = secret;this.speech=speech;
     }
     public Map<String, Object> read(UUID id) {
         var tasks = database.queryForList("SELECT * FROM tasks WHERE id=?", id);
@@ -37,7 +38,7 @@ public class TaskExecution {
             var rows = database.queryForList("SELECT * FROM tasks WHERE id=? FOR UPDATE", id);
             if (rows.isEmpty()) throw new ResponseStatusException(NOT_FOUND, "任务不存在");
             var task = rows.get(0);
-            if (!"MEDIA_PREPARE".equals(task.get("type"))) throw new ResponseStatusException(CONFLICT, "执行器不能领取此任务类型");
+            if (!java.util.List.of("MEDIA_PREPARE","CONTENT_ANALYZE").contains(task.get("type"))) throw new ResponseStatusException(CONFLICT, "执行器不能领取此任务类型");
             if ("RUNNING".equals(task.get("status"))) {
                 var attempt = database.queryForMap("SELECT *, lease_expires_at>now() AS valid FROM task_attempts WHERE id=?", task.get("current_attempt_id"));
                 if (request.executorId().equals(attempt.get("executor_id")) && request.claimRequestId().equals(attempt.get("claim_request_id")) && Boolean.TRUE.equals(attempt.get("valid")))
@@ -49,6 +50,7 @@ public class TaskExecution {
             int number = database.queryForObject("SELECT coalesce(max(attempt_number),0)+1 FROM task_attempts WHERE task_id=?", Integer.class, id);
             database.update("INSERT INTO task_attempts (id,task_id,attempt_number,executor_id,claim_request_id,lease_token_hash,lease_expires_at) VALUES (?,?,?,?,?,?,now()+interval '60 seconds')", attemptId, id, number, request.executorId(), request.claimRequestId(), hash(token(attemptId)));
             database.update("UPDATE tasks SET status='RUNNING',current_attempt_id=? WHERE id=?", attemptId, id);
+            if("CONTENT_ANALYZE".equals(task.get("type"))) database.update("UPDATE analysis_stages SET status='RUNNING',error_json=NULL,updated_at=now() WHERE task_id=? AND stage_key='ASR'",id);
             task.put("status", "RUNNING");
             return claimed(task, database.queryForMap("SELECT * FROM task_attempts WHERE id=?", attemptId));
         });
@@ -100,7 +102,8 @@ public class TaskExecution {
     public Object complete(UUID id, TaskController.Completed request) {
         return transactions.execute(tx -> {
             var task = locked(id);
-            if (!"MEDIA_PREPARED".equals(request.resultType()) || !"MEDIA_PREPARE".equals(task.get("type")))
+            if (!("MEDIA_PREPARED".equals(request.resultType()) && "MEDIA_PREPARE".equals(task.get("type")))
+                    && !("SPEECH_ANALYZED".equals(request.resultType()) && "CONTENT_ANALYZE".equals(task.get("type"))))
                 throw new ResponseStatusException(CONFLICT, "任务结果类型不匹配");
             String result = request.result().toString();
             var previous = database.queryForList("SELECT *,payload_json=?::jsonb AS same_payload FROM execution_reports WHERE task_id=? AND attempt_id=? AND report_kind='COMPLETE' AND producer_key=?", result, id, request.attemptId(), request.producerKey());
@@ -117,6 +120,14 @@ public class TaskExecution {
             try { input = json.readTree(task.get("input_json").toString()); }
             catch (java.io.IOException invalid) { throw new IllegalStateException(invalid); }
             UUID assetId = UUID.fromString(input.path("assetId").asText());
+            if("CONTENT_ANALYZE".equals(task.get("type"))) {
+                speech.publish(task,input,request.result());
+                database.update("UPDATE tasks SET status='SUCCEEDED',result_json=?::jsonb WHERE id=?",result,id);
+                database.update("UPDATE task_attempts SET status='SUCCEEDED' WHERE id=?",request.attemptId());
+                String outcome="{\"status\":\"SUCCEEDED\",\"assetId\":\""+assetId+"\"}";
+                database.update("INSERT INTO execution_reports (task_id,attempt_id,report_kind,producer_key,payload_json,outcome_json) VALUES (?,?,'COMPLETE',?,?::jsonb,?::jsonb)",id,request.attemptId(),request.producerKey(),result,outcome);
+                return Map.of("status","SUCCEEDED","assetId",assetId);
+            }
             long duration = request.result().path("durationMs").asLong();
             if (request.result().path("byteSize").asLong(-1) != input.path("sizeBytes").asLong()
                     || !request.result().path("sha256").asText().equalsIgnoreCase(input.path("sha256").asText())
@@ -125,6 +136,7 @@ public class TaskExecution {
             int published = database.update("UPDATE assets SET validation_status='VALID',duration_ms=?,media_info_json=?::jsonb,time_mapping_json=?::jsonb,row_version=row_version+1 WHERE id=? AND validation_status='VALIDATING'",
                     duration, request.result().path("mediaInfo").toString(), request.result().path("timeMapping").toString(), assetId);
             if (published != 1) throw new ResponseStatusException(CONFLICT, "素材已失去发布资格");
+            speech.initialize(assetId,(UUID)task.get("project_id"),request.result());
             database.update("UPDATE tasks SET status='SUCCEEDED',result_json=?::jsonb WHERE id=?", result, id);
             database.update("UPDATE task_attempts SET status='SUCCEEDED' WHERE id=?", request.attemptId());
             String outcome = "{\"status\":\"SUCCEEDED\",\"assetId\":\"" + assetId + "\"}";
@@ -135,7 +147,7 @@ public class TaskExecution {
     public Object fail(UUID id,TaskController.Failed request) {
         return transactions.execute(tx -> {
             var task=locked(id);
-            if(!"MEDIA_PREPARE".equals(task.get("type"))) throw new ResponseStatusException(CONFLICT,"任务结果类型不匹配");
+            if(!java.util.List.of("MEDIA_PREPARE","CONTENT_ANALYZE").contains(task.get("type"))) throw new ResponseStatusException(CONFLICT,"任务结果类型不匹配");
             String payload;
             try { payload=json.writeValueAsString(Map.of("code",request.code(),"message",request.message())); }
             catch(java.io.IOException invalid) { throw new IllegalStateException(invalid); }
@@ -149,6 +161,24 @@ public class TaskExecution {
             }
             var attempt=requireAttempt(task,request.attemptId(),request.leaseToken(),true);
             if(!"RUNNING".equals(task.get("status"))) throw new ResponseStatusException(CONFLICT,"任务已失去回报资格");
+            if("CONTENT_ANALYZE".equals(task.get("type"))) {
+                com.fasterxml.jackson.databind.JsonNode input;
+                try { input=json.readTree(task.get("input_json").toString()); }
+                catch(java.io.IOException invalid) { throw new IllegalStateException(invalid); }
+                database.update("UPDATE task_attempts SET status='FAILED' WHERE id=?",request.attemptId());
+                boolean retry="ANALYSIS_EXECUTION_FAILED".equals(request.code()) && ((Number)attempt.get("attempt_number")).intValue()<3;
+                String next=retry?"PENDING":"FAILED";
+                database.update("UPDATE tasks SET status=?,current_attempt_id=CASE WHEN ? THEN NULL ELSE current_attempt_id END,result_json=?::jsonb WHERE id=?",next,retry,payload,id);
+                database.update("UPDATE analysis_stages SET status=?,error_json=?::jsonb,updated_at=now() WHERE analysis_id=? AND stage_key='ASR'",
+                        retry?"PENDING":"ASR_UNVERIFIED".equals(request.code())?"UNVERIFIED":"FAILED",payload,UUID.fromString(input.path("analysisId").asText()));
+                if(retry) {
+                    UUID event=UUID.randomUUID();
+                    database.update("INSERT INTO outbox_events (id,task_id,type,payload_json,available_at) VALUES (?,?,'CONTENT_ANALYZE',jsonb_build_object('schemaVersion','1.0','eventId',?::text,'taskId',?::text,'taskType','CONTENT_ANALYZE','projectId',?::text,'occurredAt',now()),now()+interval '5 seconds')",event,id,event,id,task.get("project_id"));
+                }
+                String outcome="{\"status\":\""+next+"\"}";
+                database.update("INSERT INTO execution_reports (task_id,attempt_id,report_kind,producer_key,payload_json,outcome_json) VALUES (?,?,'FAIL',?,?::jsonb,?::jsonb)",id,request.attemptId(),request.producerKey(),payload,outcome);
+                return Map.of("status",next);
+            }
             database.update("UPDATE task_attempts SET status='FAILED' WHERE id=?",request.attemptId());
             boolean transientFailure="MEDIA_EXECUTION_FAILED".equals(request.code());
             if(transientFailure && ((Number)attempt.get("attempt_number")).intValue()<3) {
@@ -178,6 +208,15 @@ public class TaskExecution {
                     "leaseToken", token(id), "leaseExpiresAt", ((java.sql.Timestamp) attempt.get("lease_expires_at")).toInstant().toString(),
                     "input", json.readTree(task.get("input_json").toString()));
         } catch (java.io.IOException invalid) { throw new IllegalStateException("Invalid persisted task input", invalid); }
+    }
+    public Object provider(UUID id,TaskController.ProviderCall request) {
+        return transactions.execute(tx -> {
+            var task=locked(id);
+            requireAttempt(task,request.attemptId(),request.leaseToken(),true);
+            if(!"CONTENT_ANALYZE".equals(task.get("type")) || !"RUNNING".equals(task.get("status"))) throw new ResponseStatusException(CONFLICT,"当前任务没有模型调用资格");
+            try { return speech.provider(id,request.attemptId(),json.readTree(task.get("input_json").toString()),request.action(),request.data()); }
+            catch(java.io.IOException invalid) { throw new IllegalStateException(invalid); }
+        });
     }
     private String token(UUID attemptId) {
         try {

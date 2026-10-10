@@ -13,7 +13,7 @@
 | [#6](https://github.com/Hou1464851806/AgenticVideoProject/issues/6) [T05] 断网、暂停与刷新后继续原上传 | P0 | #4 | 实现与验证完成，见 [记录](verification/issue-6.md) |
 | [#7](https://github.com/Hou1464851806/AgenticVideoProject/issues/7) [T06] 取消或过期上传并查看残留清理 | P1 | #4 | 待实施 |
 | [#8](https://github.com/Hou1464851806/AgenticVideoProject/issues/8) [T07] 超限或空间不足时阻止上传并解释原因 | P1 | #4 | 待实施 |
-| [#9](https://github.com/Hou1464851806/AgenticVideoProject/issues/9) [T08] 上传后自动生成可定位的语音证据 | P0 | #5 | 待实施 |
+| [#9](https://github.com/Hou1464851806/AgenticVideoProject/issues/9) [T08] 上传后自动生成可定位的语音证据 | P0 | #5 | 实现与验证完成，见 [记录](verification/issue-9.md) |
 | [#10](https://github.com/Hou1464851806/AgenticVideoProject/issues/10) [T09] 查找人名、数字和原句并跳转核查 | P0 | #9 | 待实施 |
 | [#11](https://github.com/Hou1464851806/AgenticVideoProject/issues/11) [T10] 用主题和近义表达检索视频内容 | P1 | #10 | 待实施 |
 | [#12](https://github.com/Hou1464851806/AgenticVideoProject/issues/12) [T11] 查询画面与可见文字并核查观察时刻 | P1 | #11 | 待实施 |

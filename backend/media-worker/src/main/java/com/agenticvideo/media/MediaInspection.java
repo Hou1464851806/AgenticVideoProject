@@ -67,6 +67,19 @@ public class MediaInspection {
         try { return new BigDecimal(text).multiply(BigDecimal.valueOf(1000)).setScale(0, RoundingMode.HALF_UP).longValueExact(); }
         catch (ArithmeticException | NumberFormatException invalid) { throw new InvalidMedia("INVALID_TIMELINE", "媒体时间信息无效"); }
     }
+    public Map<String,Object> prepareAudio(Path source,Map<String,Object> mapping,BooleanSupplier stopped) throws Exception {
+        Path audio=source.getParent().resolve("audio.wav");
+        run(List.of("ffmpeg","-nostdin","-v","error","-threads","1","-i",source.toAbsolutePath().toString(),
+                "-map","0:a:0","-vn","-af","asetpts=PTS-STARTPTS,aresample=async=1:first_pts=0","-ar","16000","-ac","1","-c:a","pcm_s16le","-y",audio.toString()),source.getParent(),600,stopped);
+        MessageDigest digest=MessageDigest.getInstance("SHA-256");
+        try(var input=Files.newInputStream(audio)) {
+            byte[] buffer=new byte[32768];int count;
+            while((count=input.read(buffer))!=-1) { if(stopped.getAsBoolean()) throw new InterruptedException("Execution stopped");digest.update(buffer,0,count); }
+        }
+        long offset=((Number)mapping.get("audioStartMs")).longValue()-((Number)mapping.get("formatStartMs")).longValue();
+        return Map.of("sizeBytes",Files.size(audio),"sha256",HexFormat.of().formatHex(digest.digest()),"sourceOffsetMs",offset,
+                "sampleRate",16000,"channels",1,"format","wav","rule","mono-16k-pcm-pts-v1");
+    }
     private String run(List<String> command, Path directory, int timeoutSeconds, BooleanSupplier stopped) throws IOException, InterruptedException {
         Path output = Files.createTempFile(directory, "probe-", ".log");
         Process process = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(output.toFile()).start();

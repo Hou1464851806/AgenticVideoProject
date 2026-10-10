@@ -62,6 +62,7 @@ test('independent media worker validates an uploaded video before authenticated 
   const csrf = (await (await outsiderPage.request.get('/api/v1/auth/csrf')).json()).data.csrfToken;
   const denied = await outsiderPage.request.post(`/api/v1/assets/${access.assetId}/playback-access`, { headers: { 'X-XSRF-TOKEN': csrf }, data: {} });
   expect(denied.status()).toBe(404);
+  expect((await outsiderPage.request.get(`/api/v1/assets/${access.assetId}/evidence`)).status()).toBe(404);
   await outsider.close();
 });
 

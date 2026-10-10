@@ -45,6 +45,9 @@ class TaskController {
         return org.springframework.http.ResponseEntity.accepted().body(envelope(tasks.cancel(id)));
     }
     public record Execution(@NotNull UUID attemptId, @NotBlank String leaseToken) {}
+    @PostMapping("/internal/v1/tasks/{id}/provider-call")
+    Map<String,Object> provider(@PathVariable UUID id,@Valid @RequestBody ProviderCall request) { return envelope(tasks.provider(id,request)); }
+    public record ProviderCall(@NotNull UUID attemptId,@NotBlank String leaseToken,@NotBlank String action,@NotNull com.fasterxml.jackson.databind.JsonNode data) {}
     public record Stopped(@NotNull UUID attemptId, @NotBlank String leaseToken, boolean processExited) {}
     @GetMapping("/api/v1/tasks/{id}")
     Map<String, Object> get(@PathVariable UUID id, Authentication account) {

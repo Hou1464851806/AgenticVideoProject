@@ -1,0 +1,9 @@
+{
+  "source": "macOS Eddy zh_CN generated speech; known script, not a natural human recording",
+  "script": "大家好，我叫张明。今天介绍三个视频制作步骤。第一步，上传素材。第二步，核查原文。第三步，导出短视频。",
+  "videoStartMs": 0,
+  "audioStartMs": 1436,
+  "audioTimeBase": "1/16000",
+  "videoTimeBase": "1/12800",
+  "note": "ASR accuracy and clipping must be checked against natural speech separately; this fixture verifies transfer, known words and offset."
+}
