@@ -232,3 +232,10 @@ complete 结果类型为 MEDIA_PREPARED、ANALYSIS_RESULT、INDEX_VERIFIED、AGE
 ## 模型调用记录大小
 
 内部 provider-call 的 data.request／data.response 按紧凑 JSON 的 UTF-8 字节计数，默认上限分别为 16777216／4194304，可通过 MODEL_RECORD_REQUEST_MAX_BYTES／MODEL_RECORD_RESPONSE_MAX_BYTES 覆盖。等于上限允许；超限返回 413、MODEL_RECORD_TOO_LARGE、retryable=false，details 为 recordKind、actualBytes、limitBytes。它是解析后记录字段限制，不是 Token 预算或 HTTP 全请求限制。公开 messages 的 latestTask.failure 仅在该类失败时提供 code/message；其他失败仍使用原有公开提示。
+## 上传取消与过期（#7）
+
+`POST /api/v1/uploads/{id}/cancel` 使用项目所有者身份和 CSRF，重复取消返回当前终态；已完成上传返回 409。取消与完成发布串行核对当前状态／操作 token，取消后拒绝续传、签发、登记及完成；旧初始化回执和创建重放不复活终态。
+
+上传查询新增 `declaredBytes`（原文件大小）、`reservedBytes`（当前字节预留）、`reservedSlots`（素材名额）与 `cleanupStatus`。`CANCELLED`／`EXPIRED` 时名额立即释放，字节在实际清理核对后释放；`PENDING` 与 `CLEANED` 分别表示尚未核实清理和已核实无残留。清理完成后仍持续复核迟到存储事实，发现残留会恢复预留及 PENDING。每次清理仅作用于该撤销会话的服务端对象键，真实 Abort multipart／删除未发布对象，操作在数据库事务之外执行，并以持久 lease 核对结果。
+
+`upload.inactivity-seconds` 默认 86400，最后合法活动续期；读取及被拒绝操作不续期。活动完成 lease 保护正在合法完成的会话。`upload.cleanup-settle-seconds` 默认 30，初次释放等待全部已签发 URL／控制操作期限加排空窗口；持续复核弥补更晚完成的存储请求。`upload.cleanup-interval-ms` 默认 10000。Compose 对应 `UPLOAD_INACTIVITY_SECONDS`、`UPLOAD_CLEANUP_SETTLE_SECONDS`、`UPLOAD_CLEANUP_INTERVAL_MS`。

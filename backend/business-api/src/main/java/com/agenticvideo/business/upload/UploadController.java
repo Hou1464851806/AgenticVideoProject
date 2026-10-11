@@ -14,7 +14,15 @@ import org.springframework.web.bind.annotation.*;
 public class UploadController {
     private final ProjectAccess access;
     private final UploadService uploads;
-    public UploadController(ProjectAccess access, UploadService uploads) { this.access = access; this.uploads = uploads; }
+    private final UploadCleanup cleanup;
+    public UploadController(ProjectAccess access, UploadService uploads,UploadCleanup cleanup) { this.access = access; this.uploads = uploads;this.cleanup=cleanup; }
+
+    @PostMapping("/uploads/{id}/cancel")
+    Map<String,Object> cancel(@PathVariable UUID id,Authentication account) {
+        var upload=uploads.find(id);access.requireOwned(upload.projectId(),account);
+        cleanup.cancel(id);
+        return envelope(uploads.view(uploads.find(id)));
+    }
 
     @PostMapping("/projects/{projectId}/uploads")
     ResponseEntity<?> create(@PathVariable UUID projectId, @Valid @RequestBody CreateUpload request, Authentication account) {

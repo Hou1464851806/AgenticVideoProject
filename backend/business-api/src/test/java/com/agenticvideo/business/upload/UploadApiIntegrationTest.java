@@ -19,12 +19,14 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @Testcontainers
+@org.springframework.test.annotation.DirtiesContext(classMode=org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class UploadApiIntegrationTest {
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:18.6-bookworm");
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry properties) {
+        properties.add("app.auth.max-attempts", () -> 200);
         properties.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         properties.add("spring.datasource.username", POSTGRES::getUsername);
         properties.add("spring.datasource.password", POSTGRES::getPassword);
@@ -44,6 +46,8 @@ class UploadApiIntegrationTest {
         properties.add("storage.endpoint", PROXY::endpoint);
         properties.add("storage.public-endpoint", () -> "http://" + SILO.getHost() + ":" + SILO.getMappedPort(9000));
         properties.add("storage.list-page-size", () -> 1);
+        properties.add("upload.cleanup-settle-seconds", () -> 1);
+        properties.add("upload.cleanup-interval-ms", () -> 100);
         properties.add("storage.part-url-seconds", () -> 3);
         properties.add("storage.access-key", () -> "integration-user");
         properties.add("storage.secret-key", () -> "integration-password-strong");
@@ -210,6 +214,197 @@ class UploadApiIntegrationTest {
         var completed = browser.post("/uploads/" + id + "/complete", "{\"writerToken\":\"" + writer + "\"}");
         assertEquals(202, completed.statusCode(), completed.body());
         assertEquals(2, PROXY.partPages.get(), "Both pages of actual Silo parts must be read");
+    }
+
+    @Test
+    void cancellationRevokesWritingAndReclaimsRealMultipartWithoutPublishingAnAsset() throws Exception {
+        BrowserApi owner = signedIn("upload-cancel-owner");
+        BrowserApi outsider = signedIn("upload-cancel-outsider");
+        String project = json(owner.post("/projects", "{\"name\":\"取消上传\"}")).path("data").path("id").asText();
+        var created = json(owner.post("/projects/"+project+"/uploads", new ObjectMapper().writeValueAsString(java.util.Map.of(
+                "filename", "cancel.mp4", "sizeBytes", 19, "sha256", "d".repeat(64), "idempotencyKey", "cancel-one", "writerId", owner.writerId)))).path("data");
+        String id=created.path("uploadId").asText();
+        String writer=created.path("writerToken").asText();
+        String credential=new ObjectMapper().writeValueAsString(java.util.Map.of("writerToken",writer));
+        var urls=json(owner.post("/uploads/"+id+"/part-urls", "{\"partNumbers\":[1],\"writerToken\":\""+writer+"\"}")).path("data");
+        var put=HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create(urls.path("parts").get(0).path("url").asText()))
+                .PUT(HttpRequest.BodyPublishers.ofByteArray(new byte[19])).build(),HttpResponse.BodyHandlers.ofString());
+        assertEquals(200,put.statusCode());
+        assertEquals(404,outsider.post("/uploads/"+id+"/cancel","{}").statusCode());
+        var cancelled=owner.post("/uploads/"+id+"/cancel","{}");
+        assertEquals(200,cancelled.statusCode(),cancelled.body());
+        assertEquals("CANCELLED",json(cancelled).path("data").path("status").asText());
+        assertEquals(0,json(cancelled).path("data").path("reservedSlots").asInt());
+        assertEquals(409,owner.post("/uploads/"+id+"/complete",credential).statusCode());
+        assertEquals(409,owner.post("/uploads/"+id+"/part-urls","{\"partNumbers\":[1],\"writerToken\":\""+writer+"\"}").statusCode());
+        assertEquals(200,owner.post("/uploads/"+id+"/cancel","{}").statusCode());
+        Thread.sleep(1500);
+        assertEquals("PENDING",json(owner.get("/uploads/"+id)).path("data").path("cleanupStatus").asText(),
+                "Cleanup cannot release bytes while an already issued signed URL remains valid");
+        long deadline=System.nanoTime()+java.time.Duration.ofSeconds(20).toNanos();
+        JsonNode state;
+        do {state=json(owner.get("/uploads/"+id)).path("data");if("CLEANED".equals(state.path("cleanupStatus").asText()))break;Thread.sleep(100);}while(System.nanoTime()<deadline);
+        assertEquals("CLEANED",state.path("cleanupStatus").asText(),state.toString());
+        assertEquals(0,state.path("reservedBytes").asLong());
+        try(var silo=software.amazon.awssdk.services.s3.S3Client.builder().endpointOverride(URI.create("http://localhost:"+SILO.getMappedPort(9000)))
+                .region(software.amazon.awssdk.regions.Region.US_EAST_1).forcePathStyle(true)
+                .credentialsProvider(software.amazon.awssdk.auth.credentials.StaticCredentialsProvider.create(software.amazon.awssdk.auth.credentials.AwsBasicCredentials.create("integration-user","integration-password-strong"))).build()) {
+            assertEquals(0,silo.listMultipartUploads(b->b.bucket("originals").prefix("originals/"+id)).uploads().size());
+            assertEquals(0,silo.listObjectsV2(b->b.bucket("originals").prefix("originals/"+id)).contents().size());
+        }
+        assertEquals(0,json(owner.get("/projects/"+project+"/assets?includePending=true")).path("data").path("items").size());
+    }
+
+    @Test
+    void cancellationFencesAnInFlightPartReportAfterStorageHasReturnedItsFacts() throws Exception {
+        var owner=signedIn("part-report-cancel-owner");
+        String project=json(owner.post("/projects","{\"name\":\"登记竞争\"}")).path("data").path("id").asText();
+        var created=json(owner.post("/projects/"+project+"/uploads",new ObjectMapper().writeValueAsString(java.util.Map.of(
+                "filename","race.mp4","sizeBytes",19,"sha256","f".repeat(64),"idempotencyKey","report-race","writerId",owner.writerId)))).path("data");
+        String id=created.path("uploadId").asText(),writer=created.path("writerToken").asText();
+        var parts=json(owner.post("/uploads/"+id+"/part-urls","{\"partNumbers\":[1],\"writerToken\":\""+writer+"\"}")).path("data").path("parts");
+        var put=HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create(parts.get(0).path("url").asText())).PUT(HttpRequest.BodyPublishers.ofByteArray(new byte[19])).build(),HttpResponse.BodyHandlers.ofString());
+        assertEquals(200,put.statusCode());
+        String token=json(owner.get("/auth/csrf")).path("data").path("csrfToken").asText();
+        String report=new ObjectMapper().writeValueAsString(java.util.Map.of("writerToken",writer,"etag",put.headers().firstValue("ETag").orElseThrow(),"sizeBytes",19));
+        PROXY.blocked=new java.util.concurrent.CountDownLatch(1);PROXY.release=new java.util.concurrent.CountDownLatch(1);PROXY.fault.set(SiloFaultProxy.Fault.BLOCK_PARTS_RESPONSE);
+        try {
+            var inFlight=owner.client.sendAsync(HttpRequest.newBuilder(URI.create("http://localhost:"+port+"/api/v1/uploads/"+id+"/parts/1")).header("Content-Type","application/json").header("X-XSRF-TOKEN",token).PUT(HttpRequest.BodyPublishers.ofString(report)).build(),HttpResponse.BodyHandlers.ofString());
+            org.junit.jupiter.api.Assertions.assertTrue(PROXY.blocked.await(3,java.util.concurrent.TimeUnit.SECONDS));
+            assertEquals(200,owner.post("/uploads/"+id+"/cancel","{}").statusCode());
+            PROXY.fault.set(SiloFaultProxy.Fault.NONE);PROXY.release.countDown();
+            assertEquals(409,inFlight.get(5,java.util.concurrent.TimeUnit.SECONDS).statusCode(),"Cancelled uploads must reject a stale storage part report");
+            assertEquals("CANCELLED",json(owner.get("/uploads/"+id)).path("data").path("status").asText());
+        }finally{PROXY.fault.set(SiloFaultProxy.Fault.NONE);PROXY.release.countDown();}
+    }
+
+    @Test
+    void abortFailureRetainsBytesAndReconcilesALateRealPutBeforeReleasingCapacity() throws Exception {
+        var owner=signedIn("abort-failure-owner");var upload=uploadedPart(owner,"abort-failure");
+        String id=upload.path("uploadId").asText();
+        PROXY.abortAttempts.set(0);PROXY.fault.set(SiloFaultProxy.Fault.ABORT_UNAVAILABLE);
+        try {
+            var cancelled=json(owner.post("/uploads/"+id+"/cancel","{}")).path("data");
+            assertEquals("CANCELLED",cancelled.path("status").asText());
+            long until=System.nanoTime()+java.time.Duration.ofSeconds(2).toNanos();
+            while(PROXY.abortAttempts.get()==0&&System.nanoTime()<until)Thread.sleep(25);
+            org.junit.jupiter.api.Assertions.assertTrue(PROXY.abortAttempts.get()>0);
+            var late=HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create(upload.path("url").asText())).PUT(HttpRequest.BodyPublishers.ofByteArray(new byte[19])).build(),HttpResponse.BodyHandlers.ofString());
+            assertEquals(200,late.statusCode(),"The actual still-valid URL must create the late part during the injected abort failure");
+            var state=json(owner.get("/uploads/"+id)).path("data");
+            assertEquals("PENDING",state.path("cleanupStatus").asText());assertEquals(19,state.path("reservedBytes").asLong());assertEquals(0,state.path("reservedSlots").asInt());
+        }finally{PROXY.fault.set(SiloFaultProxy.Fault.NONE);}
+        awaitClean(owner,id,20);
+    }
+
+    @Test
+    void cancellationWinsAgainstAnActuallyCompletedObjectBeforeAssetPublication() throws Exception {
+        var owner=signedIn("complete-cancel-owner");var upload=uploadedPart(owner,"complete-cancel");
+        String id=upload.path("uploadId").asText();
+        String csrf=json(owner.get("/auth/csrf")).path("data").path("csrfToken").asText();
+        String body=new ObjectMapper().writeValueAsString(java.util.Map.of("writerToken",upload.path("writerToken").asText()));
+        PROXY.blocked=new java.util.concurrent.CountDownLatch(1);PROXY.release=new java.util.concurrent.CountDownLatch(1);PROXY.fault.set(SiloFaultProxy.Fault.BLOCK_COMPLETE_RESPONSE);
+        try {
+            var completion=owner.client.sendAsync(HttpRequest.newBuilder(URI.create("http://localhost:"+port+"/api/v1/uploads/"+id+"/complete")).header("Content-Type","application/json").header("X-XSRF-TOKEN",csrf).POST(HttpRequest.BodyPublishers.ofString(body)).build(),HttpResponse.BodyHandlers.ofString());
+            org.junit.jupiter.api.Assertions.assertTrue(PROXY.blocked.await(3,java.util.concurrent.TimeUnit.SECONDS));
+            assertEquals(200,owner.post("/uploads/"+id+"/cancel","{}").statusCode());
+            PROXY.fault.set(SiloFaultProxy.Fault.NONE);PROXY.release.countDown();
+            int status=completion.get(10,java.util.concurrent.TimeUnit.SECONDS).statusCode();
+            org.junit.jupiter.api.Assertions.assertTrue(status==409||status==503,"A revoked completion cannot publish an asset");
+            assertEquals("CANCELLED",json(owner.get("/uploads/"+id)).path("data").path("status").asText());
+            assertEquals(0,json(owner.get("/projects/"+upload.path("projectId").asText()+"/assets?includePending=true")).path("data").path("items").size());
+        }finally{PROXY.fault.set(SiloFaultProxy.Fault.NONE);PROXY.release.countDown();}
+        awaitClean(owner,id,40);
+    }
+
+    @Test
+    void replayingCreationCannotReviveCancellationDuringActualMultipartInitialization() throws Exception {
+        var owner=signedIn("initialization-cancel-owner");
+        String project=json(owner.post("/projects","{\"name\":\"初始化竞争\"}")).path("data").path("id").asText();
+        String csrf=json(owner.get("/auth/csrf")).path("data").path("csrfToken").asText();
+        String body=new ObjectMapper().writeValueAsString(java.util.Map.of("filename","initialize.mp4","sizeBytes",19,"sha256","f".repeat(64),"idempotencyKey","initialize-cancel","writerId",owner.writerId));
+        PROXY.blocked=new java.util.concurrent.CountDownLatch(1);PROXY.release=new java.util.concurrent.CountDownLatch(1);PROXY.fault.set(SiloFaultProxy.Fault.BLOCK_CREATE_RESPONSE);
+        try {
+            var creation=owner.client.sendAsync(HttpRequest.newBuilder(URI.create("http://localhost:"+port+"/api/v1/projects/"+project+"/uploads")).header("Content-Type","application/json").header("X-XSRF-TOKEN",csrf).POST(HttpRequest.BodyPublishers.ofString(body)).build(),HttpResponse.BodyHandlers.ofString());
+            org.junit.jupiter.api.Assertions.assertTrue(PROXY.blocked.await(3,java.util.concurrent.TimeUnit.SECONDS));
+            String id=json(owner.get("/projects/"+project+"/uploads")).path("data").path("items").get(0).path("uploadId").asText();
+            assertEquals(200,owner.post("/uploads/"+id+"/cancel","{}").statusCode());
+            PROXY.fault.set(SiloFaultProxy.Fault.NONE);PROXY.release.countDown();
+            assertEquals(201,creation.get(5,java.util.concurrent.TimeUnit.SECONDS).statusCode());
+            var replay=owner.post("/projects/"+project+"/uploads",body);
+            assertEquals(201,replay.statusCode(),replay.body());
+            assertEquals("CANCELLED",json(replay).path("data").path("status").asText(),"Creation replay must retain revocation even when initialization lost its publication lease");
+        }finally{PROXY.fault.set(SiloFaultProxy.Fault.NONE);PROXY.release.countDown();}
+    }
+
+    @Test
+    void cleanedCancellationRechecksLatePhysicalResidueAndRetainsCapacityDuringAbortFailure() throws Exception {
+        var owner=signedIn("late-residue-owner");var upload=uploadedPart(owner,"late-residue");String id=upload.path("uploadId").asText();
+        assertEquals(200,owner.post("/uploads/"+id+"/cancel","{}").statusCode());awaitClean(owner,id,20);
+        PROXY.fault.set(SiloFaultProxy.Fault.ABORT_UNAVAILABLE);
+        try(var silo=software.amazon.awssdk.services.s3.S3Client.builder().endpointOverride(URI.create("http://localhost:"+SILO.getMappedPort(9000)))
+                .region(software.amazon.awssdk.regions.Region.US_EAST_1).forcePathStyle(true).credentialsProvider(software.amazon.awssdk.auth.credentials.StaticCredentialsProvider.create(software.amazon.awssdk.auth.credentials.AwsBasicCredentials.create("integration-user","integration-password-strong"))).build()) {
+            // External late materialization: an object-store operation outlives the first empty verification.
+            String key="originals/"+id;String multipart=silo.createMultipartUpload(b->b.bucket("originals").key(key)).uploadId();
+            silo.uploadPart(b->b.bucket("originals").key(key).uploadId(multipart).partNumber(1),software.amazon.awssdk.core.sync.RequestBody.fromBytes(new byte[19]));
+            long until=System.nanoTime()+java.time.Duration.ofSeconds(6).toNanos();JsonNode state;
+            do{state=json(owner.get("/uploads/"+id)).path("data");if("PENDING".equals(state.path("cleanupStatus").asText()))break;Thread.sleep(100);}while(System.nanoTime()<until);
+            assertEquals("PENDING",state.path("cleanupStatus").asText(),"A first empty storage check must not permanently stop residue reconciliation");
+            assertEquals(19,state.path("reservedBytes").asLong());assertEquals(0,state.path("reservedSlots").asInt());
+        }finally{PROXY.fault.set(SiloFaultProxy.Fault.NONE);}
+        awaitClean(owner,id,20);
+    }
+
+    @Test
+    void rejectedPartFactsDoNotExtendTheLastLegalActivityDeadline() throws Exception {
+        var owner=signedIn("invalid-activity-owner");var upload=uploadedPart(owner,"invalid-activity");String id=upload.path("uploadId").asText();
+        String deadline=json(owner.get("/uploads/"+id)).path("data").path("expiresAt").asText();
+        String csrf=json(owner.get("/auth/csrf")).path("data").path("csrfToken").asText();
+        String report=new ObjectMapper().writeValueAsString(java.util.Map.of("writerToken",upload.path("writerToken").asText(),"etag","wrong-etag","sizeBytes",19));
+        var rejected=owner.client.send(HttpRequest.newBuilder(URI.create("http://localhost:"+port+"/api/v1/uploads/"+id+"/parts/1")).header("Content-Type","application/json").header("X-XSRF-TOKEN",csrf).PUT(HttpRequest.BodyPublishers.ofString(report)).build(),HttpResponse.BodyHandlers.ofString());
+        assertEquals(409,rejected.statusCode());
+        assertEquals(deadline,json(owner.get("/uploads/"+id)).path("data").path("expiresAt").asText(),"Rejected part facts must not renew the upload recovery deadline");
+    }
+
+    @Test
+    void aRealStreamingPutFinishingAfterTheDrainWindowCannotLeaveAnUnaccountedUpload() throws Exception {
+        var owner=signedIn("streaming-cancel-owner");var upload=uploadedPart(owner,"streaming-cancel");String id=upload.path("uploadId").asText();
+        var address=URI.create(upload.path("url").asText());
+        try(var socket=new java.net.Socket(address.getHost(),address.getPort())) {
+            socket.setSoTimeout(10000);
+            String headers="PUT "+address.getRawPath()+"?"+address.getRawQuery()+" HTTP/1.1\r\nHost: "+address.getHost()+":"+address.getPort()+"\r\nContent-Length: 19\r\nConnection: close\r\n\r\n";
+            socket.getOutputStream().write(headers.getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+            socket.getOutputStream().write(37);socket.getOutputStream().flush();
+            Thread.sleep(100);
+            assertEquals(200,owner.post("/uploads/"+id+"/cancel","{}").statusCode());
+            awaitClean(owner,id,20);
+            Thread.sleep(2000); // The real request remains open beyond URL expiry and the first empty check.
+            socket.getOutputStream().write(new byte[18]);socket.getOutputStream().flush();
+            String reply=new String(socket.getInputStream().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);
+            org.junit.jupiter.api.Assertions.assertTrue(reply.startsWith("HTTP/1.1 200")||reply.startsWith("HTTP/1.1 404"),"Silo must settle the accepted streaming request");
+        }
+        Thread.sleep(1500);awaitClean(owner,id,20);
+        assertEquals("CANCELLED",json(owner.get("/uploads/"+id)).path("data").path("status").asText());
+        try(var silo=software.amazon.awssdk.services.s3.S3Client.builder().endpointOverride(URI.create("http://localhost:"+SILO.getMappedPort(9000)))
+                .region(software.amazon.awssdk.regions.Region.US_EAST_1).forcePathStyle(true).credentialsProvider(software.amazon.awssdk.auth.credentials.StaticCredentialsProvider.create(software.amazon.awssdk.auth.credentials.AwsBasicCredentials.create("integration-user","integration-password-strong"))).build()) {
+            assertEquals(0,silo.listMultipartUploads(b->b.bucket("originals").prefix("originals/"+id)).uploads().size());
+            assertEquals(0,silo.listObjectsV2(b->b.bucket("originals").prefix("originals/"+id)).contents().size());
+        }
+    }
+
+    private JsonNode uploadedPart(BrowserApi owner,String key) throws Exception {
+        String project=json(owner.post("/projects","{\"name\":\"存储故障竞争\"}")).path("data").path("id").asText();
+        var upload=(com.fasterxml.jackson.databind.node.ObjectNode)json(owner.post("/projects/"+project+"/uploads",new ObjectMapper().writeValueAsString(java.util.Map.of(
+                "filename","race.mp4","sizeBytes",19,"sha256","f".repeat(64),"idempotencyKey",key,"writerId",owner.writerId)))).path("data");
+        String id=upload.path("uploadId").asText(),writer=upload.path("writerToken").asText();
+        String url=json(owner.post("/uploads/"+id+"/part-urls","{\"partNumbers\":[1],\"writerToken\":\""+writer+"\"}")).path("data").path("parts").get(0).path("url").asText();
+        assertEquals(200,HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create(url)).PUT(HttpRequest.BodyPublishers.ofByteArray(new byte[19])).build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+        upload.put("url",url);upload.put("projectId",project);return upload;
+    }
+    private void awaitClean(BrowserApi owner,String id,int seconds) throws Exception {
+        long until=System.nanoTime()+java.time.Duration.ofSeconds(seconds).toNanos();JsonNode state;
+        do{state=json(owner.get("/uploads/"+id)).path("data");if("CLEANED".equals(state.path("cleanupStatus").asText()))break;Thread.sleep(100);}while(System.nanoTime()<until);
+        assertEquals("CLEANED",state.path("cleanupStatus").asText(),state.toString());assertEquals(0,state.path("reservedBytes").asLong());
     }
 
     private BrowserApi signedIn(String username) throws Exception {

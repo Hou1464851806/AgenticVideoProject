@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
-import { enqueueFiles, loadUploads, uploadRows, pauseUpload, continueUpload, reselectFile } from './uploads';
+import { enqueueFiles, loadUploads, uploadRows, pauseUpload, continueUpload, reselectFile, cancelUpload } from './uploads';
 const props = defineProps<{ projectId: string }>();
 const error = ref('');
 const rows = computed(() => uploadRows.filter(row => row.projectId === props.projectId));
@@ -10,7 +10,7 @@ watch(() => props.projectId, async id => {
 let timer: ReturnType<typeof setInterval> | undefined;
 onMounted(() => {
   timer = setInterval(() => {
-    if (rows.value.some(row => row.upload?.status === 'COMPLETED' && (row.upload.validationStatus === 'VALIDATING' || row.upload.cleanupStatus && row.upload.cleanupStatus !== 'CLEANED'))) {
+    if (rows.value.some(row => row.upload && (row.upload.status!=='COMPLETED' || row.upload.validationStatus === 'VALIDATING' || row.upload.cleanupStatus && row.upload.cleanupStatus !== 'CLEANED'))) {
       void loadUploads(props.projectId).catch(failure => { error.value = failure instanceof Error ? failure.message : '无法更新验证状态'; });
     }
   }, 1000);
@@ -36,9 +36,10 @@ function reselect(event: Event, key: string) {
     <article v-for="row in rows" :key="row.key">
       <strong>{{ row.filename }}</strong>
       <p>{{ row.state }}</p>
-      <button v-if="row.hasFile && !row.paused && row.upload?.status !== 'COMPLETED'" type="button" :aria-label="`${row.filename} 暂停上传`" @click="pauseUpload(row.key)">暂停</button>
-      <button v-if="row.hasFile && (row.paused || row.state === '上传失败') && !row.running" type="button" :aria-label="`${row.filename} 继续上传`" @click="continueUpload(row.key)">继续上传</button>
-      <template v-if="row.upload && row.upload.status !== 'COMPLETED' && !row.running">
+      <button v-if="row.upload?.status !== 'COMPLETED' && row.upload?.status !== 'CANCELLED' && row.upload?.status !== 'EXPIRED'" type="button" :aria-label="`${row.filename} 取消上传`" @click="cancelUpload(row.key)">取消上传</button>
+      <button v-if="!row.cancelRequested && row.hasFile && !row.paused && row.upload?.status !== 'COMPLETED'" type="button" :aria-label="`${row.filename} 暂停上传`" @click="pauseUpload(row.key)">暂停</button>
+      <button v-if="!row.cancelRequested && row.hasFile && (row.paused || row.state === '上传失败') && !row.running" type="button" :aria-label="`${row.filename} 继续上传`" @click="continueUpload(row.key)">继续上传</button>
+      <template v-if="!row.cancelRequested && row.upload && row.upload.status !== 'COMPLETED' && !row.running">
         <label :for="`resume-file-${row.key}`">{{ row.filename }} 重选原文件继续</label>
         <input :id="`resume-file-${row.key}`" type="file" accept="video/*" @change="reselect($event, row.key)">
         <small>可恢复至 {{ new Date(row.upload.expiresAt).toLocaleString() }}</small>
@@ -46,7 +47,8 @@ function reselect(event: Event, key: string) {
       <progress :value="row.confirmed" :max="row.size" :aria-label="`${row.filename} 上传进度`"></progress>
       <small>{{ Math.floor(row.confirmed / Math.max(1, row.size) * 100) }}% 已确认</small>
       <small v-if="row.state === '正在计算文件校验值'">校验 {{ Math.floor(row.hashing / Math.max(1, row.size) * 100) }}%</small>
-      <small v-if="row.upload?.cleanupStatus === 'CLEANED'">失败对象已清理</small>
+      <small v-if="row.upload?.status === 'CANCELLED' || row.upload?.status === 'EXPIRED'">{{ row.upload.cleanupStatus==='CLEANED'?'残留清理完成，占用已释放':'残留正在清理，字节占用尚未释放' }}</small>
+      <small v-else-if="row.upload?.cleanupStatus === 'CLEANED'">失败对象已清理</small>
       <small v-else-if="row.upload?.cleanupStatus">失败对象正在清理，占用尚未释放</small>
       <p v-if="row.error" role="alert">{{ row.error }}</p>
     </article>

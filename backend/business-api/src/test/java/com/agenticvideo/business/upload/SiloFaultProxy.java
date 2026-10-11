@@ -8,9 +8,12 @@ import java.util.function.IntSupplier;
 
 /** Network fault fixture forwarding signed control requests to an actual Silo. */
 final class SiloFaultProxy implements AutoCloseable {
-    enum Fault { NONE, DROP_CREATE_RESPONSE, DROP_COMPLETE_RESPONSE, COMPLETE_EMBEDDED_ERROR }
+    enum Fault { NONE, DROP_CREATE_RESPONSE, DROP_COMPLETE_RESPONSE, COMPLETE_EMBEDDED_ERROR, BLOCK_CREATE_RESPONSE, BLOCK_PARTS_RESPONSE, BLOCK_COMPLETE_RESPONSE, ABORT_UNAVAILABLE }
     final java.util.concurrent.atomic.AtomicInteger partPages = new java.util.concurrent.atomic.AtomicInteger();
     final AtomicReference<Fault> fault = new AtomicReference<>(Fault.NONE);
+    volatile java.util.concurrent.CountDownLatch blocked = new java.util.concurrent.CountDownLatch(1);
+    volatile java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+    final java.util.concurrent.atomic.AtomicInteger abortAttempts = new java.util.concurrent.atomic.AtomicInteger();
     private final ServerSocket listener;
     private final IntSupplier targetPort;
     SiloFaultProxy(IntSupplier targetPort) {
@@ -55,6 +58,12 @@ final class SiloFaultProxy implements AutoCloseable {
             boolean create = first.startsWith("POST ") && first.contains("uploads");
             boolean complete = first.startsWith("POST ") && first.contains("uploadId=");
             Fault mode = fault.get();
+            if(first.startsWith("DELETE ") && first.contains("uploadId=")) {
+                abortAttempts.incrementAndGet();
+                if(mode==Fault.ABORT_UNAVAILABLE) {
+                    incoming.getOutputStream().write("HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".getBytes(StandardCharsets.US_ASCII));return;
+                }
+            }
             if (complete && mode == Fault.COMPLETE_EMBEDDED_ERROR) {
                 byte[] error = "<Error><Code>InternalError</Code><Message>injected completion error</Message></Error>".getBytes(StandardCharsets.UTF_8);
                 incoming.getOutputStream().write(("HTTP/1.1 200 OK\r\nContent-Type: application/xml\r\nContent-Length: " + error.length + "\r\nConnection: close\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
@@ -69,6 +78,10 @@ final class SiloFaultProxy implements AutoCloseable {
                 upstream.getOutputStream().write(body);
                 upstream.getOutputStream().flush();
                 byte[] response = upstream.getInputStream().readAllBytes();
+                if((mode==Fault.BLOCK_CREATE_RESPONSE && create) || (mode==Fault.BLOCK_PARTS_RESPONSE && first.startsWith("GET ") && first.contains("uploadId=")) || (mode==Fault.BLOCK_COMPLETE_RESPONSE && complete)) {
+                    blocked.countDown();
+                    try {release.await(15,java.util.concurrent.TimeUnit.SECONDS);}catch(InterruptedException interrupted){Thread.currentThread().interrupt();return;}
+                }
                 boolean drop = (create && mode == Fault.DROP_CREATE_RESPONSE) || (complete && mode == Fault.DROP_COMPLETE_RESPONSE);
                 if (drop && fault.compareAndSet(mode, Fault.NONE)) return;
                 incoming.getOutputStream().write(response);

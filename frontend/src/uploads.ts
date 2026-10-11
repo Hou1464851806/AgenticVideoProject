@@ -1,8 +1,8 @@
 import { reactive } from 'vue';
 import { ApiFailure, request } from './api';
 
-type Upload = { uploadId: string; filename: string; status: string; reservedBytes: number; partSizeBytes: number; expectedParts: number; expiresAt: string; writerToken?: string; confirmedBytes?: number; confirmedParts?: Array<{ partNumber: number; sizeBytes: number }>; validationStatus?: string; error?: { code: string; message: string }; cleanupStatus?: string };
-type Row = { key: string; projectId: string; filename: string; size: number; confirmed: number; hashing: number; state: string; error: string; hasFile?: boolean; paused?: boolean; running?: boolean; upload?: Upload };
+type Upload = { uploadId: string; filename: string; status: string; reservedBytes: number; declaredBytes: number; reservedSlots: number; partSizeBytes: number; expectedParts: number; expiresAt: string; writerToken?: string; confirmedBytes?: number; confirmedParts?: Array<{ partNumber: number; sizeBytes: number }>; validationStatus?: string; error?: { code: string; message: string }; cleanupStatus?: string };
+type Row = { key: string; projectId: string; filename: string; size: number; confirmed: number; hashing: number; state: string; error: string; hasFile?: boolean; paused?: boolean; running?: boolean; cancelRequested?: boolean; upload?: Upload };
 export const uploadRows = reactive<Row[]>([]);
 const queue: Array<{ file: File; row: Row }> = [];
 const selectedFiles = new Map<string, File>();
@@ -39,6 +39,7 @@ async function transfer(file: File, row: Row) {
   try {
     row.state = '正在计算文件校验值';
     const sha256 = await hashFile(file, row);
+    if(row.cancelRequested){row.state='已取消';return;}
     if (row.paused) { row.state = '已暂停'; return; }
     let upload = row.upload
       ? await retryWrite<Upload>(`/uploads/${row.upload.uploadId}/resume`, 'POST', { sizeBytes: file.size, sha256, writerId })
@@ -46,6 +47,7 @@ async function transfer(file: File, row: Row) {
           filename: file.name, sizeBytes: file.size, sha256, idempotencyKey: row.key, writerId,
         });
     row.upload = upload;
+    if(row.cancelRequested){await settleCancellation(row);return;}
     if (upload.status === 'COMPLETED') { row.state = completedState(upload); return; }
     if (upload.status !== 'UPLOADING') throw new Error('上传初始化正在核对，请稍后重试');
     row.confirmed = upload.confirmedBytes ?? 0;
@@ -53,17 +55,20 @@ async function transfer(file: File, row: Row) {
     row.state = '正在传输';
     // Every file shares these two slots. Only one bounded part per slot is in flight.
     for (let number = 1; number <= upload.expectedParts; number++) {
+      if(row.cancelRequested){await settleCancellation(row);return;}
       if (row.paused) { await settlePause(row); return; }
       if (successful.has(number)) continue;
       for (let attempt = 0; ; attempt++) {
         try {
           const authorization = await request<{ parts: Array<{ url: string; headers: Record<string, string>; sizeBytes: number }> }>(
             `/uploads/${upload.uploadId}/part-urls`, 'POST', { partNumbers: [number], writerToken: upload.writerToken });
+          if(row.cancelRequested){await settleCancellation(row);return;}
           if (row.paused) { await settlePause(row); return; }
           const part = authorization.parts[0]!;
           const offset = (number - 1) * upload.partSizeBytes;
           const response = await fetch(part.url, { method: 'PUT', headers: part.headers, body: file.slice(offset, offset + part.sizeBytes) });
           if (!response.ok) throw new ApiFailure('分片传输失败，请继续上传或重新选择原文件', response.status === 403 || response.status === 408 || response.status === 429 || response.status >= 500);
+          if(row.cancelRequested){await settleCancellation(row);return;}
           if (!response.headers.get('ETag')) throw new ApiFailure('无法读取分片确认信息', true);
           await retryWrite(`/uploads/${upload.uploadId}/parts/${number}`, 'PUT', {
             writerToken: upload.writerToken, etag: response.headers.get('ETag'), sizeBytes: part.sizeBytes,
@@ -71,11 +76,13 @@ async function transfer(file: File, row: Row) {
           row.confirmed += part.sizeBytes;
           break;
         } catch (failure) {
+          if(row.cancelRequested){await settleCancellation(row);return;}
           if (row.paused) { await settlePause(row); return; }
           if (!(failure instanceof TypeError || failure instanceof ApiFailure && failure.retryable)) throw failure;
           if (attempt >= 2) throw new Error(`第 ${number} 片自动重试已用尽，成功分片已保留，请稍后继续上传`);
           row.state = `正在重试第 ${number} 片（${attempt + 1}/2）`;
           await new Promise(resolve => setTimeout(resolve, 250 * 2 ** attempt));
+          if(row.cancelRequested){await settleCancellation(row);return;}
           if (row.paused) { await settlePause(row); return; }
           upload = await retryWrite<Upload>(`/uploads/${upload.uploadId}/resume`, 'POST', { sizeBytes: file.size, sha256, writerId });
           row.upload = upload;
@@ -85,6 +92,7 @@ async function transfer(file: File, row: Row) {
         }
       }
     }
+    if(row.cancelRequested){await settleCancellation(row);return;}
     if (row.paused) { await settlePause(row); return; }
     row.state = '正在确认上传';
     const completed = await retryWrite<Upload>(`/uploads/${upload.uploadId}/complete`, 'POST', { writerToken: upload.writerToken });
@@ -94,9 +102,30 @@ async function transfer(file: File, row: Row) {
     selectedFiles.delete(row.key);
     row.hasFile = false;
   } catch (failure) {
+    if(row.cancelRequested){row.error=failure instanceof Error?failure.message:'取消状态核对失败，请重试取消';return;}
     row.state = '上传失败';
     row.error = failure instanceof TypeError ? '网络连接不可用，自动重试已用尽；请恢复网络后继续上传' : failure instanceof Error ? failure.message : '上传暂时不可用';
   } finally { row.running = false; }
+}
+function revoked(upload?:Upload){return upload?.status==='CANCELLED'||upload?.status==='EXPIRED';}
+async function settleCancellation(row:Row){
+  if(!row.upload){row.state='已取消';return;}
+  try{
+    const cancelled=await retryWrite<Upload>(`/uploads/${row.upload.uploadId}/cancel`,'POST',{});
+    row.upload={...row.upload,...cancelled};row.state=cancelled.status==='EXPIRED'?'上传已过期，请重新上传':'已取消';row.error='';
+  }catch(failure){
+    const current=await request<Upload>(`/uploads/${row.upload.uploadId}`);
+    row.upload={...row.upload,...current};
+    if(current.status==='COMPLETED'){row.cancelRequested=false;row.state=completedState(current);row.error='上传已完成，无法取消';}
+    else throw failure;
+  }
+}
+export async function cancelUpload(key:string){
+  const row=uploadRows.find(value=>value.key===key);if(!row||row.upload?.status==='COMPLETED')return;
+  row.cancelRequested=true;row.paused=false;row.state='正在取消';row.error='';
+  for(let i=queue.length-1;i>=0;i--)if(queue[i]?.row.key===key)queue.splice(i,1);
+  selectedFiles.delete(key);row.hasFile=false;
+  try{await settleCancellation(row);}catch(failure){row.error=failure instanceof Error?failure.message:'取消失败，请重试';}
 }
 async function settlePause(row: Row) {
   if (row.upload?.writerToken) {
@@ -107,14 +136,14 @@ async function settlePause(row: Row) {
 }
 export function pauseUpload(key: string) {
   const row = uploadRows.find(value => value.key === key);
-  if (!row) return;
+  if (!row || row.cancelRequested || revoked(row.upload)) return;
   row.paused = true;
   row.state = row.running ? '正在暂停' : '已暂停';
 }
 export function continueUpload(key: string) {
   const row = uploadRows.find(value => value.key === key);
   const file = selectedFiles.get(key);
-  if (!row || !file || row.running) return;
+  if (!row || !file || row.running || row.cancelRequested || revoked(row.upload)) return;
   row.paused = false;
   row.error = '';
   row.state = '等待继续';
@@ -123,7 +152,7 @@ export function continueUpload(key: string) {
 }
 export function reselectFile(key: string, file: File) {
   const row = uploadRows.find(value => value.key === key);
-  if (!row || row.running || row.upload?.status === 'COMPLETED') return;
+  if (!row || row.running || row.cancelRequested || revoked(row.upload) || row.upload?.status === 'COMPLETED') return;
   const queued = queue.findIndex(value => value.row.key === key);
   if (queued >= 0) queue.splice(queued, 1);
   selectedFiles.set(key, file);
@@ -138,7 +167,7 @@ export function reselectFile(key: string, file: File) {
 function drain() {
   while (active < 2 && queue.length) {
     const next = queue.shift()!;
-    if (next.row.paused) continue;
+    if (next.row.paused || next.row.cancelRequested || revoked(next.row.upload)) continue;
     active++;
     next.row.running = true;
     void transfer(next.file, next.row).finally(() => { active--; drain(); });
@@ -167,18 +196,23 @@ export async function loadUploads(projectId: string) {
     for (const upload of page.items) {
       const existing = uploadRows.find(row => row.upload?.uploadId === upload.uploadId);
       if (existing) {
+        if(existing.cancelRequested && !revoked(upload) && upload.status!=='COMPLETED')continue;
         existing.upload = { ...existing.upload, ...upload };
+        if(revoked(upload)){
+          existing.cancelRequested=true;existing.state=upload.status==='EXPIRED'?'上传已过期，请重新上传':'已取消';existing.hasFile=false;selectedFiles.delete(existing.key);
+        }
         if (upload.status === 'COMPLETED') {
-          existing.confirmed = upload.reservedBytes;
+          existing.cancelRequested=false;
+          existing.confirmed = upload.declaredBytes;
           existing.state = completedState(upload);
           existing.error = upload.error?.message ?? '';
         }
         continue;
       }
-      uploadRows.push({ key: upload.uploadId, projectId, filename: upload.filename, size: upload.reservedBytes,
-        confirmed: upload.status === 'COMPLETED' ? upload.reservedBytes : upload.confirmedBytes ?? 0, hashing: 0, error: upload.error?.message ?? '', upload,
+      uploadRows.push({ key: upload.uploadId, projectId, filename: upload.filename, size: upload.declaredBytes,
+        confirmed: upload.status === 'COMPLETED' ? upload.declaredBytes : upload.confirmedBytes ?? 0, hashing: 0, error: upload.error?.message ?? '', upload,
         hasFile: false, paused: upload.status === 'PAUSED',
-        state: upload.status === 'COMPLETED' ? completedState(upload) : '重选原文件后继续上传' });
+        cancelRequested:revoked(upload),state: upload.status==='CANCELLED'?'已取消':upload.status==='EXPIRED'?'上传已过期，请重新上传':upload.status === 'COMPLETED' ? completedState(upload) : '重选原文件后继续上传' });
     }
     cursor = page.nextCursor;
   } while (cursor);

@@ -14,8 +14,11 @@ public class UploadService {
     private final JdbcTemplate database;
     private final TransactionTemplate transactions;
     private final MultipartStorage storage;
-    public UploadService(JdbcTemplate database, PlatformTransactionManager manager, MultipartStorage storage) {
-        this.database = database; this.transactions = new TransactionTemplate(manager); this.storage = storage;
+    private final long inactivitySeconds;
+    public UploadService(JdbcTemplate database, PlatformTransactionManager manager, MultipartStorage storage,
+            @org.springframework.beans.factory.annotation.Value("${upload.inactivity-seconds:86400}") long inactivitySeconds) {
+        if(inactivitySeconds<1)throw new IllegalArgumentException("Invalid upload inactivity lifetime");
+        this.database = database; this.transactions = new TransactionTemplate(manager); this.storage = storage;this.inactivitySeconds=inactivitySeconds;
     }
     public Object create(UUID projectId, UUID actorId, UploadController.CreateUpload request) {
         UUID id = transactions.execute(status -> {
@@ -41,16 +44,17 @@ public class UploadService {
                     (int) ((request.sizeBytes() + PART_BYTES - 1) / PART_BYTES), "originals/" + uploadId, UUID.randomUUID(),
                     request.writerId());
             database.update("INSERT INTO storage_reservations (id,project_id,upload_id,bytes) VALUES (?,?,?,?)", UUID.randomUUID(), projectId, uploadId, request.sizeBytes());
+            database.update("UPDATE upload_sessions SET expires_at=now()+?*interval '1 second' WHERE id=?",inactivitySeconds,uploadId);
             return uploadId;
         });
         var upload = find(id);
         if (upload.s3UploadId() == null) {
             UUID operation = UUID.randomUUID();
-            int claimed = database.update("UPDATE upload_sessions SET operation_token=?, operation_expires_at=now()+interval '30 seconds' WHERE id=? AND s3_upload_id IS NULL AND (operation_token IS NULL OR operation_expires_at < now())", operation, id);
+            int claimed = database.update("UPDATE upload_sessions SET operation_token=?, operation_expires_at=now()+interval '30 seconds' WHERE id=? AND status='INITIALIZING' AND expires_at>now() AND s3_upload_id IS NULL AND (operation_token IS NULL OR operation_expires_at < now())", operation, id);
             if (claimed == 1) {
                 try {
                     String s3Id = storage.initializeUpload(upload.key());
-                    database.update("UPDATE upload_sessions SET s3_upload_id=?,status='UPLOADING',operation_token=NULL,operation_expires_at=NULL WHERE id=? AND operation_token=?", s3Id, id, operation);
+                    database.update("UPDATE upload_sessions SET s3_upload_id=?,status='UPLOADING',operation_token=NULL,operation_expires_at=NULL WHERE id=? AND operation_token=? AND status='INITIALIZING' AND expires_at>now()", s3Id, id, operation);
                 } finally {
                     database.update("UPDATE upload_sessions SET operation_token=NULL,operation_expires_at=NULL WHERE id=? AND operation_token=?", id, operation);
                 }
@@ -70,6 +74,12 @@ public class UploadService {
         Map<String, Object> result = new LinkedHashMap<>(Map.of("uploadId", upload.id(), "filename", upload.filename(), "status", upload.status(), "reservedBytes", upload.bytes(),
                 "partSizeBytes", PART_BYTES, "expectedParts", upload.parts()));
         var completed = database.queryForMap("SELECT asset_id,validation_task_id,expires_at FROM upload_sessions WHERE id=?", upload.id());
+        var reservation=database.queryForMap("SELECT bytes,asset_slots FROM storage_reservations WHERE upload_id=?",upload.id());
+        result.put("declaredBytes",upload.bytes());
+        result.put("reservedBytes",reservation.get("bytes"));
+        result.put("reservedSlots",reservation.get("asset_slots"));
+        var cancelledCleanup=database.queryForList("SELECT status FROM upload_cleanup_jobs WHERE upload_id=?",upload.id());
+        if(!cancelledCleanup.isEmpty())result.put("cleanupStatus",cancelledCleanup.get(0).get("status"));
         result.put("expiresAt", ((java.sql.Timestamp) completed.get("expires_at")).toInstant().toString());
         result.put("confirmedBytes", database.queryForObject("SELECT coalesce(sum(size_bytes),0) FROM upload_parts WHERE upload_id=?", Long.class, upload.id()));
         if (completed.get("asset_id") != null) {
@@ -95,14 +105,18 @@ public class UploadService {
         return page;
     }
     private void requireWriter(Upload upload, UUID token) {
-        int renewed = database.update("UPDATE upload_sessions SET writer_lease_expires_at=now()+interval '330 seconds' WHERE id=? AND writer_token=? AND (status='COMPLETED' OR writer_lease_expires_at>now())", upload.id(), token);
-        if (renewed != 1)
-            throw new ResponseStatusException(CONFLICT, "上传执行资格已失效，请重新核对原文件");
+        Integer eligible=database.queryForObject("SELECT count(*) FROM upload_sessions WHERE id=? AND writer_token=? AND status NOT IN ('CANCELLED','EXPIRED') AND (status='COMPLETED' OR (writer_lease_expires_at>now() AND expires_at>now()))",Integer.class,upload.id(),token);
+        if(eligible!=1)throw new ResponseStatusException(CONFLICT,"上传执行资格已失效，请重新核对原文件");
+    }
+    private void renewActivity(UUID id) {
+        database.update("UPDATE upload_sessions SET writer_lease_expires_at=now()+interval '330 seconds',last_activity_at=now(),expires_at=CASE WHEN status='COMPLETED' THEN expires_at ELSE now()+?*interval '1 second' END WHERE id=?",inactivitySeconds,id);
     }
     public Object resume(Upload upload, UploadController.Resume request) {
         return transactions.execute(tx -> {
             var locked = database.queryForMap("SELECT *,writer_lease_expires_at>now() AS live FROM upload_sessions WHERE id=? FOR UPDATE", upload.id());
             var current = find(upload.id());
+            if (!List.of("UPLOADING", "PAUSED").contains(current.status()) || !((java.sql.Timestamp)locked.get("expires_at")).toInstant().isAfter(java.time.Instant.now()))
+                throw new ResponseStatusException(CONFLICT,"上传已取消或过期，请重新上传");
             if (current.bytes() != request.sizeBytes() || !current.sha256().equalsIgnoreCase(request.sha256()))
                 throw new ResponseStatusException(CONFLICT, "重选文件内容与原上传不一致，不能续接");
             {
@@ -124,7 +138,7 @@ public class UploadService {
             database.update("DELETE FROM upload_parts WHERE upload_id=?", current.id());
             for (var part : parts) database.update("INSERT INTO upload_parts (upload_id,part_number,etag,size_bytes) VALUES (?,?,?,?)",
                     current.id(), part.partNumber(), part.eTag(), part.size());
-            database.update("UPDATE upload_sessions SET status='UPLOADING',last_activity_at=now(),expires_at=now()+interval '24 hours' WHERE id=?", current.id());
+            database.update("UPDATE upload_sessions SET status='UPLOADING',last_activity_at=now(),expires_at=now()+?*interval '1 second' WHERE id=?", inactivitySeconds,current.id());
             var result = view(find(current.id()));
             result.put("writerToken", current.writerToken());
             result.put("confirmedBytes", confirmed);
@@ -138,19 +152,26 @@ public class UploadService {
             var current = find(upload.id());
             requireWriter(current, writer);
             if (!List.of("UPLOADING", "PAUSED").contains(current.status())) throw new ResponseStatusException(CONFLICT, "当前上传状态不能暂停");
+            renewActivity(upload.id());
             database.update("UPDATE upload_sessions SET status='PAUSED' WHERE id=?", upload.id());
             return view(find(upload.id()));
         });
     }
     public Object partUrls(Upload upload, UploadController.PartUrls request) {
-        requireWriter(upload, request.writerToken());
-        if (!"UPLOADING".equals(upload.status())) throw new ResponseStatusException(CONFLICT, "当前上传状态不能签发分片");
-        if (request.partNumbers().stream().anyMatch(n -> n > upload.parts()) || new HashSet<>(request.partNumbers()).size() != request.partNumbers().size())
-            throw new ResponseStatusException(BAD_REQUEST, "分片序号无效");
-        return Map.of("parts", request.partNumbers().stream().map(number -> Map.of("partNumber", number,
-                "url", storage.partUrl(upload.key(), upload.s3UploadId(), number), "expiresAt", java.time.Instant.now().plusSeconds(storage.partUrlSeconds()).toString(),
-                "sizeBytes", number == upload.parts() ? upload.bytes() - (number - 1L) * PART_BYTES : PART_BYTES,
-                "headers", Map.of())).toList());
+        return transactions.execute(tx->{
+            database.queryForMap("SELECT id FROM upload_sessions WHERE id=? FOR UPDATE",upload.id());
+            var current=find(upload.id());
+            requireWriter(current, request.writerToken());
+            if (!"UPLOADING".equals(current.status())) throw new ResponseStatusException(CONFLICT, "当前上传状态不能签发分片");
+            if (request.partNumbers().stream().anyMatch(n -> n > current.parts()) || new HashSet<>(request.partNumbers()).size() != request.partNumbers().size())
+                throw new ResponseStatusException(BAD_REQUEST, "分片序号无效");
+            renewActivity(current.id());
+            database.update("UPDATE upload_sessions SET last_signed_url_expires_at=greatest(coalesce(last_signed_url_expires_at,now()),now()+?*interval '1 second') WHERE id=?",storage.partUrlSeconds(),current.id());
+            return Map.of("parts", request.partNumbers().stream().map(number -> Map.of("partNumber", number,
+                    "url", storage.partUrl(current.key(), current.s3UploadId(), number), "expiresAt", java.time.Instant.now().plusSeconds(storage.partUrlSeconds()).toString(),
+                    "sizeBytes", number == current.parts() ? current.bytes() - (number - 1L) * PART_BYTES : PART_BYTES,
+                    "headers", Map.of())).toList());
+        });
     }
     public Object recordPart(Upload upload, int number, UploadController.PartReport report) {
         requireWriter(upload, report.writerToken());
@@ -160,15 +181,21 @@ public class UploadService {
         long expected = number == upload.parts() ? upload.bytes() - (number-1L)*PART_BYTES : PART_BYTES;
         if (number < 1 || number > upload.parts() || part.size() != expected || report.sizeBytes() != expected || !part.eTag().equals(report.etag()))
             throw new ResponseStatusException(CONFLICT, "分片事实不匹配");
-        database.update("INSERT INTO upload_parts (upload_id,part_number,etag,size_bytes) VALUES (?,?,?,?) ON CONFLICT (upload_id,part_number) DO UPDATE SET etag=excluded.etag,size_bytes=excluded.size_bytes,verified_at=now()", upload.id(), number, part.eTag(), part.size());
-        database.update("UPDATE upload_sessions SET last_activity_at=now(),expires_at=now()+interval '24 hours' WHERE id=?", upload.id());
-        return Map.of("partNumber", number, "sizeBytes", part.size());
+        return transactions.execute(tx->{
+            database.queryForMap("SELECT id FROM upload_sessions WHERE id=? FOR UPDATE",upload.id());
+            var current=find(upload.id());
+            requireWriter(current,report.writerToken());
+            if(!List.of("UPLOADING","PAUSED").contains(current.status()))throw new ResponseStatusException(CONFLICT,"当前状态不能登记分片");
+            database.update("INSERT INTO upload_parts (upload_id,part_number,etag,size_bytes) VALUES (?,?,?,?) ON CONFLICT (upload_id,part_number) DO UPDATE SET etag=excluded.etag,size_bytes=excluded.size_bytes,verified_at=now()", current.id(), number, part.eTag(), part.size());
+            renewActivity(current.id());
+            return Map.of("partNumber", number, "sizeBytes", part.size());
+        });
     }
     public Object complete(Upload upload, UUID writer) {
         requireWriter(upload, writer);
         if ("COMPLETED".equals(upload.status())) return view(upload);
         UUID operation = UUID.randomUUID();
-        int claimed = database.update("UPDATE upload_sessions SET status='COMPLETING', operation_token=?,operation_expires_at=now()+interval '30 seconds' WHERE id=? AND status IN ('UPLOADING','COMPLETING') AND (operation_token IS NULL OR operation_expires_at < now())", operation, upload.id());
+        int claimed = database.update("UPDATE upload_sessions SET status='COMPLETING', operation_token=?,operation_expires_at=now()+interval '30 seconds' WHERE id=? AND expires_at>now() AND status IN ('UPLOADING','COMPLETING') AND (operation_token IS NULL OR operation_expires_at < now())", operation, upload.id());
         if (claimed == 0) return view(find(upload.id()));
         try {
             Long size = storage.objectSize(upload.key());
@@ -194,7 +221,9 @@ public class UploadService {
             if (size == null || size != upload.bytes()) throw new ResponseStatusException(CONFLICT, "对象大小不匹配");
             transactions.executeWithoutResult(tx -> {
                 var locked = database.queryForMap("SELECT * FROM upload_sessions WHERE id=? FOR UPDATE", upload.id());
-                if (!operation.equals(locked.get("operation_token"))) throw new ResponseStatusException(CONFLICT, "完成资格已失效");
+                if (!operation.equals(locked.get("operation_token")) || !"COMPLETING".equals(locked.get("status"))
+                        || !((java.sql.Timestamp)locked.get("operation_expires_at")).toInstant().isAfter(java.time.Instant.now()))
+                    throw new ResponseStatusException(CONFLICT, "完成资格已失效");
                 UUID assetId = UUID.randomUUID();
                 UUID taskId = UUID.randomUUID();
                 database.update("INSERT INTO assets (id,project_id,upload_id,object_key,filename,byte_size,sha256) VALUES (?,?,?,?,?,?,?)", assetId, upload.projectId(), upload.id(), upload.key(), upload.filename(), upload.bytes(), upload.sha256());

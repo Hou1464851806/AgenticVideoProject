@@ -125,6 +125,24 @@ public class MultipartStorage {
         catch (S3Exception failure) { if (failure.statusCode() == 404) return null; throw failure; }
     }
     public void deleteObject(String key) { client.deleteObject(b -> b.bucket(bucket).key(key)); }
+    public boolean cleanUpload(String key) {
+        initialize();
+        for(var upload:unfinishedUploads(key)) {
+            try {client.abortMultipartUpload(b->b.bucket(bucket).key(key).uploadId(upload.uploadId()));}
+            catch(S3Exception missing) {if(missing.statusCode()!=404)throw missing;}
+        }
+        deleteObject(key);
+        return unfinishedUploads(key).isEmpty() && objectSize(key)==null;
+    }
+    public long uploadBytes(String key) {
+        initialize();
+        Long object=objectSize(key);long total=object==null?0:object;
+        for(var upload:unfinishedUploads(key)) {
+            try{for(var part:parts(key,upload.uploadId()))total=Math.addExact(total,part.size());}
+            catch(S3Exception missing){if(missing.statusCode()!=404)throw missing;}
+        }
+        return total;
+    }
     public void complete(String key, String uploadId, List<Part> parts) {
         var completed = parts.stream().map(p -> CompletedPart.builder().partNumber(p.partNumber()).eTag(p.eTag()).build()).toList();
         client.completeMultipartUpload(b -> b.bucket(bucket).key(key).uploadId(uploadId)
