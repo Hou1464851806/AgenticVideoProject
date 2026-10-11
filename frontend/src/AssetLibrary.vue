@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue';
 import { request } from './api';
-export type Playback = { assetId: string; filename: string; url: string; durationMs: number; expiresAt: string; startMs?: number };
+export type Playback = { assetId: string; filename: string; url: string; durationMs: number; expiresAt: string; startMs?: number; endMs?: number };
 const props = defineProps<{ projectId: string }>();
 const emit = defineEmits<{ play: [value: Playback] }>();
 const items = ref<Array<{ id: string; filename: string }>>([]);

@@ -16,11 +16,16 @@ public class ConversationTurns {
     private final JdbcTemplate database;
     private final ObjectMapper json;
     private final TransactionTemplate transactions;
+    private final com.agenticvideo.business.plan.EditPlans plans;
+    private final com.agenticvideo.business.analysis.SpeechTimings timings;
 
-    public ConversationTurns(JdbcTemplate database, ObjectMapper json, PlatformTransactionManager manager) {
+    public ConversationTurns(JdbcTemplate database, ObjectMapper json, PlatformTransactionManager manager,
+            com.agenticvideo.business.plan.EditPlans plans, com.agenticvideo.business.analysis.SpeechTimings timings) {
         this.database = database;
         this.json = json;
         this.transactions = new TransactionTemplate(manager);
+        this.plans = plans;
+        this.timings = timings;
     }
 
     public Object accept(UUID sessionId, String key, ConversationController.Turn request) {
@@ -43,16 +48,32 @@ public class ConversationTurns {
             long sequence = database.queryForObject("SELECT coalesce(max(message_seq),0)+1 FROM conversation_messages WHERE conversation_id=?", Long.class, sessionId);
             database.update("INSERT INTO conversation_messages(id,conversation_id,message_seq,role,content,references_json) VALUES (?,?,?,'USER',?,?::jsonb)",
                     message, sessionId, sequence, request.content(), encode(request.references() == null ? List.of() : request.references()));
-            String input = encode(Map.of("conversationId", sessionId, "turnId", turn, "messageId", message,
+            var fixedInput = new java.util.LinkedHashMap<String,Object>(Map.of("conversationId", sessionId, "turnId", turn, "messageId", message,
                     "content", request.content(), "assetIds", request.context() != null && request.context().has("assetIds")
                             ? request.context().path("assetIds") : decode(session.get("asset_ids_json")),
                     "history", database.queryForList("SELECT role,content FROM (SELECT role,content,message_seq FROM conversation_messages WHERE conversation_id=? ORDER BY message_seq DESC LIMIT 12) h ORDER BY message_seq", sessionId),
                     "references", request.references() == null ? List.of() : request.references(),
                     "context", request.context() == null ? Map.of() : request.context()));
+            if (request.context() != null && request.context().has("editing"))
+                fixedInput.put("editing", plans.allocate((UUID)session.get("project_id"), task, request.context().path("editing")));
+            String input = encode(fixedInput);
             database.update("INSERT INTO tasks(id,project_id,type,input_json) VALUES (?,?,'AGENT_TURN',?::jsonb)", task, session.get("project_id"), input);
             database.update("INSERT INTO conversation_turns(id,conversation_id,message_id,task_id,request_key,request_json) VALUES (?,?,?,?,?,?::jsonb)", turn, sessionId, message, task, key, payload);
             database.update("INSERT INTO outbox_events(id,task_id,type,payload_json) VALUES (?,?,'AGENT_TURN',jsonb_build_object('schemaVersion','1.0','eventId',?::text,'taskId',?::text,'taskType','AGENT_TURN','projectId',?::text,'occurredAt',now()))", event, task, event, task, session.get("project_id"));
             return identities(turn, message, task);
+        });
+    }
+
+    public Object view(UUID sessionId, ConversationController.PlanView request) {
+        return transactions.execute(tx -> {
+            var session = database.queryForMap("SELECT project_id FROM conversations WHERE id=? FOR UPDATE", sessionId);
+            if (database.queryForObject("SELECT count(*) FROM plan_revisions WHERE id=? AND plan_id=? AND project_id=?", Integer.class,
+                    request.revisionId(), request.planId(), session.get("project_id")) != 1)
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "方案版本不存在或不属于本项目");
+            if (database.update("UPDATE conversations SET view_plan_id=?,view_revision_id=?,view_row_version=view_row_version+1 WHERE id=? AND view_row_version=?",
+                    request.planId(), request.revisionId(), sessionId, request.expectedRowVersion()) != 1)
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "查看版本已变化，请重新读取会话");
+            return database.queryForMap("SELECT view_plan_id AS \"planId\",view_revision_id AS \"revisionId\",view_row_version AS \"rowVersion\" FROM conversations WHERE id=?", sessionId);
         });
     }
 
@@ -63,7 +84,7 @@ public class ConversationTurns {
         if (request.context() != null) {
             if (!request.context().isObject()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "查询上下文必须是对象");
             request.context().fieldNames().forEachRemaining(field -> {
-                if (!"assetIds".equals(field)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "查询上下文字段不受支持");
+                if (!java.util.Set.of("assetIds", "editing").contains(field)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "查询上下文字段不受支持");
             });
             if (request.context().has("assetIds")) {
                 var selected = request.context().path("assetIds");
@@ -120,6 +141,11 @@ public class ConversationTurns {
                     "text", row.get("text"), "startMs", row.get("start_ms"), "endMs", row.get("end_ms"), "sourceKind", row.get("source_kind")));
         }
         UUID message = UUID.randomUUID();
+        if (result.has("planRevision")) {
+            var revision = result.path("planRevision");
+            references.add(Map.of("type", "PLAN_REVISION", "id", revision.path("revisionId").asText(),
+                    "planId", revision.path("planId").asText(), "revisionNumber", revision.path("revisionNumber").asLong()));
+        }
         long sequence = database.queryForObject("SELECT coalesce(max(message_seq),0)+1 FROM conversation_messages WHERE conversation_id=?", Long.class, sessionId);
         database.update("INSERT INTO conversation_messages(id,conversation_id,message_seq,role,content,references_json,source_task_id) VALUES (?,?,?,'ASSISTANT',?,?::jsonb,?)",
                 message, sessionId, sequence, content, encode(references), task.get("id"));
@@ -194,12 +220,19 @@ public class ConversationTurns {
                     """, evidence, task.get("project_id"), scope);
             if (targets.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "证据不在固定素材范围内");
             var target = targets.get(0);
-            result = Map.of("observations", database.queryForList("""
-                    SELECT id AS "evidenceId",asset_id AS "assetId",text,start_ms AS "startMs",end_ms AS "endMs",source_kind AS "sourceKind"
+            var observations = database.queryForList("""
+                    SELECT id AS "evidenceId",asset_id AS "assetId",text,start_ms AS "startMs",end_ms AS "endMs",source_kind AS "sourceKind",
+                        start_ms,end_ms,audio_start_ms,observation_json
                     FROM evidence_segments WHERE project_id=? AND asset_id=? AND analysis_id=? AND source_kind=?
                     AND ordinal BETWEEN ? AND ? ORDER BY ordinal LIMIT 11
                     """, task.get("project_id"), target.get("asset_id"), target.get("analysis_id"), target.get("source_kind"),
-                    ((Number)target.get("ordinal")).intValue()-5, ((Number)target.get("ordinal")).intValue()+5));
+                    ((Number)target.get("ordinal")).intValue()-5, ((Number)target.get("ordinal")).intValue()+5);
+            for (var observation : observations) {
+                observation.put("words", timings.words(observation));
+                for (String field : List.of("start_ms","end_ms","audio_start_ms","observation_json")) observation.remove(field);
+            }
+            result = input.has("editing") ? Map.of("observations", observations, "candidateWindow", plans.candidateWindow(input,target,observations))
+                    : Map.of("observations", observations);
         }
         database.update("INSERT INTO conversation_tool_receipts(task_id,attempt_id,producer_key,request_json,result_json) VALUES (?,?,?,?::jsonb,?::jsonb)",
                 task.get("id"), request.attemptId(), request.producerKey(), payload, encode(result));
@@ -256,6 +289,9 @@ public class ConversationTurns {
     }
 
     private Map<String, Object> identities(UUID turn, UUID message, UUID task) {
-        return Map.of("turnId", turn, "messageId", message, "taskId", task);
+        var result = new java.util.LinkedHashMap<String,Object>(Map.of("turnId", turn, "messageId", message, "taskId", task));
+        var input = (com.fasterxml.jackson.databind.JsonNode)decode(database.queryForObject("SELECT input_json FROM tasks WHERE id=?", String.class, task));
+        if (input.has("editing")) result.put("planId", input.path("editing").path("planId").asText());
+        return result;
     }
 }

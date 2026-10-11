@@ -61,6 +61,7 @@ public class ConversationController {
                         "role", row.getString("role"), "content", row.getString("content"), "references", parse(row.getString("references_json"))), conversationId));
         var tasks = database.queryForList("SELECT t.id AS \"taskId\",t.status FROM conversation_turns r JOIN tasks t ON t.id=r.task_id WHERE r.conversation_id=? ORDER BY r.created_at DESC LIMIT 1", conversationId);
         data.put("latestTask", tasks.isEmpty() ? null : tasks.get(0));
+        data.put("view", database.queryForMap("SELECT view_plan_id AS \"planId\",view_revision_id AS \"revisionId\",view_row_version AS \"rowVersion\" FROM conversations WHERE id=?", conversationId));
         return response(data);
     }
 
@@ -91,4 +92,12 @@ public class ConversationController {
     public record Turn(@NotBlank @Size(max = 8000) String content,
             @Size(max = 100) List<com.fasterxml.jackson.databind.JsonNode> references,
             com.fasterxml.jackson.databind.JsonNode context) {}
+    @PatchMapping("/conversations/{conversationId}/view")
+    public Object view(@PathVariable UUID conversationId, @Valid @RequestBody PlanView request, Authentication account) {
+        requireOwned(conversationId, account);
+        return response(turns.view(conversationId, request));
+    }
+    public record PlanView(@jakarta.validation.constraints.NotNull UUID planId,
+            @jakarta.validation.constraints.NotNull UUID revisionId,
+            @jakarta.validation.constraints.Min(0) long expectedRowVersion) {}
 }

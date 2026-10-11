@@ -13,7 +13,8 @@ import static org.springframework.http.HttpStatus.CONFLICT;
 public class SpeechAnalysis {
     private final JdbcTemplate database;
     private final ObjectMapper json;
-    public SpeechAnalysis(JdbcTemplate database,ObjectMapper json) { this.database=database;this.json=json; }
+    private final SpeechTimings timings;
+    public SpeechAnalysis(JdbcTemplate database,ObjectMapper json,SpeechTimings timings) { this.database=database;this.json=json;this.timings=timings; }
     public void initialize(UUID assetId, UUID projectId, JsonNode media) {
         UUID analysisId=UUID.randomUUID();
         boolean audio=media.path("timeMapping").path("hasAudio").asBoolean();
@@ -125,17 +126,7 @@ public class SpeechAnalysis {
     public Object evidence(UUID asset) {
         var observations=new ArrayList<Object>();
         for(var row:database.queryForList("SELECT e.* FROM evidence_segments e JOIN asset_analysis_heads h ON h.analysis_id=e.analysis_id WHERE h.asset_id=? ORDER BY e.ordinal",asset)) {
-            var words=json.createArrayNode();
-            long offset=((Number)row.get("start_ms")).longValue()-((Number)row.get("audio_start_ms")).longValue();
-            for(JsonNode word:parse(row.get("observation_json")).path("words")) {
-                var mapped=word.deepCopy();
-                if(mapped instanceof com.fasterxml.jackson.databind.node.ObjectNode object) {
-                    long start=word.path("begin_time").asLong(),end=word.path("end_time").asLong();
-                    object.put("audioStartMs",start).put("audioEndMs",end).put("startMs",Math.max(0,start+offset))
-                            .put("endMs",Math.min(((Number)row.get("end_ms")).longValue(),end+offset));
-                    words.add(object);
-                }
-            }
+            var words=timings.words(row);
             observations.add(Map.of("id",row.get("id"),"sourceKind",row.get("source_kind"),"text",row.get("text"),"startMs",row.get("start_ms"),"endMs",row.get("end_ms"),
                     "audioStartMs",row.get("audio_start_ms"),"words",words,"analysisId",row.get("analysis_id"),"temporalPrecision","MODEL_TIMESTAMPS"));
         }

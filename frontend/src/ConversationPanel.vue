@@ -2,11 +2,12 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { request } from './api';
 import type { Playback } from './AssetLibrary.vue';
-const props = defineProps<{ projectId: string }>();
-const emit = defineEmits<{ play: [value: Playback] }>();
+import type { PlanBase, PlanSelection } from './PlanPanel.vue';
+const props = defineProps<{ projectId: string; editingBase?: PlanBase | null }>();
+const emit = defineEmits<{ play: [value: Playback]; plan: [value: PlanSelection]; session: [value: string] }>();
 type Session = { id: string; title: string; assetIds: string[] };
 type Asset = { id: string; filename: string };
-type Citation = { type: string; id: string; assetId?: string; text?: string; startMs?: number; endMs?: number };
+type Citation = { type: string; id: string; assetId?: string; text?: string; startMs?: number; endMs?: number; planId?: string; revisionNumber?: number };
 type Message = { id: string; role: string; content: string; references: Citation[] };
 type History = { items: Message[]; latestTask: { taskId: string; status: string } | null };
 const sessions = ref<Session[]>([]);
@@ -22,6 +23,9 @@ const creating = ref(false);
 const sending = ref(false);
 const error = ref('');
 const pending = new Map<string,{ key: string; serialized: string }>();
+type Settings = {mode:string;topic:string;minSeconds:number;maxSeconds:number;profile:string;useBase:boolean};
+const editing = ref<Record<string,Settings>>({});
+const settings = computed(() => editing.value[selected.value]!);
 const session = computed(() => sessions.value.find(item => item.id === selected.value));
 const running = computed(() => ['PENDING','RUNNING','CANCEL_REQUESTED','WAITING_INPUT'].includes(latestTask.value?.status ?? ''));
 const draft = computed({ get: () => drafts.value[selected.value] ?? '', set: (value: string) => { drafts.value[selected.value] = value; } });
@@ -54,6 +58,8 @@ async function loadHistory() {
 }
 async function choose(id: string) {
   references.value[id] ??= [];
+  editing.value[id] ??= {mode:'QUERY',topic:'',minSeconds:10,maxSeconds:30,profile:'LANDSCAPE_720',useBase:false};
+  emit('session',id);
   selected.value = id; messages.value = []; latestTask.value = null; error.value = '';
   await loadHistory();
 }
@@ -69,7 +75,17 @@ async function create() {
 async function send() {
   if (!selected.value || sending.value || running.value || !draft.value.trim()) return;
   const id = selected.value, content = draft.value;
-  const body = { content, references: (references.value[id] ?? []).map(assetId => ({ type: 'ASSET', id: assetId })), context: {} };
+  const condition = settings.value;
+  const context: Record<string,unknown> = {};
+  if (condition.mode === 'GENERATE_PLAN') {
+    if (!condition.topic.trim() || condition.minSeconds <= 0 || condition.maxSeconds < condition.minSeconds || condition.maxSeconds > 3600) {
+      error.value = '请明确主题和合法的硬时长范围'; return;
+    }
+    if (condition.useBase && !props.editingBase) { error.value = '请先查看要继续生成的方案版本'; return; }
+    context.editing = {topic:condition.topic,minDurationMs:Math.round(condition.minSeconds*1000),maxDurationMs:Math.round(condition.maxSeconds*1000),profile:condition.profile,
+      ...(condition.useBase && props.editingBase ? {planId:props.editingBase.planId,baseRevisionId:props.editingBase.revisionId} : {})};
+  }
+  const body = { content, references: (references.value[id] ?? []).map(assetId => ({ type: 'ASSET', id: assetId })), context };
   const serialized = JSON.stringify(body);
   const identity = pending.get(id)?.serialized === serialized ? pending.get(id)! : { key: crypto.randomUUID(), serialized };
   pending.set(id, identity);
@@ -122,15 +138,26 @@ onUnmounted(() => { alive = false; clearInterval(timer); });
       <div class="messages" aria-live="polite">
         <article v-for="message in messages" :key="message.id" :aria-label="message.role === 'USER' ? '用户需求' : '助手答复'">
           <strong>{{ message.role === 'USER' ? '你' : '助手' }}</strong><p class="message-content">{{ message.content }}</p>
+          <button v-for="result in message.references.filter(item => item.type === 'PLAN_REVISION')" :key="result.id" class="secondary"
+            @click="emit('plan',{planId:result.planId!,revisionId:result.id,sessionId:selected})">查看方案 V{{ result.revisionNumber }}</button>
           <div v-for="citation in message.references.filter(item => item.type === 'EVIDENCE')" :key="citation.id" class="citation">
             <p>语音原文：{{ citation.text }}</p><small>{{ ((citation.startMs ?? 0)/1000).toFixed(2) }}–{{ ((citation.endMs ?? 0)/1000).toFixed(2) }} 秒 · 模型观察，建议回看核查</small>
             <button class="secondary" @click="inspect(citation)">核查引用原视频</button>
           </div>
         </article>
       </div>
-      <p v-if="running" role="status">正在查询素材；可以继续编辑草稿，完成后再发送。</p>
+      <p v-if="running" role="status">正在处理需求；可以继续编辑草稿，完成后再发送。</p>
       <p v-else-if="latestTask?.status === 'FAILED'" role="alert">本次对话未完成，未发布正式答复。</p>
       <form @submit.prevent="send">
+        <label for="intent-select">需求类型</label><select id="intent-select" v-model="settings.mode"><option value="QUERY">查询素材</option><option value="GENERATE_PLAN">生成讲话方案</option></select>
+        <fieldset v-if="settings.mode === 'GENERATE_PLAN'"><legend>本次明确制作条件</legend>
+          <label for="plan-topic">方案主题</label><input id="plan-topic" v-model="settings.topic" required maxlength="120">
+          <label for="minimum-duration">最短时长（秒）</label><input id="minimum-duration" v-model.number="settings.minSeconds" type="number" min="0.001" max="3600" step="0.001" required>
+          <label for="maximum-duration">最长时长（秒）</label><input id="maximum-duration" v-model.number="settings.maxSeconds" type="number" :min="settings.minSeconds" max="3600" step="0.001" required>
+          <label for="output-profile">输出画幅</label><select id="output-profile" v-model="settings.profile"><option value="LANDSCAPE_720">横屏 720p</option><option value="PORTRAIT_720">竖屏 720p</option></select>
+          <label class="choice"><input v-model="settings.useBase" type="checkbox" :disabled="!editingBase">基于正在查看的方案重新生成</label>
+          <p>未勾选时创建独立方案。硬时长无法满足时会解释，内部候选不会成为版本。</p>
+        </fieldset>
         <fieldset v-if="session.assetIds.length"><legend>本次明确引用</legend>
           <label v-for="asset in assets.filter(item => session?.assetIds.includes(item.id))" :key="asset.id" class="choice"><input v-model="references[selected]" type="checkbox" :value="asset.id" :aria-label="`引用素材 ${asset.filename}`">{{ asset.filename }}</label>
         </fieldset>

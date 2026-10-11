@@ -53,6 +53,10 @@ public class TaskController {
     @PostMapping("/internal/v1/tasks/{id}/provider-call")
     Map<String,Object> provider(@PathVariable UUID id,@Valid @RequestBody ProviderCall request) { return envelope(tasks.provider(id,request)); }
     public record ProviderCall(@NotNull UUID attemptId,@NotBlank String leaseToken,@NotBlank String action,@NotNull com.fasterxml.jackson.databind.JsonNode data) {}
+    @PostMapping("/internal/v1/tasks/{id}/validate-edit")
+    Map<String,Object> validateEdit(@PathVariable UUID id,@Valid @RequestBody Candidate request) { return envelope(tasks.validateEdit(id,request)); }
+    public record Candidate(@NotNull UUID attemptId,@NotBlank String leaseToken,
+            @NotBlank @Size(max=120) String producerKey,@NotNull com.fasterxml.jackson.databind.JsonNode proposal) {}
     public record Stopped(@NotNull UUID attemptId, @NotBlank String leaseToken, boolean processExited) {}
     @GetMapping("/api/v1/tasks/{id}")
     Map<String, Object> get(@PathVariable UUID id, Authentication account) {

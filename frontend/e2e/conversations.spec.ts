@@ -214,3 +214,104 @@ test('different evidence times in one video seek even when playback access retur
   expect(await video.evaluate((node: HTMLVideoElement) => node.currentTime)).toBeLessThan(hits[1].startMs / 1000 + 2);
   await expect(page.getByLabel('定位秒数', { exact: true })).toHaveValue(String(hits[1].startMs / 1000));
 });
+
+
+test('real Agent keeps the complete human-transcribed viewpoint inside a hard duration range', async ({ page }) => {
+  page.setDefaultTimeout(30000);
+  const post = async (path: string, data: unknown, key = crypto.randomUUID()) => {
+    const token = (await (await page.request.get('/api/v1/auth/csrf')).json()).data.csrfToken;
+    return page.request.post(`/api/v1${path}`, { headers: { 'X-XSRF-TOKEN': token, 'Idempotency-Key': key }, data });
+  };
+  const project = (await (await post('/projects', { name: '人工讲话的完整观点' })).json()).data;
+  await page.goto(`/?project=${project.id}`);
+  const uploaded = page.waitForResponse(response => response.url().endsWith('/complete'));
+  await page.getByLabel('选择视频', { exact: true }).setInputFiles('e2e/fixtures/human-speech.mp4');
+  const assetId = (await (await uploaded).json()).data.assetId;
+  await expect.poll(async () => (await (await page.request.get(`/api/v1/assets/${assetId}`)).json()).data.analysis?.stages.ASR,
+    { timeout: 180000 }).toBe('SUCCEEDED');
+  const originalAnalysis = (await (await page.request.get(`/api/v1/assets/${assetId}/evidence`)).json()).data;
+  const created = await post(`/projects/${project.id}/conversations`, { title: '篇章结束与新的开始', assetIds: [assetId] });
+  expect(created.status()).toBe(201);
+  const session = (await created.json()).data;
+  const request = { content: '生成一条7至11秒的横屏短视频方案，主题是篇章结束与新的开始。必须完整保留“这并不是告别”以及“这是一个篇章的结束，也是新篇章的开始”，不要截断观点。可以保留原视频中的句前句后停顿，但不要添加新素材、变速或重复片段。',
+    context: { editing: { topic: '篇章结束与新的开始', minDurationMs: 7000, maxDurationMs: 11000, profile: 'LANDSCAPE_720' } } };
+  const accepted = await post(`/conversations/${session.id}/turns`, request, 'human-initial-plan');
+  expect(accepted.status()).toBe(202);
+  const identity = (await accepted.json()).data;
+  await expect.poll(async () => (await (await page.request.get(`/api/v1/tasks/${identity.taskId}`)).json()).data.status,
+    { timeout: 180000 }).toBe('SUCCEEDED');
+  const versions = (await (await page.request.get(`/api/v1/plans/${identity.planId}/revisions`)).json()).data.items;
+  expect(versions).toHaveLength(1);
+  const revision = (await (await page.request.get(`/api/v1/revisions/${versions[0].id}`)).json()).data;
+  expect(revision.content.outputs).toHaveLength(1);
+  const output = revision.content.outputs[0];
+  expect(output.durationMs).toBeGreaterThanOrEqual(7000);
+  expect(output.durationMs).toBeLessThanOrEqual(11000);
+  // Independent human reference: FLEURS utterance 1906, attribution in fixtures/LICENSES.md.
+  const words = output.subtitles.cues.map((cue: {text:string}) => cue.text).join('').replace(/[^\p{Script=Han}]/gu, '');
+  expect(words).toBe('这并不是告别这是一个篇章的结束也是新篇章的开始');
+  for (const clip of output.clips) {
+    expect(clip.assetId).toBe(assetId); expect(clip.sourceInMs).toBeGreaterThanOrEqual(0);
+    expect(clip.sourceOutMs).toBeLessThanOrEqual(11000); expect(clip.sourceOutMs).toBeGreaterThan(clip.sourceInMs);
+    expect(clip.reason.length).toBeGreaterThan(0); expect(clip.evidenceIds.length).toBeGreaterThan(0);
+  }
+  const history = (await (await page.request.get(`/api/v1/conversations/${session.id}/messages`)).json()).data.items;
+  expect(history[1].references).toContainEqual(expect.objectContaining({ type: 'PLAN_REVISION', id: revision.id }));
+  await page.goto(`/?project=${project.id}`);
+  await expect(page.getByLabel('需求类型', {exact:true})).toBeVisible();
+  await page.getByRole('button', {name:'查看方案 V1',exact:true}).click();
+  await expect(page.getByLabel('查看版本', {exact:true})).toHaveValue(revision.id);
+  const selectedClip = page.getByRole('article', {name:'方案剪辑片段'}).first();
+  await expect(selectedClip).toContainText('human-speech.mp4');
+  await selectedClip.getByRole('button', {name:'播放源片段',exact:true}).click();
+  const video = page.getByLabel('视频播放器', {exact:true});
+  await expect.poll(() => video.evaluate((node: HTMLVideoElement) => node.readyState)).toBeGreaterThanOrEqual(1);
+  const endSeconds = output.clips[0].sourceOutMs/1000;
+  await video.evaluate((node: HTMLVideoElement, end: number) => {node.currentTime=end-0.05;void node.play();}, endSeconds);
+  await expect.poll(() => video.evaluate((node: HTMLVideoElement) => node.paused)).toBe(true);
+  expect(await video.evaluate((node: HTMLVideoElement) => node.currentTime)).toBeLessThanOrEqual(endSeconds+0.15);
+  await page.getByLabel('需求类型', {exact:true}).selectOption('GENERATE_PLAN');
+  await page.getByLabel('方案主题', {exact:true}).fill('篇章结束与新的开始');
+  await page.getByLabel('最短时长（秒）', {exact:true}).fill('7');
+  await page.getByLabel('最长时长（秒）', {exact:true}).fill('11');
+  await page.getByLabel('对话输入', {exact:true}).fill(request.content);
+  const uiAccepted = page.waitForResponse(response => response.url().endsWith('/turns') && response.request().method()==='POST');
+  await page.getByRole('button', {name:'发送需求',exact:true}).click();
+  const uiResponse = await uiAccepted;
+  expect(uiResponse.status()).toBe(202);
+  const uiIdentity = (await uiResponse.json()).data;
+  expect(uiIdentity.planId).not.toBe(identity.planId);
+  await expect(page.getByRole('article', {name:'助手答复'})).toHaveCount(2, {timeout:180000});
+  await expect(page.getByRole('article', {name:'助手答复'}).last().getByRole('button', {name:'查看方案 V1',exact:true})).toBeVisible();
+  await expect(page.getByLabel('查看版本', {exact:true})).toHaveValue(revision.id);
+  const reusedAnalysis = (await (await page.request.get(`/api/v1/assets/${assetId}/evidence`)).json()).data;
+  expect(reusedAnalysis.providerCalls).toEqual(originalAnalysis.providerCalls);
+  expect(reusedAnalysis.observations).toEqual(originalAnalysis.observations);
+  const impossible = await post(`/conversations/${session.id}/turns`, {
+    content: '只用这份11秒原视频生成12至13秒方案，不可添加素材、变速或重复。若不能满足，请说明原因。',
+    context: { editing: { topic:'篇章结束与新的开始', minDurationMs:12000, maxDurationMs:13000, profile:'LANDSCAPE_720' } },
+  });
+  expect(impossible.status()).toBe(202);
+  const impossibleIdentity = (await impossible.json()).data;
+  await expect.poll(async () => (await (await page.request.get(`/api/v1/tasks/${impossibleIdentity.taskId}`)).json()).data.status,
+    {timeout:180000}).toBe('SUCCEEDED');
+  expect((await (await page.request.get(`/api/v1/plans/${impossibleIdentity.planId}/revisions`)).json()).data.items).toHaveLength(0);
+  const explanation = (await (await page.request.get(`/api/v1/conversations/${session.id}/messages`)).json()).data.items.at(-1);
+  expect(explanation.role).toBe('ASSISTANT');
+  expect(explanation.content).toMatch(/无法|不能|不足|不满足|不够/);
+  const replay = (await (await post(`/conversations/${session.id}/turns`, request, 'human-initial-plan')).json()).data;
+  expect(replay).toEqual(identity);
+  expect((await (await page.request.get(`/api/v1/plans/${identity.planId}/revisions`)).json()).data.items).toHaveLength(1);
+  await page.getByRole('button', {name:'返回项目列表',exact:true}).click();
+  const isolatedProjectName = `无方案隔离项目-${Date.now()}`;
+  await page.getByLabel('项目名称', {exact:true}).fill(isolatedProjectName);
+  await page.getByRole('button', {name:'创建项目',exact:true}).click();
+  const projectSwitchRequests: string[] = [];
+  page.on('request', request => projectSwitchRequests.push(request.url()));
+  await page.getByRole('button', {name:isolatedProjectName,exact:true}).click();
+  await page.waitForLoadState('networkidle');
+  expect(projectSwitchRequests.some(url => url.includes(`/conversations/${session.id}/messages`))).toBe(false);
+  await expect(page.getByRole('region', {name:'编排剪辑方案'})).toContainText('暂无方案');
+  await expect(page.getByLabel('查看版本', {exact:true})).toHaveCount(0);
+  await expect(page.getByRole('article', {name:'方案剪辑片段'})).toHaveCount(0);
+});

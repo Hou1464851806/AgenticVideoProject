@@ -52,12 +52,14 @@ class TaskRecovery {
                     if("CANCEL_REQUESTED".equals(task.get("status"))) {
                         database.update("UPDATE tasks SET status='CANCELLED' WHERE id=?",task.get("id"));
                         database.update("UPDATE task_attempts SET status='CANCELLED' WHERE id=?",attempt);
+                        database.update("UPDATE edit_plans SET editing_task_id=NULL,editing_attempt_id=NULL WHERE editing_task_id=?",task.get("id"));
                         return;
                     }
                     database.update("UPDATE task_attempts SET status='EXPIRED' WHERE id=?",attempt);
                     if(((Number)task.get("attempt_number")).intValue()>=3) {
                         String error="{\"code\":\"EXECUTION_RECOVERY_EXHAUSTED\",\"message\":\"媒体执行中断，恢复次数已耗尽\"}";
                         database.update("UPDATE tasks SET status='FAILED',result_json=?::jsonb WHERE id=?",error,task.get("id"));
+                        database.update("UPDATE edit_plans SET editing_task_id=NULL,editing_attempt_id=NULL WHERE editing_task_id=?",task.get("id"));
                         if("MEDIA_PREPARE".equals(task.get("type"))) database.update("UPDATE assets SET validation_status='INVALID',error_json=?::jsonb WHERE id=(SELECT (input_json->>'assetId')::uuid FROM tasks WHERE id=?) AND validation_status='VALIDATING'",error,task.get("id"));
                         else database.update("UPDATE analysis_stages SET status='FAILED',error_json=?::jsonb WHERE task_id=? AND stage_key='ASR'",error,task.get("id"));
                         return;

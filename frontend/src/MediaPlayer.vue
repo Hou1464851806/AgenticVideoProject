@@ -81,6 +81,12 @@ function seek() {
   void video.value.play();
 }
 function inspectSpeech(observation: Observation) { seconds.value=String(observation.startMs/1000);seek(); }
+function enforceClipEnd() {
+  if (props.playback.endMs !== undefined && video.value && video.value.currentTime >= props.playback.endMs/1000) {
+    video.value.pause();
+    if (video.value.currentTime > props.playback.endMs/1000) video.value.currentTime = props.playback.endMs/1000;
+  }
+}
 </script>
 <template>
   <div>
@@ -96,7 +102,7 @@ function inspectSpeech(observation: Observation) { seconds.value=String(observat
     <p v-for="(name,key) in stageNames" :key="key">{{ name }}：{{ stageStates[information?.analysis?.stages[key] ?? 'PENDING'] ?? '状态待核对' }}</p>
     <p v-for="(failure,key) in information?.analysis?.errors" :key="`error-${key}`" role="alert">{{ failure.message }}</p>
     <video ref="video" :src="source" controls preload="metadata" aria-label="视频播放器"
-      @error="refreshAccess" @loadedmetadata="loaded" @loadeddata="refreshed = false"></video>
+      @error="refreshAccess" @loadedmetadata="loaded" @loadeddata="refreshed = false" @timeupdate="enforceClipEnd"></video>
     <form @submit.prevent="seek"><label for="seek-seconds">定位秒数</label><input id="seek-seconds" v-model="seconds" type="number" min="0" step="0.1"><button type="submit">定位播放</button></form>
     <section v-if="evidence?.observations.length">
       <h3>语音证据</h3>
