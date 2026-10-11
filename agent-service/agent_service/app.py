@@ -90,8 +90,14 @@ class Execution:
         self.finished = threading.Event()
 
     def check(self):
-        if self.stop.is_set() or datetime.now(timezone.utc) >= self.deadline:
+        if self.stop.is_set() or datetime.now(timezone.utc) >= self.deadline or self.remaining_budget() <= 0:
             raise LostAttempt()
+
+    def remaining_budget(self):
+        if "budgetDeadline" not in self.input:
+            return 90.0
+        deadline = datetime.fromisoformat(self.input["budgetDeadline"].replace("Z", "+00:00"))
+        return (deadline - datetime.now(timezone.utc)).total_seconds()
 
     def post(self, action, data):
         return business(f"/internal/v1/tasks/{self.task}/{action}", {**self.credentials, **data})
@@ -120,7 +126,7 @@ class Execution:
         heartbeat = threading.Thread(target=self.heartbeat, daemon=True)
         heartbeat.start()
         try:
-            if self.input.get("operation") == "VISION_ANALYZE":
+            if self.input.get("operation") in {"VISION_ANALYZE", "INSPECTION_ANALYZE"}:
                 from .vision import analyze_vision
                 analyze_vision(self)
                 return
@@ -203,7 +209,7 @@ class Execution:
             except Exception:
                 pass
         except Exception as failure:
-            if self.input.get("operation") == "VISION_ANALYZE":
+            if self.input.get("operation") in {"VISION_ANALYZE", "INSPECTION_ANALYZE"}:
                 try:
                     self.post("fail", {"producerKey":"vision-failed", "code":"VISION_UNVERIFIED", "message":str(failure) if isinstance(failure, RuntimeError) else "视觉分析未可靠完成；语音能力仍可使用"})
                 except Exception:

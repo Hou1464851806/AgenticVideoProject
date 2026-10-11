@@ -15,3 +15,5 @@ Other video fixtures are locally generated FFmpeg test patterns and tones.
 `labelled-vision-vfr.mp4` is a locally drawn red/blue rectangle fixture with Noto Sans CJK SC text (SIL Open Font License 1.1), encoded losslessly with irregular frame PTS. Its independently measured frame times and manually assigned scene/text labels are in `labelled-vision-vfr.json`. No audio is present.
 
 `speech-mention-only.mp4` uses the same red rectangle / 证据42 image and macOS Eddy zh_CN generated speech: “视频里提到一只猫，但当前画面只有红色矩形。” The image contains no cat. It verifies that audio mentions do not become visual observations; it is not a natural speech accuracy benchmark.
+
+`brief-small-text.mp4` is a locally drawn white/red rectangle fixture with 16-pixel Noto Sans CJK SC text (SIL Open Font License 1.1), visible from 900 through 1350 ms at 20 fps. Labels in `brief-small-text.json` were assigned from the drawing and timeline before model calls. It contains no airplane and no audio; it verifies bounded inspection of transient small text, not general OCR accuracy.

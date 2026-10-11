@@ -254,3 +254,11 @@ complete 结果类型为 MEDIA_PREPARED、ANALYSIS_RESULT、INDEX_VERIFIED、AGE
 - `POST /projects/{id}/search` 可用 `sourceKinds: ["SPEECH"|"VISUAL"|"VISIBLE_TEXT"]` 控制来源，省略保持语音。视觉命中及上下文返回 `observedAtMs` / `FRAME_OBSERVATION`，不返回 startMs/endMs。视觉 coverage 包含稀疏 sampling 和独立阶段／索引状态。
 - `POST /evidence/{id}/frame-access`：仅当前有效分析及项目所有者可签发 300 秒佐证帧链接，返回观察时刻。
 - `/assets/{id}/evidence` 的 `vision` 包含帧、视觉观察、模型调用记录和稀疏覆盖。语音 observations 单独返回；units 明确 sourceKind，视觉使用观察点。
+
+## 预算内视觉补查（#13）
+
+- `POST /projects/{project}/visual-inspections`：所有者、CSRF 与 Idempotency-Key；输入 assetId、query、sourceKind（VISUAL / VISIBLE_TEXT）、可选 startMs/endMs。省略范围则覆盖采样指定素材，提供范围则加密采样。202 返回持久轮次、当前权威 taskId、不可由客户端修改的预算与用量。
+- `GET /visual-inspections/{id}`：所有者读取状态、预算、用量、授权覆盖与追加观察（observedAtMs / FRAME_OBSERVATION）。终态包含 SUCCEEDED、NO_NEW_EVIDENCE、BUDGET_EXHAUSTED、FAILED、CANCELLED。
+- `POST /visual-inspections/{id}/expansion-proposal`：当前轮次结束后生成并复用拟扩大素材／范围／新增预算／费用说明；PROPOSED 不启动执行。
+- `POST /visual-inspections/{id}/expansion-decision`：`choice: APPROVE | DECLINE`，所有者明确选择；接受才产生 childInspectionId。重复相同选择幂等，不同选择 409；尚无方案返回 409，拒绝保留父轮结果。
+- 首轮 4 帧 / 4 调用 / 8 步 / 180 秒 / 4 MiB；明确接受的子轮 8 帧 / 8 调用 / 16 步 / 300 秒 / 8 MiB。预算与截止时间跨尝试保存，过期心跳 STOP，取消／版本／尝试失效不能发布。

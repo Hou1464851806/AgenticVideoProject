@@ -95,10 +95,10 @@ public class MediaExecutor {
                 }
             }
             var result=inspection.inspect(source,execution.input.path("sizeBytes").asLong(),execution.input.path("sha256").asText(),execution::stopped);
-            if("VISION_PREPARE".equals(execution.input.path("operation").asText())){
+            if(java.util.Set.of("VISION_PREPARE","INSPECTION_PREPARE").contains(execution.input.path("operation").asText())){
                 var prepared=prepareFrames(execution,source,result);
                 if(execution.stopped())throw new InterruptedException("Execution stopped");
-                report(execution,"complete",Map.of("attemptId",execution.attemptId,"leaseToken",execution.token,"producerKey","vision-frames-prepared","resultType","VISION_FRAMES_PREPARED","result",prepared));
+                report(execution,"complete",Map.of("attemptId",execution.attemptId,"leaseToken",execution.token,"producerKey","vision-frames-prepared","resultType",execution.input.has("inspectionId")?"INSPECTION_FRAMES_PREPARED":"VISION_FRAMES_PREPARED","result",prepared));
                 return;
             }
             var published=new java.util.LinkedHashMap<String,Object>(result);
@@ -128,6 +128,7 @@ public class MediaExecutor {
                 try { work.delete(directory); }
                 catch(java.io.IOException ignored) { /* Kept within this attempt's work directory for recovery cleanup. */ }
             }
+            if(execution.budgetExpired()&&!execution.cancelRequested)heartbeat(execution);
             if(execution.cancelRequested) {
                 try { report(execution,"cancelled",Map.of("attemptId",execution.attemptId,"leaseToken",execution.token,"processExited",true)); }
                 catch(Exception unavailable) { /* Recovery verifies the stopped runtime before finalizing cancellation. */ }
@@ -137,7 +138,9 @@ public class MediaExecutor {
     }
     private Map<String,Object> prepareFrames(Execution execution,Path source,Map<String,Object> media)throws Exception{
         @SuppressWarnings("unchecked") var mapping=(Map<String,Object>)media.get("timeMapping");
-        var result=new java.util.LinkedHashMap<String,Object>(frames.extract(source,((Number)media.get("durationMs")).longValue(),((Number)mapping.get("formatStartMs")).longValue(),execution::stopped));
+        long duration=((Number)media.get("durationMs")).longValue(),origin=((Number)mapping.get("formatStartMs")).longValue();
+        var extracted=execution.input.has("inspectionId")?frames.window(source,duration,origin,execution.input.path("startMs").asLong(),execution.input.path("endMs").asLong(),execution.input.path("maxFrames").asInt(),execution.input.path("samplingKind").asText(),execution::stopped):frames.extract(source,duration,origin,execution::stopped);
+        var result=new java.util.LinkedHashMap<String,Object>(extracted);
         var manifest=new java.util.ArrayList<Object>();
         for(Object item:(java.util.List<?>)result.get("frames")){
             @SuppressWarnings("unchecked") var frame=new java.util.LinkedHashMap<String,Object>((Map<String,Object>)item);
@@ -192,6 +195,7 @@ public class MediaExecutor {
         volatile Instant deadline; volatile boolean lost,cancelRequested;
         Execution(UUID task,UUID attempt,String token,Instant deadline,JsonNode input) { this.taskId=task;this.attemptId=attempt;this.token=token;this.deadline=deadline;this.input=input; }
         boolean expired() { return !Instant.now().isBefore(deadline); }
-        boolean stopped() { return lost || cancelRequested || expired(); }
+        boolean budgetExpired() { return input.has("budgetDeadline")&&!Instant.now().isBefore(Instant.parse(input.path("budgetDeadline").asText())); }
+        boolean stopped() { return lost || cancelRequested || expired() || budgetExpired(); }
     }
 }

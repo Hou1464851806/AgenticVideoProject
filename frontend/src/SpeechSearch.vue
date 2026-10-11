@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed,ref } from 'vue';
 import { request } from './api';
+import InspectionPanel from './InspectionPanel.vue';
 import type { Playback } from './AssetLibrary.vue';
 const props=defineProps<{projectId:string}>();
 const emit=defineEmits<{play:[value:Playback]}>();
@@ -15,6 +16,8 @@ const mode=ref('literal');
 const sourceKind=ref('SPEECH');
 const sourceNames:Record<string,string>={SPEECH:'语音',VISUAL:'画面',VISIBLE_TEXT:'可见文字'};
 const frames=ref<Record<string,string>>({});
+const inspection=ref<{key:string;assetId:string;sourceKind:string;query:string;observedAtMs?:number}|null>(null);
+function refine(assetId:string,kind:string,observedAtMs?:number){inspection.value={key:crypto.randomUUID(),assetId,sourceKind:kind,query:query.value,observedAtMs};}
 const result=ref<Result|null>(null);
 const busy=ref(false);
 const error=ref('');
@@ -70,6 +73,7 @@ function time(value:{startMs?:number;endMs?:number;observedAtMs?:number}){
           <p>{{asset.filename}} · {{sourceNames[asset.sourceKind]}}：{{coverageStates[asset.status]??'状态待核对'}}</p>
           <p>语义索引：{{asset.indexStatus==='SUCCEEDED'?'已就绪':coverageStates[asset.indexStatus]??'尚未构建'}}</p>
           <button v-if="asset.status==='SUCCEEDED'" type="button" @click="rebuild(asset.assetId)">重建语义索引</button>
+          <button v-if="asset.sourceKind!=='SPEECH'" type="button" @click="refine(asset.assetId,asset.sourceKind)">预算内覆盖补查</button>
           <p v-for="range in asset.processedRanges" :key="range.startMs">{{(range.startMs/1000).toFixed(2)}}–{{(range.endMs/1000).toFixed(2)}} 秒</p>
           <p v-if="asset.sourceKind==='SPEECH'&&asset.status==='SUCCEEDED'&&!asset.processedRanges.length">语音已分析，时间覆盖范围尚无法确认。</p>
         </div>
@@ -83,9 +87,11 @@ function time(value:{startMs?:number;endMs?:number;observedAtMs?:number}){
         <section v-if="contexts[hit.evidenceIds[0]!]" role="region" aria-label="邻近原文">
           <p v-for="observation in contexts[hit.evidenceIds[0]!]!.observations" :key="observation.id">{{time(observation)}} · {{observation.text}}</p>
         </section>
+        <button v-if="hit.sourceKind!=='SPEECH'" type="button" @click="refine(hit.assetId,hit.sourceKind,hit.observedAtMs)">预算内复查候选</button>
         <p>检索窗口不是最终剪辑切点，请回看原视频。</p>
       </article>
     </template>
+    <InspectionPanel v-if="inspection" :key="inspection.key" :project-id="projectId" :asset-id="inspection.assetId" :source-kind="inspection.sourceKind" :query="inspection.query" :observed-at-ms="inspection.observedAtMs" />
   </section>
 </template>
 <style scoped>

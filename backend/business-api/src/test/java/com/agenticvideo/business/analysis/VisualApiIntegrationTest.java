@@ -94,6 +94,116 @@ class VisualApiIntegrationTest {
         var response=owner.get("/assets/"+source.asset()+"/evidence");assertEquals(200,response.statusCode(),response.body());assertEquals(0,json(response).path("data").path("vision").path("observations").size());
     }
 
+    @Test
+    void expiredInspectionStopsAtHeartbeatWithoutResettingItsDeadline() throws Exception {
+        BrowserApi owner=signedIn("inspection-time-owner"),outsider=signedIn("inspection-time-outsider");
+        String project=json(owner.post("/projects","{\"name\":\"补查时间预算\"}")).path("data").path("id").asText();var source=speechFixture(project);
+        String body=new ObjectMapper().writeValueAsString(java.util.Map.of("assetId",source.asset(),"query","小字","sourceKind","VISIBLE_TEXT","startMs",500,"endMs",1500));
+        assertEquals(404,outsider.post("/projects/"+project+"/visual-inspections",body,"time-budget").statusCode());
+        var accepted=owner.post("/projects/"+project+"/visual-inspections",body,"time-budget");assertEquals(202,accepted.statusCode(),accepted.body());
+        var run=json(accepted).path("data");String id=run.path("id").asText(),task=run.path("taskId").asText();
+        assertEquals(4,run.path("budget").path("maxFrames").asInt());assertEquals(id,json(owner.post("/projects/"+project+"/visual-inspections",body,"time-budget")).path("data").path("id").asText());
+        assertEquals(404,outsider.get("/visual-inspections/"+id).statusCode());
+        var claim=json(internal(task,"claim",java.util.Map.of("executorId","bounded-time","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        // A prior elapsed deadline is external state; assertions remain at public/executor HTTP seams.
+        fixtures.update("UPDATE visual_inspections SET deadline_at=clock_timestamp()-interval '1 second' WHERE id=?",java.util.UUID.fromString(id));
+        var credentials=java.util.Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText());
+        var heartbeat=internal(task,"heartbeat",credentials);assertEquals(200,heartbeat.statusCode(),heartbeat.body());assertEquals("STOP",json(heartbeat).path("data").path("action").asText());
+        assertEquals("BUDGET_EXHAUSTED",json(owner.get("/visual-inspections/"+id)).path("data").path("status").asText());
+        assertEquals("CANCEL_REQUESTED",json(owner.get("/tasks/"+task)).path("data").path("status").asText());
+        assertEquals(200,internal(task,"cancelled",java.util.Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"processExited",true)).statusCode());
+        assertEquals("BUDGET_EXHAUSTED",json(owner.get("/visual-inspections/"+id)).path("data").path("status").asText());
+        assertEquals(1,json(owner.post("/projects/"+project+"/search","{\"query\":\"上传素材\",\"literalPhrase\":true}")).path("data").path("hits").size());
+    }
+
+    @Test
+    void inspectionCannotChargeAfterTheAssetAnalysisHeadIsRemoved() throws Exception {
+        BrowserApi owner=signedIn("inspection-head-owner");String project=json(owner.post("/projects","{\"name\":\"补查版本围栏\"}")).path("data").path("id").asText();var source=speechFixture(project);
+        var run=preparedInspection(owner,project,source.asset(),"head-fence");String task=run.path("taskId").asText();
+        var claim=json(internal(task,"claim",java.util.Map.of("executorId","bounded-head","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        fixtures.update("DELETE FROM asset_analysis_heads WHERE asset_id=?",source.asset());
+        var receipt=java.util.Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"action","LOOKUP","data",java.util.Map.of());
+        assertEquals(409,internal(task,"provider-call",receipt).statusCode());
+        assertEquals(0,json(owner.get("/visual-inspections/"+run.path("id").asText())).path("data").path("usage").path("calls").asInt());
+    }
+
+    @Test
+    void exhaustedCallStepAndInputAllowancesCannotBeResetByProviderActions() throws Exception {
+        BrowserApi owner=signedIn("inspection-limits-owner");String project=json(owner.post("/projects","{\"name\":\"补查程序预算\"}")).path("data").path("id").asText();
+        for(String limit:java.util.List.of("calls_used","steps_used","input_bytes_used")){
+            var source=speechFixture(project);var run=preparedInspection(owner,project,source.asset(),limit);String task=run.path("taskId").asText(),id=run.path("id").asText();
+            var claim=json(internal(task,"claim",java.util.Map.of("executorId","bounded-limit","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+            var receipt=new java.util.LinkedHashMap<String,Object>();receipt.put("attemptId",claim.path("attemptId").asText());receipt.put("leaseToken",claim.path("leaseToken").asText());receipt.put("action","LOOKUP");receipt.put("data",java.util.Map.of());
+            var frame=json(internal(task,"provider-call",receipt)).path("data").path("frames").get(0);
+            // Seed resources already consumed before an executor restart; clients cannot submit these counters.
+            long cap=switch(limit){case "calls_used"->4;case "steps_used"->8;default->4194304;};
+            fixtures.update("UPDATE visual_inspections SET "+limit+"=? WHERE id=?",cap,java.util.UUID.fromString(id));
+            receipt.put("action","PREPARE");receipt.put("data",java.util.Map.of("callId",frame.path("callId").asText(),"resetBudget",true,"maxCalls",1000));
+            var denied=internal(task,"provider-call",receipt);assertEquals(200,denied.statusCode(),denied.body());assertEquals(false,json(denied).path("data").path("canSubmit").asBoolean());
+            assertEquals("BUDGET_EXHAUSTED",json(owner.get("/visual-inspections/"+id)).path("data").path("status").asText());
+            assertEquals(409,internal(task,"provider-call",receipt).statusCode());
+            var usage=json(owner.get("/visual-inspections/"+id)).path("data").path("usage");String field=switch(limit){case "calls_used"->"calls";case "steps_used"->"steps";default->"inputBytes";};assertEquals(cap,usage.path(field).asLong());
+        }
+    }
+
+    @Test
+    void tooManyInspectionFramesAreRejectedAtomicallyAndCancellationFencesLateResults() throws Exception {
+        BrowserApi owner=signedIn("inspection-frames-owner");String project=json(owner.post("/projects","{\"name\":\"补查帧预算\"}")).path("data").path("id").asText();var source=speechFixture(project);
+        String body=new ObjectMapper().writeValueAsString(java.util.Map.of("assetId",source.asset(),"query","小字","sourceKind","VISIBLE_TEXT","startMs",500,"endMs",1500,"maxFrames",1000));
+        var run=json(owner.post("/projects/"+project+"/visual-inspections",body,"frame-limit")).path("data");assertEquals(4,run.path("budget").path("maxFrames").asInt());String task=run.path("taskId").asText(),id=run.path("id").asText();
+        var claim=json(internal(task,"claim",java.util.Map.of("executorId","bounded-frames","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        var frames=new java.util.ArrayList<Object>();for(int i=0;i<5;i++)frames.add(java.util.Map.of("ordinal",i,"observedAtMs",500+i*100,"sourcePts","0.5","objectKey","derived/frames/"+source.asset()+"/inspection/"+i+".jpg","sha256","c".repeat(64),"sizeBytes",1));
+        var report=java.util.Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","inspection-over-limit","resultType","INSPECTION_FRAMES_PREPARED","result",java.util.Map.of("frames",frames,"profile",java.util.Map.of("kind","BOUNDED_DENSE_FRAMES","complete",false)));
+        assertEquals(409,internal(task,"complete",report).statusCode());assertEquals(1,json(owner.get("/assets/"+source.asset()+"/evidence")).path("data").path("vision").path("frames").size());
+        assertEquals(202,owner.post("/tasks/"+task+"/cancel","{}").statusCode());assertEquals(200,internal(task,"cancelled",java.util.Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"processExited",true)).statusCode());
+        assertEquals(409,internal(task,"complete",report).statusCode());assertEquals("CANCELLED",json(owner.get("/visual-inspections/"+id)).path("data").path("status").asText());
+    }
+
+    @Test
+    void expansionProposalRequiresOwnershipAndChoiceIsDurableAndIdempotent() throws Exception {
+        BrowserApi owner=signedIn("inspection-choice-owner"),outsider=signedIn("inspection-choice-outsider");String project=json(owner.post("/projects","{\"name\":\"补查授权选择\"}")).path("data").path("id").asText();
+        for(String choice:java.util.List.of("DECLINE","APPROVE")){
+            var source=speechFixture(project);var run=preparedInspection(owner,project,source.asset(),choice);String id=run.path("id").asText();
+            assertEquals(409,owner.post("/visual-inspections/"+id+"/expansion-proposal","{}").statusCode());
+            assertEquals(409,owner.post("/visual-inspections/"+id+"/expansion-decision","{\"choice\":\"APPROVE\"}").statusCode());
+            // Seed an already finished inspection; real completion and visual observations are exercised in Compose.
+            fixtures.update("UPDATE visual_inspections SET status='NO_NEW_EVIDENCE' WHERE id=?",java.util.UUID.fromString(id));
+            assertEquals(404,outsider.post("/visual-inspections/"+id+"/expansion-proposal","{}").statusCode());
+            var proposal=json(owner.post("/visual-inspections/"+id+"/expansion-proposal","{}")).path("data");assertEquals("PROPOSED",proposal.path("status").asText());assertEquals(true,proposal.path("childInspectionId").isNull());
+            assertEquals(404,outsider.post("/visual-inspections/"+id+"/expansion-decision","{\"choice\":\"APPROVE\"}").statusCode());
+            var selected=owner.post("/visual-inspections/"+id+"/expansion-decision","{\"choice\":\""+choice+"\"}");assertEquals(200,selected.statusCode(),selected.body());var decision=json(selected).path("data");
+            assertEquals(decision,json(owner.post("/visual-inspections/"+id+"/expansion-decision","{\"choice\":\""+choice+"\"}")).path("data"));
+            assertEquals(409,owner.post("/visual-inspections/"+id+"/expansion-decision","{\"choice\":\""+("APPROVE".equals(choice)?"DECLINE":"APPROVE")+"\"}").statusCode());
+            assertEquals(4,json(owner.get("/visual-inspections/"+id)).path("data").path("budget").path("maxFrames").asInt());
+            if("APPROVE".equals(choice)){var child=json(owner.get("/visual-inspections/"+decision.path("childInspectionId").asText())).path("data");assertEquals("PENDING",child.path("status").asText());assertEquals(8,child.path("budget").path("maxFrames").asInt());assertEquals(0,child.path("usage").path("calls").asInt());}
+            else assertEquals(true,decision.path("childInspectionId").isNull());
+        }
+    }
+
+    @Test
+    void inspectionCannotSpendItsBudgetOnAFrameOutsideItsAuthorizedScope() throws Exception {
+        BrowserApi owner=signedIn("inspection-scope-owner");String project=json(owner.post("/projects","{\"name\":\"补查付费图像范围\"}")).path("data").path("id").asText();var source=speechFixture(project);
+        String baseline=json(owner.post("/assets/"+source.asset()+"/vision-analysis","{}")).path("data").path("taskId").asText();
+        var baseClaim=json(internal(baseline,"claim",java.util.Map.of("executorId","scope-baseline","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        var baseReceipt=java.util.Map.of("attemptId",baseClaim.path("attemptId").asText(),"leaseToken",baseClaim.path("leaseToken").asText(),"action","LOOKUP","data",java.util.Map.of());
+        String outsideCall=json(internal(baseline,"provider-call",baseReceipt)).path("data").path("frames").get(0).path("callId").asText();
+        var run=preparedInspection(owner,project,source.asset(),"scope-budget");String task=run.path("taskId").asText();
+        var claim=json(internal(task,"claim",java.util.Map.of("executorId","scope-inspection","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        var receipt=java.util.Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"action","PREPARE","data",java.util.Map.of("callId",outsideCall));
+        assertEquals(409,internal(task,"provider-call",receipt).statusCode());
+        var usage=json(owner.get("/visual-inspections/"+run.path("id").asText())).path("data").path("usage");assertEquals(0,usage.path("calls").asInt());assertEquals(0,usage.path("inputBytes").asInt());
+    }
+
+    private JsonNode preparedInspection(BrowserApi owner,String project,java.util.UUID asset,String key) throws Exception {
+        String body=new ObjectMapper().writeValueAsString(java.util.Map.of("assetId",asset,"query","小字","sourceKind","VISIBLE_TEXT","startMs",500,"endMs",1500));
+        var accepted=owner.post("/projects/"+project+"/visual-inspections",body,key);assertEquals(202,accepted.statusCode(),accepted.body());var run=json(accepted).path("data");String task=run.path("taskId").asText();
+        var claim=json(internal(task,"claim",java.util.Map.of("executorId","bounded-prepare","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        var frame=java.util.Map.of("ordinal",0,"observedAtMs",500,"sourcePts","0.5","objectKey","derived/frames/"+asset+"/inspection/frame.jpg","sha256","c".repeat(64),"sizeBytes",1);
+        var report=java.util.Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","inspection-frames","resultType","INSPECTION_FRAMES_PREPARED","result",java.util.Map.of("frames",java.util.List.of(frame),"profile",java.util.Map.of("kind","BOUNDED_DENSE_FRAMES","complete",false)));
+        var complete=internal(task,"complete",report);assertEquals(200,complete.statusCode(),complete.body());assertEquals(json(complete).path("data"),json(internal(task,"complete",report)).path("data"));
+        return json(owner.get("/visual-inspections/"+run.path("id").asText())).path("data");
+    }
+
     private record Speech(java.util.UUID asset, java.util.UUID first, java.util.UUID second) {}
     private Speech speechFixture(String project) {
         var projectId=java.util.UUID.fromString(project);

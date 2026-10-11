@@ -1,0 +1,332 @@
+{
+  "fixture": "brief-small-text.mp4",
+  "inspections": [
+    {
+      "id": "fe044196-2180-4091-8ab9-6c4e5b3efd5c",
+      "status": "SUCCEEDED",
+      "range": [
+        0,
+        4000
+      ],
+      "sampling": "BOUNDED_DENSE_FRAMES",
+      "budget": {
+        "maxCalls": 8,
+        "maxSteps": 16,
+        "maxFrames": 8,
+        "maxSeconds": 300,
+        "maxInputBytes": 8388608
+      },
+      "usage": {
+        "frames": 8,
+        "calls": 0,
+        "steps": 3,
+        "inputBytes": 0
+      },
+      "observations": [
+        {
+          "sourceKind": "VISUAL",
+          "text": "白色背景上有一个位于左上方的纯红色矩形。",
+          "observedAtMs": 3500,
+          "frameId": "f8c5d8a8-9bf5-436f-82bf-4e37e5a8b8e2",
+          "modelCallId": "90bdbb44-51e1-40c7-8f73-e45fd97907d0"
+        },
+        {
+          "sourceKind": "VISUAL",
+          "text": "白色背景上有一个位于左上方的纯红色矩形。",
+          "observedAtMs": 0,
+          "frameId": "26d79b38-e9c7-4536-b5da-6ab0b8bac472",
+          "modelCallId": "90bdbb44-51e1-40c7-8f73-e45fd97907d0"
+        },
+        {
+          "sourceKind": "VISUAL",
+          "text": "白色背景上有一个位于左上方的纯红色矩形。",
+          "observedAtMs": 500,
+          "frameId": "c4908927-f9bc-42df-8fce-e771e28226e5",
+          "modelCallId": "90bdbb44-51e1-40c7-8f73-e45fd97907d0"
+        },
+        {
+          "sourceKind": "VISUAL",
+          "text": "白色背景上有一个位于左上方的纯红色矩形，下方偏左位置有黑色文字“瞬时83”。",
+          "observedAtMs": 1000,
+          "frameId": "2112e6b8-00e3-4923-a993-4491f8ea4712",
+          "modelCallId": "d322c316-8aa7-41e7-89dd-aeae1927e596"
+        },
+        {
+          "sourceKind": "VISIBLE_TEXT",
+          "text": "瞬时83",
+          "observedAtMs": 1000,
+          "frameId": "2112e6b8-00e3-4923-a993-4491f8ea4712",
+          "modelCallId": "d322c316-8aa7-41e7-89dd-aeae1927e596"
+        },
+        {
+          "sourceKind": "VISUAL",
+          "text": "白色背景上有一个位于左上方的纯红色矩形。",
+          "observedAtMs": 1500,
+          "frameId": "f0195480-e5ff-4e17-8d55-b43e34846706",
+          "modelCallId": "90bdbb44-51e1-40c7-8f73-e45fd97907d0"
+        },
+        {
+          "sourceKind": "VISUAL",
+          "text": "白色背景上有一个位于左上方的纯红色矩形。",
+          "observedAtMs": 2000,
+          "frameId": "051cec29-5f4a-47ef-8179-6b49e69af3cd",
+          "modelCallId": "90bdbb44-51e1-40c7-8f73-e45fd97907d0"
+        },
+        {
+          "sourceKind": "VISUAL",
+          "text": "白色背景上有一个位于左上方的纯红色矩形。",
+          "observedAtMs": 2500,
+          "frameId": "ef707988-d8bd-49a4-b366-37659c22bd99",
+          "modelCallId": "90bdbb44-51e1-40c7-8f73-e45fd97907d0"
+        },
+        {
+          "sourceKind": "VISUAL",
+          "text": "白色背景上有一个位于左上方的纯红色矩形。",
+          "observedAtMs": 3000,
+          "frameId": "74986dde-5bdb-475d-9789-22fb8e872eb3",
+          "modelCallId": "90bdbb44-51e1-40c7-8f73-e45fd97907d0"
+        }
+      ]
+    },
+    {
+      "id": "fad5d29a-2b9c-4f61-be99-2d7b818a184d",
+      "status": "SUCCEEDED",
+      "range": [
+        0,
+        4000
+      ],
+      "sampling": "BOUNDED_COVERAGE_FRAMES",
+      "budget": {
+        "maxCalls": 4,
+        "maxSteps": 8,
+        "maxFrames": 4,
+        "maxSeconds": 180,
+        "maxInputBytes": 4194304
+      },
+      "usage": {
+        "frames": 4,
+        "calls": 0,
+        "steps": 3,
+        "inputBytes": 0
+      },
+      "observations": [
+        {
+          "sourceKind": "VISUAL",
+          "text": "白色背景上有一个位于左上方的纯红色矩形。",
+          "observedAtMs": 0,
+          "frameId": "e5cf7857-9bc2-48bb-8228-24cfdae3d147",
+          "modelCallId": "90bdbb44-51e1-40c7-8f73-e45fd97907d0"
+        },
+        {
+          "sourceKind": "VISUAL",
+          "text": "白色背景上有一个位于左上方的纯红色矩形，下方偏左位置有黑色文字“瞬时83”。",
+          "observedAtMs": 1000,
+          "frameId": "d0c12335-460b-4b71-816a-93ac2c5ba5e5",
+          "modelCallId": "d322c316-8aa7-41e7-89dd-aeae1927e596"
+        },
+        {
+          "sourceKind": "VISIBLE_TEXT",
+          "text": "瞬时83",
+          "observedAtMs": 1000,
+          "frameId": "d0c12335-460b-4b71-816a-93ac2c5ba5e5",
+          "modelCallId": "d322c316-8aa7-41e7-89dd-aeae1927e596"
+        },
+        {
+          "sourceKind": "VISUAL",
+          "text": "白色背景上有一个位于左上方的纯红色矩形。",
+          "observedAtMs": 2000,
+          "frameId": "d81e6576-b901-42e9-a9bd-e65ae64fc92e",
+          "modelCallId": "90bdbb44-51e1-40c7-8f73-e45fd97907d0"
+        },
+        {
+          "sourceKind": "VISUAL",
+          "text": "白色背景上有一个位于左上方的纯红色矩形。",
+          "observedAtMs": 3000,
+          "frameId": "e5cda4c3-9522-4c8c-8df0-31e7feab6cfd",
+          "modelCallId": "90bdbb44-51e1-40c7-8f73-e45fd97907d0"
+        }
+      ]
+    },
+    {
+      "id": "db39ee44-1cd3-447b-abb4-309b83640be7",
+      "status": "NO_NEW_EVIDENCE",
+      "range": [
+        0,
+        4000
+      ],
+      "sampling": "BOUNDED_COVERAGE_FRAMES",
+      "budget": {
+        "maxCalls": 4,
+        "maxSteps": 8,
+        "maxFrames": 4,
+        "maxSeconds": 180,
+        "maxInputBytes": 4194304
+      },
+      "usage": {
+        "frames": 4,
+        "calls": 0,
+        "steps": 3,
+        "inputBytes": 0
+      },
+      "observations": [
+        {
+          "sourceKind": "VISUAL",
+          "text": "白色背景上有一个位于左上方的纯红色矩形。",
+          "observedAtMs": 0,
+          "frameId": "93381dff-927c-4852-b638-051bcae6686d",
+          "modelCallId": "90bdbb44-51e1-40c7-8f73-e45fd97907d0"
+        },
+        {
+          "sourceKind": "VISUAL",
+          "text": "白色背景上有一个位于左上方的纯红色矩形，下方偏左位置有黑色文字“瞬时83”。",
+          "observedAtMs": 1000,
+          "frameId": "bf6dc0d2-3356-4740-ac7e-af002dd28f51",
+          "modelCallId": "d322c316-8aa7-41e7-89dd-aeae1927e596"
+        },
+        {
+          "sourceKind": "VISIBLE_TEXT",
+          "text": "瞬时83",
+          "observedAtMs": 1000,
+          "frameId": "bf6dc0d2-3356-4740-ac7e-af002dd28f51",
+          "modelCallId": "d322c316-8aa7-41e7-89dd-aeae1927e596"
+        },
+        {
+          "sourceKind": "VISUAL",
+          "text": "白色背景上有一个位于左上方的纯红色矩形。",
+          "observedAtMs": 2000,
+          "frameId": "833c9726-009b-4155-95a4-8dcabeb2bb8d",
+          "modelCallId": "90bdbb44-51e1-40c7-8f73-e45fd97907d0"
+        },
+        {
+          "sourceKind": "VISUAL",
+          "text": "白色背景上有一个位于左上方的纯红色矩形。",
+          "observedAtMs": 3000,
+          "frameId": "25be816f-1572-4ae6-99ba-ddc0b2368eeb",
+          "modelCallId": "90bdbb44-51e1-40c7-8f73-e45fd97907d0"
+        }
+      ]
+    },
+    {
+      "id": "543606f8-95c3-4296-a337-2cde2805d2bc",
+      "status": "SUCCEEDED",
+      "range": [
+        500,
+        1500
+      ],
+      "sampling": "BOUNDED_DENSE_FRAMES",
+      "budget": {
+        "maxCalls": 4,
+        "maxSteps": 8,
+        "maxFrames": 4,
+        "maxSeconds": 180,
+        "maxInputBytes": 4194304
+      },
+      "usage": {
+        "frames": 4,
+        "calls": 2,
+        "steps": 5,
+        "inputBytes": 13234
+      },
+      "observations": [
+        {
+          "sourceKind": "VISUAL",
+          "text": "白色背景上有一个位于左上方的纯红色矩形。",
+          "observedAtMs": 500,
+          "frameId": "0947ba73-1d9d-44e3-92ea-49b1d139e9b3",
+          "modelCallId": "90bdbb44-51e1-40c7-8f73-e45fd97907d0"
+        },
+        {
+          "sourceKind": "VISUAL",
+          "text": "白色背景上有一个位于左上方的纯红色矩形。",
+          "observedAtMs": 750,
+          "frameId": "a3d6ffdc-429b-47c2-b33b-7697a5f738fe",
+          "modelCallId": "90bdbb44-51e1-40c7-8f73-e45fd97907d0"
+        },
+        {
+          "sourceKind": "VISUAL",
+          "text": "白色背景上有一个位于左上方的纯红色矩形，下方偏左位置有黑色文字“瞬时83”。",
+          "observedAtMs": 1000,
+          "frameId": "79e8b3a7-f003-436e-9be7-798c8e629215",
+          "modelCallId": "d322c316-8aa7-41e7-89dd-aeae1927e596"
+        },
+        {
+          "sourceKind": "VISIBLE_TEXT",
+          "text": "瞬时83",
+          "observedAtMs": 1000,
+          "frameId": "79e8b3a7-f003-436e-9be7-798c8e629215",
+          "modelCallId": "d322c316-8aa7-41e7-89dd-aeae1927e596"
+        },
+        {
+          "sourceKind": "VISUAL",
+          "text": "白色背景上有一个位于左上方的纯红色矩形，下方偏左位置有黑色文字“瞬时83”。",
+          "observedAtMs": 1250,
+          "frameId": "38ea92c6-0439-4b5e-9749-7b959c10c0bd",
+          "modelCallId": "d322c316-8aa7-41e7-89dd-aeae1927e596"
+        },
+        {
+          "sourceKind": "VISIBLE_TEXT",
+          "text": "瞬时83",
+          "observedAtMs": 1250,
+          "frameId": "38ea92c6-0439-4b5e-9749-7b959c10c0bd",
+          "modelCallId": "d322c316-8aa7-41e7-89dd-aeae1927e596"
+        }
+      ]
+    }
+  ],
+  "providerCalls": [
+    {
+      "id": "90bdbb44-51e1-40c7-8f73-e45fd97907d0",
+      "model": "qwen3-vl-plus",
+      "status": "SUCCEEDED",
+      "requestId": "ea54031a-79f9-9721-a35e-0801e94cb0b8",
+      "usage": {
+        "image_tokens": 512,
+        "input_tokens": 597,
+        "total_tokens": 624,
+        "output_tokens": 27,
+        "input_tokens_details": {
+          "text_tokens": 85,
+          "image_tokens": 512
+        },
+        "output_tokens_details": {
+          "text_tokens": 27
+        },
+        "prompt_tokens_details": {
+          "cached_tokens": 384
+        }
+      },
+      "observation": {
+        "description": "白色背景上有一个位于左上方的纯红色矩形。",
+        "visibleText": []
+      }
+    },
+    {
+      "id": "d322c316-8aa7-41e7-89dd-aeae1927e596",
+      "model": "qwen3-vl-plus",
+      "status": "SUCCEEDED",
+      "requestId": "53940c4a-68ec-9e0e-9b3c-8d90e175c245",
+      "usage": {
+        "image_tokens": 512,
+        "input_tokens": 597,
+        "total_tokens": 643,
+        "output_tokens": 46,
+        "input_tokens_details": {
+          "text_tokens": 85,
+          "image_tokens": 512
+        },
+        "output_tokens_details": {
+          "text_tokens": 46
+        },
+        "prompt_tokens_details": {
+          "cached_tokens": 384
+        }
+      },
+      "observation": {
+        "description": "白色背景上有一个位于左上方的纯红色矩形，下方偏左位置有黑色文字“瞬时83”。",
+        "visibleText": [
+          "瞬时83"
+        ]
+      }
+    }
+  ]
+}

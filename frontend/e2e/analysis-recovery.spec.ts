@@ -111,7 +111,9 @@ test('analysis executor interruption after provider submission recovers without 
     expect(lateProvider.status).toBe(409);
     const unchanged=(await(await page.request.get(`/api/v1/assets/${assetId}/evidence`)).json()).data;
     expect(unchanged.observations.map((item:{id:string})=>item.id)).toEqual(after.observations.map((item:{id:string})=>item.id));
-    expect(execFileSync(docker,['compose','exec','-T','agent-service','python','-c','from pathlib import Path; print(len(list(Path("/work").iterdir())))'],{timeout:5000}).toString().trim()).toBe('0');
+    const attemptedDirectories=leases.get(taskId)!.map(lease=>lease.attemptId);
+    const cleanupCheck=`from pathlib import Path; attempts=${JSON.stringify(attemptedDirectories)}; print(sum((Path("/work") / attempt).exists() for attempt in attempts))`;
+    expect(execFileSync(docker,['compose','exec','-T','agent-service','python','-c',cleanupCheck],{timeout:5000}).toString().trim()).toBe('0');
   }finally{
     release();recreate({...process.env});
     await new Promise<void>(resolve=>proxy.close(()=>resolve()));

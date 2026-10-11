@@ -1,0 +1,12 @@
+{
+  "provenance": "Locally drawn and manually labelled synthetic video; no audio",
+  "durationMs": 4000,
+  "frameRate": "20/1",
+  "text": "瞬时83",
+  "textSizePixels": 16,
+  "visibleRangeMs": {"startMs": 900, "endMsExclusive": 1400},
+  "scene": "White background with red rectangle; no airplane",
+  "baselineSampleMs": [0, 2000],
+  "inspectionSampleMs": [500, 750, 1000, 1250],
+  "inspectionTextHitMs": [1000, 1250]
+}

@@ -30,10 +30,12 @@ def analyze_vision(execution):
             body.close()
         if len(image) != frame["sizeBytes"] or hashlib.sha256(image).hexdigest() != frame["sha256"]:
             raise RuntimeError("代表帧身份校验失败")
-        execution.provider("PREPARE", {"callId":frame["callId"]})
+        grant=execution.provider("PREPARE", {"callId":frame["callId"]})
+        if not grant.get("canSubmit"):
+            raise RuntimeError("补查预算已耗尽，停止新增视觉调用")
         try:
             response = requests.post(os.environ.get("DASHSCOPE_BASE_URL","https://dashscope.aliyuncs.com/api/v1").rstrip("/")+"/services/aigc/multimodal-generation/generation",
-                headers={"Authorization":"Bearer "+os.environ["DASHSCOPE_API_KEY"]}, timeout=(3,90),
+                headers={"Authorization":"Bearer "+os.environ["DASHSCOPE_API_KEY"]}, timeout=(min(3,max(0.01,execution.remaining_budget()/2)),min(90,max(0.01,execution.remaining_budget()/2))),
                 json={"model":manifest["model"],"input":{"messages":[{"role":"user","content":[
                     {"image":"data:image/jpeg;base64,"+base64.b64encode(image).decode()},
                     {"text":"只观察输入的单张图片，不推断音频、前后事件或持续区间。返回严格JSON对象，description为实际画面场景与物体的中文描述，不混入屏幕文字；visibleText为可见文字逐条原样转写的字符串数组（包括数字），没有文字返回空数组。格式：{\"description\":\"...\",\"visibleText\":[\"...\"]}。"}]}]},
@@ -52,4 +54,4 @@ def analyze_vision(execution):
         execution.check()
         execution.provider("SUCCEEDED", {"callId":frame["callId"],"observation":observation,"requestId":result.get("request_id",""),"usage":result.get("usage",{})})
     execution.check()
-    execution.post("complete", {"producerKey":"vision-analyzed","resultType":"VISION_ANALYZED","result":{}})
+    execution.post("complete", {"producerKey":"vision-analyzed","resultType":"INSPECTION_ANALYZED" if execution.input.get("inspectionId") else "VISION_ANALYZED","result":{}})
