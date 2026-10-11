@@ -158,6 +158,16 @@ SearchHit 基线：assetId、retrievalUnitId、evidenceIds、sourceKind、text�
 
 消息内容为类型化 block：TEXT、EVIDENCE_CARD、QUESTION_CARD、PLAN_RESULT_CARD、TASK_RESULT_CARD，所有卡片身份由后端校验。生成中的文字／卡片只能作草稿展示，版本结果卡仅在成功提交后发布。用户可自然语言修正简报，历史不提供原地编辑／成功回复任意 regenerate 端点。
 
+## 当前已实现的低清预览（#24）
+
+`POST /revisions/{revisionId}/previews` 要求 `Idempotency-Key`（1–200 字符）及 `{outputId,previewProfile:"LOW_360"}`，返回 202 与 `{requestId,revisionId,outputId,taskId,kind,status,configuration,artifactId?}`。同项目预览意图的同键重放返回原接纳回执，同键改变输入返回 409；失败或取消后重新生成使用新键。请求与任务关系不可变，显式重试产生新请求；不同键的相同有效预览仍复用同一任务／产物。
+
+`GET /revisions/{revisionId}/previews` 返回该版本请求历史；`GET /render-requests/{requestId}` 返回固定任务当前状态及失败原因。`POST /artifacts/{artifactId}/playback-access` 校验项目权限及对象存在，返回五分钟播放 URL、durationMs、expiresInSeconds；产物不存在或未发布返回 410，他人产物返回 404。公开接口不返回上传目标。
+
+实际规格为横屏 640×360／竖屏 360×640、30fps、H.264 CRF28／800kbps 上限、AAC 64kbps／48kHz／双声道、按显示比例留边。Worker 使用固定版本内的字幕与片段，不重调 ASR；无音轨片段补静音。缓存包含版本、输出、实际配置、渲染规则及素材校验值；中文字体包版本计入配置。更新渲染规则不会复用旧规则缓存。
+
+预览执行器回报使用 `PREVIEW_RENDERED`，业务端核对当前尝试的服务端上传目标、对象大小、时长与音视频规格；重复完成回报返回同一产物。取消以执行进程退出确认终结；未发布对象仅在所属尝试已终结／确认失效后清理，失败删除由独立扫描重试。
+
 ## 方案、预览与正式导出
 
 | 方法与路径 | 语义 |

@@ -8,3 +8,5 @@
 **/.venv/
 **/__pycache__/
 .scratch/asr-fixture/
+.scratch/preview-diagnosis/
+.scratch/preview-verification/

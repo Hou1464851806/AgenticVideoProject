@@ -52,6 +52,7 @@ services:
       dockerfile: backend/media-worker/Dockerfile
     platform: linux/arm64
     environment:
+      BUSINESS_API_URL: ${MEDIA_BUSINESS_API_URL:-http://business-api:8080}
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USER: agentic-worker
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}

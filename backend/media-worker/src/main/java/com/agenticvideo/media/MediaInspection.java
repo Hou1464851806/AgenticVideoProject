@@ -80,9 +80,9 @@ public class MediaInspection {
         return Map.of("sizeBytes",Files.size(audio),"sha256",HexFormat.of().formatHex(digest.digest()),"sourceOffsetMs",offset,
                 "sampleRate",16000,"channels",1,"format","wav","rule","mono-16k-pcm-pts-v1");
     }
-    private String run(List<String> command, Path directory, int timeoutSeconds, BooleanSupplier stopped) throws IOException, InterruptedException {
+    String run(List<String> command, Path directory, int timeoutSeconds, BooleanSupplier stopped) throws IOException, InterruptedException {
         Path output = Files.createTempFile(directory, "probe-", ".log");
-        Process process = new ProcessBuilder(command).redirectErrorStream(true).redirectOutput(output.toFile()).start();
+        Process process = new ProcessBuilder(command).directory(directory.toFile()).redirectErrorStream(true).redirectOutput(output.toFile()).start();
         try {
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds);
             while (!process.waitFor(200, TimeUnit.MILLISECONDS)) {

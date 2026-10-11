@@ -9,12 +9,42 @@ const emit = defineEmits<{ play: [value: Playback]; base: [value: PlanBase | nul
 type Plan = { id: string; title: string; editingTaskId: string | null };
 type Version = { id: string; revisionNumber: number; parentRevisionId: string | null };
 type Clip = { clipId: string; assetId: string; sourceInMs: number; sourceOutMs: number; reason: string; evidenceIds: string[] };
-type Output = { title: string; durationMs: number; clips: Clip[]; render: {width:number;height:number}; subtitles: {cues:{startMs:number;endMs:number;text:string}[]} };
+type Output = { outputId:string; title: string; durationMs: number; clips: Clip[]; render: {width:number;height:number}; subtitles: {cues:{startMs:number;endMs:number;text:string}[]} };
 type Revision = Version & { planId: string; content: {outputs: Output[]} };
 const plans = ref<Plan[]>([]), versions = ref<Version[]>([]);
 const selectedPlan = ref(''), selectedRevision = ref('');
 const current = ref<Revision | null>(null), names = ref<Record<string,string>>({});
 const error = ref(''), stopping = ref(false), loading = ref(false);
+type Preview = {requestId:string;taskId:string;revisionId:string;status:string;artifactId?:string;error?:{message:string}};
+const preview=ref<Preview|null>(null),previewVersion=ref(0),previewUrl=ref(''),previewBusy=ref(false);
+let previewRefreshing=false;
+async function generatePreview(output:Output) {
+  if(!current.value || previewBusy.value)return;
+  const revision=current.value.id,version=current.value.revisionNumber;
+  previewBusy.value=true;error.value='';
+  try {
+    const result=await request<Preview>(`/revisions/${revision}/previews`,'POST',{outputId:output.outputId,previewProfile:'LOW_360'},{'Idempotency-Key':crypto.randomUUID()});
+    if(alive){preview.value=result;previewVersion.value=version;previewUrl.value='';}
+  }catch(failure){if(alive)error.value=failure instanceof Error?failure.message:'无法生成预览';}
+  finally{if(alive)previewBusy.value=false;}
+}
+async function refreshPreview(){
+  if(!preview.value || previewRefreshing)return;
+  const id=preview.value.requestId;previewRefreshing=true;
+  try{const result=await request<Preview>(`/render-requests/${id}`);if(alive && preview.value?.requestId===id)preview.value=result;}
+  catch(failure){if(alive)error.value=failure instanceof Error?failure.message:'无法读取预览';}
+  finally{previewRefreshing=false;}
+}
+async function playPreview(){
+  const artifact=preview.value?.artifactId;if(!artifact)return;
+  try{const result=await request<{url:string}>(`/artifacts/${artifact}/playback-access`,'POST',{});if(alive && preview.value?.artifactId===artifact)previewUrl.value=result.url;}
+  catch(failure){if(alive)error.value=failure instanceof Error?failure.message:'无法播放预览';}
+}
+async function cancelPreview(){
+  const task=preview.value?.taskId;if(!task)return;
+  try{await request(`/tasks/${task}/cancel`,'POST',{});await refreshPreview();}
+  catch(failure){if(alive)error.value=failure instanceof Error?failure.message:'无法停止预览';}
+}
 let alive = true, refreshing = false, epoch = 0;
 let timer: ReturnType<typeof setInterval> | undefined;
 async function refresh() {
@@ -89,7 +119,7 @@ async function stop(taskId: string) {
 }
 watch(() => props.selection, selection => { if (selection) void openRevision(selection.planId,selection.revisionId); });
 watch(() => props.sessionId, () => { void restoreView(); });
-onMounted(async () => { await refresh(); await restoreView(); timer = setInterval(() => {void refresh();},1000); });
+onMounted(async () => { await refresh(); await restoreView(); timer = setInterval(() => {void refresh();void refreshPreview();},1000); });
 onUnmounted(() => { alive = false; ++epoch; clearInterval(timer); });
 </script>
 <template>
@@ -121,11 +151,20 @@ onUnmounted(() => { alive = false; ++epoch; clearInterval(timer); });
             <p>原素材 {{ (clip.sourceInMs/1000).toFixed(3) }}–{{ (clip.sourceOutMs/1000).toFixed(3) }} 秒</p>
             <p>选取依据：{{ clip.reason }}</p><button class="secondary" @click="play(clip)">播放源片段</button>
           </article>
+          <button class="secondary" :disabled="previewBusy" @click="generatePreview(output)">生成低清效果预览</button>
           <details><summary>映射后的原文字幕</summary><p v-for="(cue,index) in output.subtitles.cues" :key="index">{{ (cue.startMs/1000).toFixed(3) }}–{{ (cue.endMs/1000).toFixed(3) }} 秒 · {{ cue.text }}</p></details>
         </div>
         <p>当前为编排方案；核查后再决定制作。生成方案不会自动预览或导出。</p>
       </div>
     </template>
+    <section v-if="preview" aria-label="低清效果预览">
+      <h4>低清效果预览 · 固定 V{{ previewVersion }}</h4>
+      <p role="status">{{ ({PENDING:'等待合成',RUNNING:'正在合成',CANCEL_REQUESTED:'正在停止',CANCELLED:'已停止',SUCCEEDED:'合成完成',FAILED:'合成失败'} as Record<string,string>)[preview.status] }}</p>
+      <p v-if="preview.error" role="alert">{{ preview.error.message }}</p>
+      <button v-if="['PENDING','RUNNING'].includes(preview.status)" class="secondary" @click="cancelPreview">停止预览</button>
+      <button v-if="preview.status==='SUCCEEDED'" class="secondary" @click="playPreview">播放低清预览</button>
+      <video v-if="previewUrl" :src="previewUrl" controls aria-label="低清合成预览播放器" style="width:100%;max-height:420px" />
+    </section>
   </section>
 </template>
 <style scoped>

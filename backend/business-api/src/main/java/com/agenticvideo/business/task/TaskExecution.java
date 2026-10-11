@@ -25,13 +25,15 @@ public class TaskExecution {
     private final com.agenticvideo.business.analysis.SpeechAnalysis speech;
     private final com.agenticvideo.business.conversation.ConversationTurns conversations;
     private final com.agenticvideo.business.plan.EditPlans plans;
+    private final com.agenticvideo.business.render.RenderArtifacts artifacts;
     TaskExecution(JdbcTemplate database, PlatformTransactionManager manager, ObjectMapper json,
             @Value("${internal.worker-token:}") String secret, com.agenticvideo.business.analysis.SpeechAnalysis speech,
             com.agenticvideo.business.conversation.ConversationTurns conversations,
-            com.agenticvideo.business.plan.EditPlans plans) {
+            com.agenticvideo.business.plan.EditPlans plans,com.agenticvideo.business.render.RenderArtifacts artifacts) {
         this.database = database; this.transactions = new TransactionTemplate(manager); this.json = json; this.secret = secret;this.speech=speech;
         this.conversations = conversations;
         this.plans = plans;
+        this.artifacts = artifacts;
     }
     public Map<String, Object> read(UUID id) {
         var tasks = database.queryForList("SELECT * FROM tasks WHERE id=?", id);
@@ -44,7 +46,7 @@ public class TaskExecution {
             var rows = database.queryForList("SELECT * FROM tasks WHERE id=? FOR UPDATE", id);
             if (rows.isEmpty()) throw new ResponseStatusException(NOT_FOUND, "任务不存在");
             var task = rows.get(0);
-            if (!java.util.List.of("MEDIA_PREPARE","CONTENT_ANALYZE","AGENT_TURN").contains(task.get("type"))) throw new ResponseStatusException(CONFLICT, "执行器不能领取此任务类型");
+            if (!java.util.List.of("MEDIA_PREPARE","CONTENT_ANALYZE","AGENT_TURN","PREVIEW_RENDER").contains(task.get("type"))) throw new ResponseStatusException(CONFLICT, "执行器不能领取此任务类型");
             if ("RUNNING".equals(task.get("status"))) {
                 var attempt = database.queryForMap("SELECT *, lease_expires_at>now() AS valid FROM task_attempts WHERE id=?", task.get("current_attempt_id"));
                 if (request.executorId().equals(attempt.get("executor_id")) && request.claimRequestId().equals(attempt.get("claim_request_id")) && Boolean.TRUE.equals(attempt.get("valid")))
@@ -96,7 +98,7 @@ public class TaskExecution {
         });
     }
     public Object cancelled(UUID id, TaskController.Stopped request) {
-        return transactions.execute(tx -> {
+        Object outcome=transactions.execute(tx -> {
             var task = locked(id);
             requireAttempt(task, request.attemptId(), request.leaseToken(), false);
             if (!request.processExited()) throw new ResponseStatusException(CONFLICT, "执行进程尚未退出");
@@ -107,12 +109,15 @@ public class TaskExecution {
             plans.release(id);
             return Map.of("status", "CANCELLED");
         });
+        artifacts.cleanupTask(id);
+        return outcome;
     }
     public Object complete(UUID id, TaskController.Completed request) {
         return transactions.execute(tx -> {
             var task = locked(id);
             if (!("MEDIA_PREPARED".equals(request.resultType()) && "MEDIA_PREPARE".equals(task.get("type")))
                     && !("SPEECH_ANALYZED".equals(request.resultType()) && "CONTENT_ANALYZE".equals(task.get("type")))
+                    && !("PREVIEW_RENDERED".equals(request.resultType()) && "PREVIEW_RENDER".equals(task.get("type")))
                     && !(java.util.Set.of("CONVERSATION_ANSWERED", "EDIT_PROPOSAL").contains(request.resultType()) && "AGENT_TURN".equals(task.get("type"))))
                 throw new ResponseStatusException(CONFLICT, "任务结果类型不匹配");
             String result = request.result().toString();
@@ -137,6 +142,16 @@ public class TaskExecution {
             com.fasterxml.jackson.databind.JsonNode input;
             try { input = json.readTree(task.get("input_json").toString()); }
             catch (java.io.IOException invalid) { throw new IllegalStateException(invalid); }
+            if("PREVIEW_RENDER".equals(task.get("type"))) {
+                Object outcome=artifacts.publish(task,input,request.result());
+                String receipt;
+                try{receipt=json.writeValueAsString(outcome);}catch(java.io.IOException invalid){throw new IllegalStateException(invalid);}
+                database.update("UPDATE tasks SET status='SUCCEEDED',result_json=?::jsonb WHERE id=?",result,id);
+                database.update("UPDATE task_attempts SET status='SUCCEEDED' WHERE id=?",request.attemptId());
+                database.update("INSERT INTO execution_reports(task_id,attempt_id,report_kind,producer_key,payload_json,outcome_json,result_type) VALUES (?,?,'COMPLETE',?,?::jsonb,?::jsonb,?)",
+                        id,request.attemptId(),request.producerKey(),result,receipt,request.resultType());
+                return outcome;
+            }
             if ("AGENT_TURN".equals(task.get("type"))) {
                 if ("CONVERSATION_ANSWERED".equals(request.resultType()) && request.result().has("planRevision"))
                     throw new ResponseStatusException(CONFLICT, "方案结果身份必须由后端成功提交分配");
@@ -185,7 +200,7 @@ public class TaskExecution {
     public Object fail(UUID id,TaskController.Failed request) {
         return transactions.execute(tx -> {
             var task=locked(id);
-            if(!java.util.List.of("MEDIA_PREPARE","CONTENT_ANALYZE","AGENT_TURN").contains(task.get("type"))) throw new ResponseStatusException(CONFLICT,"任务结果类型不匹配");
+            if(!java.util.List.of("MEDIA_PREPARE","CONTENT_ANALYZE","AGENT_TURN","PREVIEW_RENDER").contains(task.get("type"))) throw new ResponseStatusException(CONFLICT,"任务结果类型不匹配");
             String payload;
             try { payload=json.writeValueAsString(Map.of("code",request.code(),"message",request.message())); }
             catch(java.io.IOException invalid) { throw new IllegalStateException(invalid); }
@@ -199,7 +214,7 @@ public class TaskExecution {
             }
             var attempt=requireAttempt(task,request.attemptId(),request.leaseToken(),true);
             if(!"RUNNING".equals(task.get("status"))) throw new ResponseStatusException(CONFLICT,"任务已失去回报资格");
-            if ("AGENT_TURN".equals(task.get("type"))) {
+            if (java.util.Set.of("AGENT_TURN","PREVIEW_RENDER").contains(task.get("type"))) {
                 database.update("UPDATE task_attempts SET status='FAILED' WHERE id=?", request.attemptId());
                 database.update("UPDATE tasks SET status='FAILED',result_json=?::jsonb WHERE id=?", payload, id);
                 plans.release(id);
@@ -251,9 +266,11 @@ public class TaskExecution {
     private Object claimed(Map<String, Object> task, Map<String, Object> attempt) {
         UUID id = (UUID) attempt.get("id");
         try {
+            var input=json.readTree(task.get("input_json").toString());
+            if("PREVIEW_RENDER".equals(task.get("type")))input=artifacts.prepare(task,id,input);
             return Map.of("taskId", task.get("id"), "status", "RUNNING", "claimed", true, "attemptId", id,
                     "leaseToken", token(id), "leaseExpiresAt", ((java.sql.Timestamp) attempt.get("lease_expires_at")).toInstant().toString(),
-                    "input", json.readTree(task.get("input_json").toString()));
+                    "input", input);
         } catch (java.io.IOException invalid) { throw new IllegalStateException("Invalid persisted task input", invalid); }
     }
     public Object provider(UUID id,TaskController.ProviderCall request) {

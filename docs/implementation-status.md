@@ -2,7 +2,7 @@
 
 本轮按 ready-for-agent 的 32 张子任务实施；#1 为汇总需求。实施起点为 `63efde7`，在当前 main 分支逐票提交。
 
-用户已要求恢复实施。#20 已完成，接下来处理可开始的 P0 任务 #24。
+用户已要求恢复实施。#24 已完成，接下来处理可开始的 P0 任务 #25。
 
 已确认测试边界：公开 HTTP 接口为主，关键 PostgreSQL／对象存储／消息／媒体／模型边界使用真实集成；浏览器验证用户操作闭环。
 
@@ -30,7 +30,7 @@
 | [#21](https://github.com/Hou1464851806/AgenticVideoProject/issues/21) [T20] 一次生成多条短视频成片定义 | P1 | #20 | 待实施 |
 | [#22](https://github.com/Hou1464851806/AgenticVideoProject/issues/22) [T21] 手动调整片段并从任意历史版本继续 | P1 | #20 | 待实施 |
 | [#23](https://github.com/Hou1464851806/AgenticVideoProject/issues/23) [T22] 对话替换指定片段并保留其他内容 | P1 | #18, #20 | 待实施 |
-| [#24](https://github.com/Hou1464851806/AgenticVideoProject/issues/24) [T23] 手动生成带原声与字幕的低清效果预览 | P0 | #20 | 待实施 |
+| [#24](https://github.com/Hou1464851806/AgenticVideoProject/issues/24) [T23] 手动生成带原声与字幕的低清效果预览 | P0 | #20 | 实现与验证完成，见 [记录](verification/issue-24.md) |
 | [#25](https://github.com/Hou1464851806/AgenticVideoProject/issues/25) [T24] 确认具体版本后明确导出并下载一条成片 | P0 | #24 | 待实施 |
 | [#26](https://github.com/Hou1464851806/AgenticVideoProject/issues/26) [T25] 批量导出选定成片并展示部分完成 | P1 | #21, #25 | 待实施 |
 | [#27](https://github.com/Hou1464851806/AgenticVideoProject/issues/27) [T26] 按需求跨素材编排并导出基础混剪 | P1 | #25 | 待实施 |
