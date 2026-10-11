@@ -218,3 +218,13 @@ complete 结果类型为 MEDIA_PREPARED、ANALYSIS_RESULT、INDEX_VERIFIED、AGE
 ## 验收
 
 接口契约测试覆盖鉴权与项目关联、输入上限、时间／大小单位、幂等同键异输入、忙碌冲突、固定基准、WAITING_INPUT 回答、旧尝试拒绝、确认与导出分离、历史引用删除保护和 SSE 快照恢复。真实对象存储与模型的联调不能由 mock 契约通过替代。
+
+## #25 已实现的单条正式导出契约
+
+- `POST /revisions/{id}/confirmations` 仅接收 `{explicitIntent:"CONFIRM"}`，必填 `Idempotency-Key`；来源由服务器记录，客户端不能伪造用户消息。`GET` 同路径读取该版本确认。
+- `GET /revisions/{id}/export-requests` 按项目权限返回该不可变版本的正式导出历史，包含时间、规格、任务与产物身份；刷新或后续任务失败后可再次选择旧成功成片。
+- `POST /revisions/{id}/export-requests` 接收 `outputIds`（本票恰好一条）、`confirmationId`、`exportProfile`（`HD_720`／`FULL_HD_1080`）、`explicitIntent:"EXPORT"` 和必填幂等键。返回单个固定输入任务回执；新的意图独立创建任务，同键同输入复用回执。多输出聚合由 #26 实施。
+- 正式任务为 `EXPORT_RENDER`，当前尝试获得 `exports/{requestId}/{attemptId}.mp4` 专属上传目标，完成类型 `EXPORT_RENDERED`。受控规格、源校验与进程退出协议复用预览执行器，默认并发为 1。
+- `POST /artifacts/{id}/playback-access` 与 `POST /artifacts/{id}/download-access` 在项目鉴权及文件存在校验后签发五分钟 URL；下载带服务器生成的 attachment 文件名，不删除文件。
+- `GET /artifacts/{id}` 返回正式产物状态及实际 `storedBytes`；`DELETE` 同路径必须提交 `{explicitIntent:"DELETE"}`。删除意图持久化后才移除对象并核查不存在；存储故障保持 `DELETE_PENDING`，独立扫描重试，不误报释放空间。原素材不在该删除路径内。
+- 制作会话的直接 USER 消息支持 `确认当前版本`／`确认V1`，以及另行 `导出当前版本 720p`／`导出V1 1080p`；多条成片时要求 `第1条` 等明确选择。问句、否定、合并确认与导出等不匹配指令只澄清，不进入 Agent 或正式渲染。未明确清晰度时使用 720p。确认和导出保存实际 USER 消息身份，Agent 回复不能制造授权。

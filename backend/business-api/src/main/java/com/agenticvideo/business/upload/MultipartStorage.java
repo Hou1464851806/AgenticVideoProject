@@ -102,6 +102,11 @@ public class MultipartStorage {
         return presigner.presignGetObject(b -> b.signatureDuration(Duration.ofMinutes(5))
                 .getObjectRequest(r -> r.bucket(bucket).key(key))).url().toString();
     }
+    public String downloadUrl(String key, java.util.UUID artifactId) {
+        return presigner.presignGetObject(b -> b.signatureDuration(Duration.ofMinutes(5))
+                .getObjectRequest(r -> r.bucket(bucket).key(key)
+                        .responseContentDisposition("attachment; filename=\"export-"+artifactId+".mp4\""))).url().toString();
+    }
     public List<Part> parts(String key, String uploadId) {
         List<Part> parts = new ArrayList<>();
         Integer marker = null;

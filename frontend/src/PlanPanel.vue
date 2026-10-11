@@ -4,7 +4,7 @@ import { request } from './api';
 import type { Playback } from './AssetLibrary.vue';
 export type PlanSelection = { planId: string; revisionId: string; sessionId: string };
 export type PlanBase = { planId: string; revisionId: string };
-const props = defineProps<{ projectId: string; sessionId: string; selection: PlanSelection | null }>();
+const props = defineProps<{ projectId: string; sessionId: string; selection: PlanSelection | null; exportRequestId?:string }>();
 const emit = defineEmits<{ play: [value: Playback]; base: [value: PlanBase | null] }>();
 type Plan = { id: string; title: string; editingTaskId: string | null };
 type Version = { id: string; revisionNumber: number; parentRevisionId: string | null };
@@ -15,15 +15,54 @@ const plans = ref<Plan[]>([]), versions = ref<Version[]>([]);
 const selectedPlan = ref(''), selectedRevision = ref('');
 const current = ref<Revision | null>(null), names = ref<Record<string,string>>({});
 const error = ref(''), stopping = ref(false), loading = ref(false);
-type Preview = {requestId:string;taskId:string;revisionId:string;status:string;artifactId?:string;error?:{message:string}};
-const preview=ref<Preview|null>(null),previewVersion=ref(0),previewUrl=ref(''),previewBusy=ref(false);
+type RenderRequest = {requestId:string;taskId:string;revisionId:string;status:string;artifactId?:string;createdAt?:string;configuration?:{profile:string};error?:{message:string}};
+const preview=ref<RenderRequest|null>(null),previewVersion=ref(0),previewUrl=ref(''),previewBusy=ref(false);
+const exportHistory=ref<RenderRequest[]>([]);
+const exportDeletePending=ref(false);
+const confirmationId=ref(''),exportProfile=ref('HD_720'),exportBusy=ref(false);
+const exported=ref<RenderRequest|null>(null),exportVersion=ref(0),exportUrl=ref(''),exportRemoved=ref(false);
+let exportRefreshing=false,exportHistoryReading=false,exportOpenEpoch=0;
+async function confirmVersion(){
+  if(!current.value)return;
+  const id=current.value.id;exportBusy.value=true;
+  try{const result=await request<{confirmationId:string}>(`/revisions/${id}/confirmations`,'POST',{explicitIntent:'CONFIRM'},{'Idempotency-Key':crypto.randomUUID()});if(alive&&current.value?.id===id)confirmationId.value=result.confirmationId;}
+  catch(failure){if(alive)error.value=failure instanceof Error?failure.message:'无法确认版本';}
+  finally{if(alive)exportBusy.value=false;}
+}
+async function exportOutput(output:Output){
+  if(!current.value||!confirmationId.value||exportBusy.value)return;
+  const revision=current.value.id,version=current.value.revisionNumber;exportBusy.value=true;error.value='';
+  try{const result=await request<RenderRequest>(`/revisions/${revision}/export-requests`,'POST',{outputIds:[output.outputId],confirmationId:confirmationId.value,exportProfile:exportProfile.value,explicitIntent:'EXPORT'},{'Idempotency-Key':crypto.randomUUID()});if(alive){++exportOpenEpoch;exported.value=result;exportVersion.value=version;exportUrl.value='';exportRemoved.value=false;exportDeletePending.value=false;await refreshExportHistory();}}
+  catch(failure){if(alive)error.value=failure instanceof Error?failure.message:'无法导出成片';}
+  finally{if(alive)exportBusy.value=false;}
+}
+async function refreshExport(){
+  if(!exported.value||exportRefreshing)return;
+  const id=exported.value.requestId;exportRefreshing=true;
+  try{const value=await request<RenderRequest>(`/render-requests/${id}`);if(alive&&exported.value?.requestId===id){exported.value=value;if(exportDeletePending.value&&value.artifactId){const artifact=await request<{state:string}>(`/artifacts/${value.artifactId}`);if(alive&&exported.value?.requestId===id){exportRemoved.value=artifact.state==='REMOVED';exportDeletePending.value=artifact.state==='DELETE_PENDING';}}}}
+  catch(failure){if(alive)error.value=failure instanceof Error?failure.message:'无法读取导出状态';}
+  finally{exportRefreshing=false;}
+}
+async function artifactAction(action:'playback-access'|'download-access'){
+  const id=exported.value?.artifactId;if(!id)return;
+  try{const value=await request<{url:string}>(`/artifacts/${id}/${action}`,'POST',{});if(!alive||exported.value?.artifactId!==id)return;
+    if(action==='playback-access')exportUrl.value=value.url;
+    else{const link=document.createElement('a');link.href=value.url;link.download=`export-${id}.mp4`;document.body.appendChild(link);link.click();link.remove();}}
+  catch(failure){if(alive)error.value=failure instanceof Error?failure.message:'无法访问成片';}
+}
+async function deleteExport(){
+  const id=exported.value?.artifactId;if(!id)return;
+  try{const value=await request<{state:string;removedBytes:number}>(`/artifacts/${id}`,'DELETE',{explicitIntent:'DELETE'});if(alive&&exported.value?.artifactId===id){exportRemoved.value=value.state==='REMOVED';exportDeletePending.value=value.state==='DELETE_PENDING';if(exportRemoved.value)exportUrl.value='';else error.value='删除请求已记录，正在重试移除文件。';}}
+  catch(failure){if(alive)error.value=failure instanceof Error?failure.message:'无法删除成片';}
+}
+async function cancelExport(){const task=exported.value?.taskId;if(!task)return;try{await request(`/tasks/${task}/cancel`,'POST',{});await refreshExport();}catch(failure){if(alive)error.value=failure instanceof Error?failure.message:'无法停止导出';}}
 let previewRefreshing=false;
 async function generatePreview(output:Output) {
   if(!current.value || previewBusy.value)return;
   const revision=current.value.id,version=current.value.revisionNumber;
   previewBusy.value=true;error.value='';
   try {
-    const result=await request<Preview>(`/revisions/${revision}/previews`,'POST',{outputId:output.outputId,previewProfile:'LOW_360'},{'Idempotency-Key':crypto.randomUUID()});
+    const result=await request<RenderRequest>(`/revisions/${revision}/previews`,'POST',{outputId:output.outputId,previewProfile:'LOW_360'},{'Idempotency-Key':crypto.randomUUID()});
     if(alive){preview.value=result;previewVersion.value=version;previewUrl.value='';}
   }catch(failure){if(alive)error.value=failure instanceof Error?failure.message:'无法生成预览';}
   finally{if(alive)previewBusy.value=false;}
@@ -31,7 +70,7 @@ async function generatePreview(output:Output) {
 async function refreshPreview(){
   if(!preview.value || previewRefreshing)return;
   const id=preview.value.requestId;previewRefreshing=true;
-  try{const result=await request<Preview>(`/render-requests/${id}`);if(alive && preview.value?.requestId===id)preview.value=result;}
+  try{const result=await request<RenderRequest>(`/render-requests/${id}`);if(alive && preview.value?.requestId===id)preview.value=result;}
   catch(failure){if(alive)error.value=failure instanceof Error?failure.message:'无法读取预览';}
   finally{previewRefreshing=false;}
 }
@@ -64,7 +103,7 @@ async function openRevision(planId: string, revisionId: string, persist = true) 
   const operation = ++epoch;
   const previousPlan = selectedPlan.value, previousRevision = selectedRevision.value;
   selectedPlan.value = planId; selectedRevision.value = revisionId;
-  loading.value = true; error.value = ''; emit('base', null);
+  loading.value = true; error.value = ''; confirmationId.value=''; exportHistory.value=[]; emit('base', null);
   try {
     const [revision, history] = await Promise.all([
       request<Revision>(`/revisions/${revisionId}`), request<{items:Version[]}>(`/plans/${planId}/revisions`),
@@ -79,6 +118,12 @@ async function openRevision(planId: string, revisionId: string, persist = true) 
     }
     if (!alive || operation !== epoch) return;
     current.value = revision; versions.value = history.items;
+    const confirmations=await request<{items:{confirmationId:string}[]}>(`/revisions/${revisionId}/confirmations`);
+    if(!alive||operation!==epoch)return;
+    confirmationId.value=confirmations.items[0]?.confirmationId??'';
+    await refreshExportHistory();
+    if(!alive||operation!==epoch)return;
+    if(!exported.value&&exportHistory.value[0])await openStoredExport(exportHistory.value[0].requestId);
     names.value = Object.fromEntries(information.map(asset => [asset.id, asset.filename]));
     emit('base', {planId, revisionId});
   } catch (failure) {
@@ -90,7 +135,7 @@ async function openRevision(planId: string, revisionId: string, persist = true) 
   } finally { if (alive && operation === epoch) loading.value = false; }
 }
 async function choosePlan(id: string) {
-  ++epoch; selectedPlan.value = id; selectedRevision.value = ''; current.value = null; versions.value = []; emit('base', null);
+  ++epoch; selectedPlan.value = id; selectedRevision.value = ''; current.value = null; versions.value = []; exportHistory.value=[]; emit('base', null);
   await refresh();
 }
 async function restoreView() {
@@ -117,9 +162,25 @@ async function stop(taskId: string) {
   catch (failure) { error.value = failure instanceof Error ? failure.message : '无法停止修改'; }
   finally { stopping.value = false; }
 }
+async function openStoredExport(id:string){
+  if(!id)return;const operation=++exportOpenEpoch;
+  try{const result=await request<RenderRequest>(`/render-requests/${id}`);const revision=await request<Revision>(`/revisions/${result.revisionId}`);
+    if(!alive||operation!==exportOpenEpoch)return;
+    exported.value=result;exportVersion.value=revision.revisionNumber;exportUrl.value='';exportRemoved.value=false;exportDeletePending.value=false;
+    if(result.artifactId){const artifact=await request<{state:string}>(`/artifacts/${result.artifactId}`);if(alive&&exported.value?.requestId===id){exportRemoved.value=artifact.state==='REMOVED';exportDeletePending.value=artifact.state==='DELETE_PENDING';}}
+  }catch(failure){if(alive)error.value=failure instanceof Error?failure.message:'无法查看正式导出';}
+}
+async function refreshExportHistory(){
+  const revision=current.value?.id;if(!revision||exportHistoryReading)return;exportHistoryReading=true;
+  try{const history=await request<{items:RenderRequest[]}>(`/revisions/${revision}/export-requests`);if(alive&&current.value?.id===revision)exportHistory.value=history.items;}
+  catch(failure){if(alive)error.value=failure instanceof Error?failure.message:'无法读取导出记录';}
+  finally{exportHistoryReading=false;}
+}
+function exportLabel(item:RenderRequest){return `${item.createdAt?new Date(item.createdAt).toLocaleString():''} · ${item.configuration?.profile==='FULL_HD_1080'?'1080p':'720p'} · ${({PENDING:'等待',RUNNING:'执行中',SUCCEEDED:'成功',FAILED:'失败',CANCEL_REQUESTED:'停止中',CANCELLED:'已停止'} as Record<string,string>)[item.status]??item.status}`;}
+watch(()=>props.exportRequestId,id=>{if(id)void openStoredExport(id);});
 watch(() => props.selection, selection => { if (selection) void openRevision(selection.planId,selection.revisionId); });
 watch(() => props.sessionId, () => { void restoreView(); });
-onMounted(async () => { await refresh(); await restoreView(); timer = setInterval(() => {void refresh();void refreshPreview();},1000); });
+onMounted(async () => { await refresh(); await restoreView(); timer = setInterval(() => {void refresh();void refreshPreview();void refreshExport();void refreshExportHistory();},1000); });
 onUnmounted(() => { alive = false; ++epoch; clearInterval(timer); });
 </script>
 <template>
@@ -144,6 +205,10 @@ onUnmounted(() => { alive = false; ++epoch; clearInterval(timer); });
       <p v-if="loading" role="status">正在读取版本…</p>
       <div v-if="current && !loading">
         <h4>V{{ current.revisionNumber }} · {{ current.content.outputs[0]?.title }}</h4>
+        <p v-if="confirmationId">当前版本已确认；导出仍需另行操作。</p>
+        <button v-else class="secondary" :disabled="exportBusy" @click="confirmVersion">确认当前版本</button>
+        <label for="export-profile-select">成片导出清晰度</label><select id="export-profile-select" v-model="exportProfile"><option value="HD_720">720p</option><option value="FULL_HD_1080">1080p</option></select>
+        <label v-if="exportHistory.length" for="export-history-select">查看正式导出记录</label><select v-if="exportHistory.length" id="export-history-select" :value="exported?.revisionId===current.id?exported.requestId:''" @change="openStoredExport(($event.target as HTMLSelectElement).value)"><option value="">选择导出记录</option><option v-for="item in exportHistory" :key="item.requestId" :value="item.requestId">{{ exportLabel(item) }}</option></select>
         <div v-for="output in current.content.outputs" :key="output.title">
           <p>{{ (output.durationMs/1000).toFixed(3) }} 秒 · {{ output.render.width }} × {{ output.render.height }} · 原声与原文字幕</p>
           <article v-for="(clip,index) in output.clips" :key="clip.clipId" aria-label="方案剪辑片段" class="clip">
@@ -152,11 +217,26 @@ onUnmounted(() => { alive = false; ++epoch; clearInterval(timer); });
             <p>选取依据：{{ clip.reason }}</p><button class="secondary" @click="play(clip)">播放源片段</button>
           </article>
           <button class="secondary" :disabled="previewBusy" @click="generatePreview(output)">生成低清效果预览</button>
+          <button class="secondary" :disabled="!confirmationId || exportBusy" @click="exportOutput(output)">导出正式成片</button>
           <details><summary>映射后的原文字幕</summary><p v-for="(cue,index) in output.subtitles.cues" :key="index">{{ (cue.startMs/1000).toFixed(3) }}–{{ (cue.endMs/1000).toFixed(3) }} 秒 · {{ cue.text }}</p></details>
         </div>
         <p>当前为编排方案；核查后再决定制作。生成方案不会自动预览或导出。</p>
       </div>
     </template>
+    <section v-if="exported" aria-label="正式成片导出">
+      <h4>正式成片 · 固定 V{{ exportVersion }}</h4>
+      <p role="status">{{ ({PENDING:'等待导出',RUNNING:'正在导出',CANCEL_REQUESTED:'正在停止',CANCELLED:'已停止',SUCCEEDED:'导出完成',FAILED:'导出失败'} as Record<string,string>)[exported.status] }}</p>
+      <p v-if="exported.error" role="alert">{{ exported.error.message }}</p>
+      <button v-if="['PENDING','RUNNING'].includes(exported.status)" @click="cancelExport">停止正式导出</button>
+      <p v-if="exportRemoved">成片文件已删除，原始素材保留。</p>
+      <p v-else-if="exportDeletePending">正在删除成片文件，存储恢复后自动重试。</p>
+      <template v-else-if="exported.status==='SUCCEEDED'">
+        <button @click="artifactAction('playback-access')">播放正式成片</button>
+        <button @click="artifactAction('download-access')">下载正式成片</button>
+        <button @click="deleteExport">删除成片文件</button>
+      </template>
+      <video v-if="exportUrl" :src="exportUrl" controls aria-label="正式成片播放器" style="width:100%;max-height:420px" />
+    </section>
     <section v-if="preview" aria-label="低清效果预览">
       <h4>低清效果预览 · 固定 V{{ previewVersion }}</h4>
       <p role="status">{{ ({PENDING:'等待合成',RUNNING:'正在合成',CANCEL_REQUESTED:'正在停止',CANCELLED:'已停止',SUCCEEDED:'合成完成',FAILED:'合成失败'} as Record<string,string>)[preview.status] }}</p>

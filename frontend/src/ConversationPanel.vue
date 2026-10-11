@@ -4,7 +4,7 @@ import { request } from './api';
 import type { Playback } from './AssetLibrary.vue';
 import type { PlanBase, PlanSelection } from './PlanPanel.vue';
 const props = defineProps<{ projectId: string; editingBase?: PlanBase | null }>();
-const emit = defineEmits<{ play: [value: Playback]; plan: [value: PlanSelection]; session: [value: string] }>();
+const emit = defineEmits<{ play: [value: Playback]; plan: [value: PlanSelection]; session: [value: string]; exported: [requestId:string] }>();
 type Session = { id: string; title: string; assetIds: string[] };
 type Asset = { id: string; filename: string };
 type Citation = { type: string; id: string; assetId?: string; text?: string; startMs?: number; endMs?: number; planId?: string; revisionNumber?: number };
@@ -140,6 +140,7 @@ onUnmounted(() => { alive = false; clearInterval(timer); });
           <strong>{{ message.role === 'USER' ? '你' : '助手' }}</strong><p class="message-content">{{ message.content }}</p>
           <button v-for="result in message.references.filter(item => item.type === 'PLAN_REVISION')" :key="result.id" class="secondary"
             @click="emit('plan',{planId:result.planId!,revisionId:result.id,sessionId:selected})">查看方案 V{{ result.revisionNumber }}</button>
+          <button v-for="result in message.references.filter(item => item.type === 'EXPORT_REQUEST')" :key="result.id" class="secondary" @click="emit('exported',result.id)">查看正式导出</button>
           <div v-for="citation in message.references.filter(item => item.type === 'EVIDENCE')" :key="citation.id" class="citation">
             <p>语音原文：{{ citation.text }}</p><small>{{ ((citation.startMs ?? 0)/1000).toFixed(2) }}–{{ ((citation.endMs ?? 0)/1000).toFixed(2) }} 秒 · 模型观察，建议回看核查</small>
             <button class="secondary" @click="inspect(citation)">核查引用原视频</button>

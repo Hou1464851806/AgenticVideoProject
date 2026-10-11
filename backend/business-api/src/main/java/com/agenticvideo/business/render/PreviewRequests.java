@@ -106,6 +106,8 @@ public class PreviewRequests {
         String status=database.queryForObject("SELECT status FROM tasks WHERE id=?",String.class,request.get("task_id"));
         var result=new LinkedHashMap<String,Object>(Map.of("requestId",requestId,"revisionId",request.get("revision_id"),"outputId",request.get("output_id"),"taskId",request.get("task_id"),
                 "kind",request.get("kind"),"status",status,"configuration",parse(request.get("config_json"))));
+        result.put("createdAt",((java.sql.Timestamp)request.get("created_at")).toInstant().toString());
+        if(request.get("confirmation_id")!=null)result.put("confirmationId",request.get("confirmation_id"));
         if(request.get("artifact_id")!=null)result.put("artifactId",request.get("artifact_id"));
         if("FAILED".equals(status)) {
             Object failure=database.queryForObject("SELECT result_json FROM tasks WHERE id=?",Object.class,request.get("task_id"));
@@ -114,7 +116,7 @@ public class PreviewRequests {
         return result;
     }
     public Object list(UUID revision) {
-        return Map.of("items",database.queryForList("SELECT id FROM render_requests WHERE revision_id=? ORDER BY created_at,id",revision).stream()
+        return Map.of("items",database.queryForList("SELECT id FROM render_requests WHERE revision_id=? AND kind='PREVIEW' ORDER BY created_at,id",revision).stream()
                 .map(row -> read((UUID)row.get("id"))).toList());
     }
     private JsonNode parse(Object value) {try{return json.readTree(value.toString());}catch(java.io.IOException invalid){throw new IllegalStateException(invalid);}}

@@ -46,7 +46,7 @@ public class TaskExecution {
             var rows = database.queryForList("SELECT * FROM tasks WHERE id=? FOR UPDATE", id);
             if (rows.isEmpty()) throw new ResponseStatusException(NOT_FOUND, "任务不存在");
             var task = rows.get(0);
-            if (!java.util.List.of("MEDIA_PREPARE","CONTENT_ANALYZE","AGENT_TURN","PREVIEW_RENDER").contains(task.get("type"))) throw new ResponseStatusException(CONFLICT, "执行器不能领取此任务类型");
+            if (!java.util.List.of("MEDIA_PREPARE","CONTENT_ANALYZE","AGENT_TURN","PREVIEW_RENDER","EXPORT_RENDER").contains(task.get("type"))) throw new ResponseStatusException(CONFLICT, "执行器不能领取此任务类型");
             if ("RUNNING".equals(task.get("status"))) {
                 var attempt = database.queryForMap("SELECT *, lease_expires_at>now() AS valid FROM task_attempts WHERE id=?", task.get("current_attempt_id"));
                 if (request.executorId().equals(attempt.get("executor_id")) && request.claimRequestId().equals(attempt.get("claim_request_id")) && Boolean.TRUE.equals(attempt.get("valid")))
@@ -118,6 +118,7 @@ public class TaskExecution {
             if (!("MEDIA_PREPARED".equals(request.resultType()) && "MEDIA_PREPARE".equals(task.get("type")))
                     && !("SPEECH_ANALYZED".equals(request.resultType()) && "CONTENT_ANALYZE".equals(task.get("type")))
                     && !("PREVIEW_RENDERED".equals(request.resultType()) && "PREVIEW_RENDER".equals(task.get("type")))
+                    && !("EXPORT_RENDERED".equals(request.resultType()) && "EXPORT_RENDER".equals(task.get("type")))
                     && !(java.util.Set.of("CONVERSATION_ANSWERED", "EDIT_PROPOSAL").contains(request.resultType()) && "AGENT_TURN".equals(task.get("type"))))
                 throw new ResponseStatusException(CONFLICT, "任务结果类型不匹配");
             String result = request.result().toString();
@@ -142,7 +143,7 @@ public class TaskExecution {
             com.fasterxml.jackson.databind.JsonNode input;
             try { input = json.readTree(task.get("input_json").toString()); }
             catch (java.io.IOException invalid) { throw new IllegalStateException(invalid); }
-            if("PREVIEW_RENDER".equals(task.get("type"))) {
+            if(java.util.Set.of("PREVIEW_RENDER","EXPORT_RENDER").contains(task.get("type"))) {
                 Object outcome=artifacts.publish(task,input,request.result());
                 String receipt;
                 try{receipt=json.writeValueAsString(outcome);}catch(java.io.IOException invalid){throw new IllegalStateException(invalid);}
@@ -200,7 +201,7 @@ public class TaskExecution {
     public Object fail(UUID id,TaskController.Failed request) {
         return transactions.execute(tx -> {
             var task=locked(id);
-            if(!java.util.List.of("MEDIA_PREPARE","CONTENT_ANALYZE","AGENT_TURN","PREVIEW_RENDER").contains(task.get("type"))) throw new ResponseStatusException(CONFLICT,"任务结果类型不匹配");
+            if(!java.util.List.of("MEDIA_PREPARE","CONTENT_ANALYZE","AGENT_TURN","PREVIEW_RENDER","EXPORT_RENDER").contains(task.get("type"))) throw new ResponseStatusException(CONFLICT,"任务结果类型不匹配");
             String payload;
             try { payload=json.writeValueAsString(Map.of("code",request.code(),"message",request.message())); }
             catch(java.io.IOException invalid) { throw new IllegalStateException(invalid); }
@@ -214,7 +215,7 @@ public class TaskExecution {
             }
             var attempt=requireAttempt(task,request.attemptId(),request.leaseToken(),true);
             if(!"RUNNING".equals(task.get("status"))) throw new ResponseStatusException(CONFLICT,"任务已失去回报资格");
-            if (java.util.Set.of("AGENT_TURN","PREVIEW_RENDER").contains(task.get("type"))) {
+            if (java.util.Set.of("AGENT_TURN","PREVIEW_RENDER","EXPORT_RENDER").contains(task.get("type"))) {
                 database.update("UPDATE task_attempts SET status='FAILED' WHERE id=?", request.attemptId());
                 database.update("UPDATE tasks SET status='FAILED',result_json=?::jsonb WHERE id=?", payload, id);
                 plans.release(id);
@@ -267,7 +268,7 @@ public class TaskExecution {
         UUID id = (UUID) attempt.get("id");
         try {
             var input=json.readTree(task.get("input_json").toString());
-            if("PREVIEW_RENDER".equals(task.get("type")))input=artifacts.prepare(task,id,input);
+            if(java.util.Set.of("PREVIEW_RENDER","EXPORT_RENDER").contains(task.get("type")))input=artifacts.prepare(task,id,input);
             return Map.of("taskId", task.get("id"), "status", "RUNNING", "claimed", true, "attemptId", id,
                     "leaseToken", token(id), "leaseExpiresAt", ((java.sql.Timestamp) attempt.get("lease_expires_at")).toInstant().toString(),
                     "input", input);

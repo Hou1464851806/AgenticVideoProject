@@ -146,6 +146,8 @@ def run_conversation(execution, root):
             used += 1
             if name not in {"list_assets", "search_evidence", "read_evidence_context"} or not isinstance(arguments, dict):
                 result = {"error": "工具或参数不受支持，请使用已声明的业务工具"}
+            elif name == "search_evidence" and (not isinstance(arguments.get("query"), str) or len(arguments["query"]) > 256):
+                result = {"error": "search_evidence 需要 query 文本参数，最多 256 字符；请修正后重试"}
             else:
                 result = execution.post("tool", {"producerKey": f"tool-{state['calls']}-{index}", "name": name, "arguments": arguments})
             messages.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(result, ensure_ascii=False)})

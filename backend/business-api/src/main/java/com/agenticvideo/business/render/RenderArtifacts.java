@@ -27,9 +27,10 @@ public class RenderArtifacts {
         Map<String,Object> artifact;
         if(existing.isEmpty()) {
             UUID id=UUID.randomUUID(),request=UUID.fromString(input.path("requestId").asText());
-            String key="previews/"+request+"/"+attempt+".mp4";
-            database.update("INSERT INTO artifacts(id,project_id,request_id,revision_id,output_id,task_id,attempt_id,kind,object_key) VALUES (?,?,?,?,?,?,?,'PREVIEW',?)",
-                    id,task.get("project_id"),request,UUID.fromString(input.path("revisionId").asText()),UUID.fromString(input.path("outputId").asText()),task.get("id"),attempt,key);
+            String kind="EXPORT_RENDER".equals(task.get("type"))?"EXPORT":"PREVIEW";
+            String key=("EXPORT".equals(kind)?"exports/":"previews/")+request+"/"+attempt+".mp4";
+            database.update("INSERT INTO artifacts(id,project_id,request_id,revision_id,output_id,task_id,attempt_id,kind,object_key) VALUES (?,?,?,?,?,?,?,?,?)",
+                    id,task.get("project_id"),request,UUID.fromString(input.path("revisionId").asText()),UUID.fromString(input.path("outputId").asText()),task.get("id"),attempt,kind,key);
             artifact=row(id);
         } else artifact=existing.get(0);
         ObjectNode granted=(ObjectNode)input.deepCopy();

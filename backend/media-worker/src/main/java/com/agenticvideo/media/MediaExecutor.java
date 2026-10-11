@@ -27,15 +27,15 @@ public class MediaExecutor {
     private final ScheduledExecutorService heartbeats = Executors.newSingleThreadScheduledExecutor();
     private final BusinessClient business;
     private final MediaInspection inspection;
-    private final PreviewRenderer previews;
+    private final MediaRenderer renderer;
     private final WorkDirectories work;
     private final ObjectMapper json;
     private final S3Client storage;
     private final String bucket;
-    MediaExecutor(BusinessClient business, MediaInspection inspection, WorkDirectories work, ObjectMapper json, PreviewRenderer previews,
+    MediaExecutor(BusinessClient business, MediaInspection inspection, WorkDirectories work, ObjectMapper json, MediaRenderer renderer,
             @Value("${worker.storage-endpoint}") String endpoint, @Value("${worker.storage-access-key}") String access,
             @Value("${worker.storage-secret-key}") String secret, @Value("${worker.storage-bucket}") String bucket) {
-        this.previews=previews; this.business=business; this.inspection=inspection; this.work=work; this.json=json; this.bucket=bucket;
+        this.renderer=renderer; this.business=business; this.inspection=inspection; this.work=work; this.json=json; this.bucket=bucket;
         storage = S3Client.builder().endpointOverride(java.net.URI.create(endpoint)).region(Region.US_EAST_1)
                 .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(access,secret)))
                 .forcePathStyle(true).build();
@@ -71,10 +71,10 @@ public class MediaExecutor {
         Path directory=null;
         try {
             directory=work.create(execution.attemptId);
-            if("PREVIEW".equals(execution.input.path("operation").asText())) {
-                var rendered=previews.render(execution.input,directory,storage,bucket,execution::stopped);
+            if(java.util.Set.of("PREVIEW","EXPORT").contains(execution.input.path("operation").asText())) {
+                var rendered=renderer.render(execution.input,directory,storage,bucket,execution::stopped);
                 if(execution.stopped()) throw new InterruptedException("Execution stopped");
-                report(execution,"complete",Map.of("attemptId",execution.attemptId,"leaseToken",execution.token,"producerKey","preview-rendered","resultType","PREVIEW_RENDERED","result",rendered));
+                report(execution,"complete",Map.of("attemptId",execution.attemptId,"leaseToken",execution.token,"producerKey","rendered","resultType","EXPORT".equals(execution.input.path("operation").asText())?"EXPORT_RENDERED":"PREVIEW_RENDERED","result",rendered));
                 return;
             }
             Path source=directory.resolve("source");

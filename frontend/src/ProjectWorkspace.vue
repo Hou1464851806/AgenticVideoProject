@@ -7,6 +7,8 @@ import MediaPlayer from './MediaPlayer.vue';
 import SpeechSearch from './SpeechSearch.vue';
 import ConversationPanel from './ConversationPanel.vue';
 import PlanPanel, { type PlanBase, type PlanSelection } from './PlanPanel.vue';
+const exportRequestId=ref('');
+function viewExport(id:string){exportRequestId.value=id;activePane.value='results';}
 const planSelection = ref<PlanSelection | null>(null), editingBase = ref<PlanBase | null>(null), sessionId = ref('');
 function viewPlan(selection: PlanSelection) { planSelection.value = selection; activePane.value = 'results'; }
 function chooseSession(id: string) { sessionId.value = id; planSelection.value = null; editingBase.value = null; }
@@ -115,8 +117,8 @@ onUnmounted(() => window.removeEventListener('popstate', restoreSelection));
       </div>
       <div class="workspace">
         <section id="panel-assets" class="panel" :class="{ active: activePane === 'assets' }" role="tabpanel" aria-labelledby="tab-assets"><h2>素材库</h2><UploadPanel :project-id="selected.id" /><AssetLibrary :key="selected.id" :project-id="selected.id" @play="playAsset" /><SpeechSearch :key="`search-${selected.id}`" :project-id="selected.id" @play="playAsset" /></section>
-        <section id="panel-conversation" class="panel" :class="{ active: activePane === 'conversation' }" role="tabpanel" aria-labelledby="tab-conversation"><h2>对话</h2><ConversationPanel :key="`conversation-${selected.id}`" :project-id="selected.id" :editing-base="editingBase" @play="playAsset" @plan="viewPlan" @session="chooseSession" /></section>
-        <section id="panel-results" class="panel" :class="{ active: activePane === 'results' }" role="tabpanel" aria-labelledby="tab-results"><h2>播放器与结果</h2><MediaPlayer v-if="playback" :key="playback.assetId" :playback="playback" /><div v-else class="player-empty">选择素材或结果即可播放</div><PlanPanel :key="`plans-${selected.id}`" :project-id="selected.id" :session-id="sessionId" :selection="planSelection" @play="playAsset" @base="editingBase = $event" /></section>
+        <section id="panel-conversation" class="panel" :class="{ active: activePane === 'conversation' }" role="tabpanel" aria-labelledby="tab-conversation"><h2>对话</h2><ConversationPanel :key="`conversation-${selected.id}`" :project-id="selected.id" :editing-base="editingBase" @play="playAsset" @plan="viewPlan" @session="chooseSession" @exported="viewExport" /></section>
+        <section id="panel-results" class="panel" :class="{ active: activePane === 'results' }" role="tabpanel" aria-labelledby="tab-results"><h2>播放器与结果</h2><MediaPlayer v-if="playback" :key="playback.assetId" :playback="playback" /><div v-else class="player-empty">选择素材或结果即可播放</div><PlanPanel :key="`plans-${selected.id}`" :project-id="selected.id" :session-id="sessionId" :selection="planSelection" :export-request-id="exportRequestId" @play="playAsset" @base="editingBase = $event" /></section>
       </div>
     </template>
   </section>
