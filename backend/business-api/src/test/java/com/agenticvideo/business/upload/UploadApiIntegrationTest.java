@@ -54,6 +54,46 @@ class UploadApiIntegrationTest {
     }
     @LocalServerPort int port;
 
+    private final java.util.List<BrowserApi> owners = new java.util.ArrayList<>();
+    @org.junit.jupiter.api.AfterEach
+    void releaseThisTestsFutureReservationsThroughPublicCancellation() throws Exception {
+        PROXY.fault.set(SiloFaultProxy.Fault.NONE);
+        PROXY.release.countDown();
+        for(var owner:owners) {
+            for(var project:json(owner.get("/projects")).path("data").path("items")) {
+                for(var upload:json(owner.get("/projects/"+project.path("id").asText()+"/uploads")).path("data").path("items")) {
+                    String id=upload.path("uploadId").asText();
+                    if("COMPLETED".equals(upload.path("status").asText())) {
+                        String task=upload.path("validationTaskId").asText();
+                        assertEquals(202,owner.post("/tasks/"+task+"/cancel","{}").statusCode());
+                    } else {
+                        assertEquals(200,owner.post("/uploads/"+id+"/cancel","{}").statusCode());
+                        awaitClean(owner,id,45);
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    void anOversizedRealSignedPartIsRejectedAndReconciledBeforeItCanPublishAnAsset() throws Exception {
+        var owner = signedIn("oversized-real-part-owner");
+        String project = json(owner.post("/projects", "{\"name\":\"实际超额分片\"}")).path("data").path("id").asText();
+        var upload = json(owner.post("/projects/" + project + "/uploads", new ObjectMapper().writeValueAsString(java.util.Map.of(
+                "filename", "oversized.mp4", "sizeBytes", 19, "sha256", "a".repeat(64), "idempotencyKey", "oversized-real", "writerId", owner.writerId)))).path("data");
+        String id = upload.path("uploadId").asText(), writer = upload.path("writerToken").asText();
+        String url = json(owner.post("/uploads/" + id + "/part-urls", new ObjectMapper().writeValueAsString(java.util.Map.of("partNumbers", java.util.List.of(1), "writerToken", writer))))
+                .path("data").path("parts").get(0).path("url").asText();
+        var stored = HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create(url)).PUT(HttpRequest.BodyPublishers.ofByteArray(new byte[20])).build(), HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, stored.statusCode(), stored.body());
+        var rejected = owner.post("/uploads/" + id + "/complete", new ObjectMapper().writeValueAsString(java.util.Map.of("writerToken", writer)));
+        assertEquals(409, rejected.statusCode(), rejected.body());
+        assertEquals("CANCELLED", json(owner.get("/uploads/" + id)).path("data").path("status").asText());
+        assertEquals(0, json(owner.get("/projects/" + project + "/assets?includePending=true")).path("data").path("items").size());
+        awaitClean(owner, id, 40);
+        assertEquals(0, json(owner.get("/uploads/" + id)).path("data").path("reservedBytes").asLong());
+    }
+
     @Test
     void createUploadPersistsOneIdentityAndReservationAcrossDuplicateRequests() throws Exception {
         BrowserApi browser = signedIn("upload-owner");
@@ -412,6 +452,7 @@ class UploadApiIntegrationTest {
         String credentials = new ObjectMapper().writeValueAsString(java.util.Map.of("username", username, "password", "project-strong-password"));
         assertEquals(201, browser.post("/auth/register", credentials).statusCode());
         assertEquals(200, browser.post("/auth/login", credentials).statusCode());
+        owners.add(browser);
         return browser;
     }
 

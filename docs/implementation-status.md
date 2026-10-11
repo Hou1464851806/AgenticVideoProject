@@ -2,7 +2,7 @@
 
 本轮按 ready-for-agent 的 32 张子任务实施；#1 为汇总需求。实施起点为 `63efde7`，在当前 main 分支逐票提交。
 
-11 张 P0 任务均已实现、验证并逐票本地提交。用户已恢复 P1 实施，#7 已完成，继续按优先级和依赖逐票实施；P2 尚待后续阶段。当前功能见 [功能清单](current-features.md)。
+11 张 P0 任务均已实现、验证并逐票本地提交。用户已恢复 P1 实施，#7、#8 已完成，接下来依次实施 #11、#12，随后按用户要求暂停并梳理视频理解与检索能力及升级方向；其他 P1 / P2 尚待后续阶段。当前功能见 [功能清单](current-features.md)。
 
 已确认测试边界：公开 HTTP 接口为主，关键 PostgreSQL／对象存储／消息／媒体／模型边界使用真实集成；浏览器验证用户操作闭环。
 
@@ -14,7 +14,7 @@
 | [#5](https://github.com/Hou1464851806/AgenticVideoProject/issues/5) [T04] 验证视频后在素材库定位播放 | P0 | #4 | 实现与验证完成，见 [记录](verification/issue-5.md) |
 | [#6](https://github.com/Hou1464851806/AgenticVideoProject/issues/6) [T05] 断网、暂停与刷新后继续原上传 | P0 | #4 | 实现与验证完成，见 [记录](verification/issue-6.md) |
 | [#7](https://github.com/Hou1464851806/AgenticVideoProject/issues/7) [T06] 取消或过期上传并查看残留清理 | P1 | #4 | 实现与验证完成，见 [记录](verification/issue-7.md) |
-| [#8](https://github.com/Hou1464851806/AgenticVideoProject/issues/8) [T07] 超限或空间不足时阻止上传并解释原因 | P1 | #4 | 待实施 |
+| [#8](https://github.com/Hou1464851806/AgenticVideoProject/issues/8) [T07] 超限或空间不足时阻止上传并解释原因 | P1 | #4 | 实现与验证完成，见 [记录](verification/issue-8.md) |
 | [#9](https://github.com/Hou1464851806/AgenticVideoProject/issues/9) [T08] 上传后自动生成可定位的语音证据 | P0 | #5 | 实现与验证完成，见 [记录](verification/issue-9.md) |
 | [#10](https://github.com/Hou1464851806/AgenticVideoProject/issues/10) [T09] 查找人名、数字和原句并跳转核查 | P0 | #9 | 实现与验证完成，见 [记录](verification/issue-10.md) |
 | [#11](https://github.com/Hou1464851806/AgenticVideoProject/issues/11) [T10] 用主题和近义表达检索视频内容 | P1 | #10 | 待实施 |

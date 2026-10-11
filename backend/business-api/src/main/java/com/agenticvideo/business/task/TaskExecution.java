@@ -18,6 +18,7 @@ import static org.springframework.http.HttpStatus.*;
 
 @Service
 public class TaskExecution {
+    private final com.agenticvideo.business.storage.StorageCapacity capacity;
     private final JdbcTemplate database;
     private final TransactionTemplate transactions;
     private final ObjectMapper json;
@@ -29,7 +30,8 @@ public class TaskExecution {
     TaskExecution(JdbcTemplate database, PlatformTransactionManager manager, ObjectMapper json,
             @Value("${internal.worker-token:}") String secret, com.agenticvideo.business.analysis.SpeechAnalysis speech,
             com.agenticvideo.business.conversation.ConversationTurns conversations,
-            com.agenticvideo.business.plan.EditPlans plans,com.agenticvideo.business.render.RenderArtifacts artifacts) {
+            com.agenticvideo.business.plan.EditPlans plans,com.agenticvideo.business.render.RenderArtifacts artifacts,com.agenticvideo.business.storage.StorageCapacity capacity) {
+        this.capacity=capacity;
         this.database = database; this.transactions = new TransactionTemplate(manager); this.json = json; this.secret = secret;this.speech=speech;
         this.conversations = conversations;
         this.plans = plans;
@@ -75,6 +77,22 @@ public class TaskExecution {
         var rows = database.queryForList("SELECT * FROM tasks WHERE id=? FOR UPDATE", id);
         if (rows.isEmpty()) throw new ResponseStatusException(NOT_FOUND, "任务不存在");
         return rows.get(0);
+    }
+    public Object spaceCheck(UUID id, TaskController.Execution request) {
+        return transactions.execute(tx -> {
+            var task=locked(id);
+            requireAttempt(task,request.attemptId(),request.leaseToken(),true);
+            if(!"RUNNING".equals(task.get("status")))throw new ResponseStatusException(CONFLICT,"任务没有有效执行资格");
+            if(!java.util.Set.of("MEDIA_PREPARE","PREVIEW_RENDER","EXPORT_RENDER").contains(task.get("type")))
+                throw new ResponseStatusException(CONFLICT,"任务不属于媒体执行");
+            capacity.require(0);
+            long required=((Number)task.get("disk_budget_bytes")).longValue();
+            if("MEDIA_PREPARE".equals(task.get("type"))) {
+                try {required=capacity.uploadBudget(json.readTree(task.get("input_json").toString()).path("sizeBytes").asLong());}
+                catch(java.io.IOException invalid) {throw new IllegalStateException(invalid);}
+            }
+            return Map.of("requiredBytes",required);
+        });
     }
     public Object heartbeat(UUID id, TaskController.Execution request) {
         return transactions.execute(tx -> {

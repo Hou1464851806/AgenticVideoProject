@@ -17,12 +17,13 @@ import static org.springframework.http.HttpStatus.*;
 @Service
 public class PreviewRequests {
     public static final String RENDERER_VERSION="ffmpeg-6.1.1-noto20230817-hardcut-v2";
+    private final com.agenticvideo.business.storage.StorageCapacity capacity;
     private final JdbcTemplate database;
     private final ObjectMapper json;
     private final TransactionTemplate transactions;
     private final RenderArtifacts artifacts;
-    public PreviewRequests(JdbcTemplate database,ObjectMapper json,PlatformTransactionManager manager,RenderArtifacts artifacts) {
-        this.database=database;this.json=json;transactions=new TransactionTemplate(manager);this.artifacts=artifacts;
+    public PreviewRequests(JdbcTemplate database,ObjectMapper json,PlatformTransactionManager manager,RenderArtifacts artifacts,com.agenticvideo.business.storage.StorageCapacity capacity) {
+        this.capacity=capacity;this.database=database;this.json=json;transactions=new TransactionTemplate(manager);this.artifacts=artifacts;
     }
     public Map<String,Object> revision(UUID id) {
         var rows=database.queryForList("SELECT * FROM plan_revisions WHERE id=?",id);
@@ -87,9 +88,11 @@ public class PreviewRequests {
             UUID request=UUID.randomUUID(),task=UUID.randomUUID(),event=UUID.randomUUID();
             var input=Map.of("operation","PREVIEW","requestId",request,"revisionId",revisionId,"outputId",outputId,"output",output,
                     "configuration",configuration,"rendererVersion",RENDERER_VERSION,"sources",sources.values());
+            long diskBudget=capacity.renderBudget(json.valueToTree(input));
+            capacity.require(diskBudget);
             database.update("INSERT INTO render_requests(id,project_id,revision_id,output_id,kind,config_json,renderer_version,cache_key,task_id) VALUES (?,?,?,?,'PREVIEW',?::jsonb,?,?,?)",
                     request,revision.get("project_id"),revisionId,outputId,encode(configuration),RENDERER_VERSION,cacheKey,task);
-            database.update("INSERT INTO tasks(id,project_id,type,input_json) VALUES (?,?,'PREVIEW_RENDER',?::jsonb)",task,revision.get("project_id"),encode(input));
+            database.update("INSERT INTO tasks(id,project_id,type,input_json,disk_budget_bytes) VALUES (?,?,'PREVIEW_RENDER',?::jsonb,?)",task,revision.get("project_id"),encode(input),diskBudget);
             database.update("INSERT INTO outbox_events(id,task_id,type,payload_json) VALUES (?,?,'PREVIEW_RENDER',jsonb_build_object('schemaVersion','1.0','eventId',?::text,'taskId',?::text,'taskType','PREVIEW_RENDER','projectId',?::text,'occurredAt',now()))",
                     event,task,event,task,revision.get("project_id"));
             return remember(projectId,key,revisionId,normalized,read(request));

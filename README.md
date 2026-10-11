@@ -79,3 +79,9 @@ Java 集成测试启动独立的真实 PostgreSQL、Silo 和 RabbitMQ 容器。�
 ### 模型调用记录大小配置
 
 `MODEL_RECORD_REQUEST_MAX_BYTES` 默认 16777216（16 MiB），`MODEL_RECORD_RESPONSE_MAX_BYTES` 默认 4194304（4 MiB）。二者控制内部登记 JSON 字段的 UTF-8 序列化字节数，均须为正数；超限会明确反馈而不反复提交。修改运行配置后重建 business-api 容器生效。这不是模型 Token 窗口设置；调用记录仍完整保存在 PostgreSQL。修复范围和验证见 [记录](docs/verification/model-record-limits.md)。
+
+### 上传与空间配置
+
+单文件、项目原始素材总量及视频数量分别由 `UPLOAD_MAX_FILE_BYTES`（默认 2 GiB）、`UPLOAD_MAX_PROJECT_BYTES`（默认 5 GiB）、`UPLOAD_MAX_PROJECT_ASSETS`（默认 10）控制。`CAPACITY_MIN_FREE_BYTES` 默认保留 512 MiB 安全余量；`CAPACITY_MAX_RESERVED_BYTES` 可进一步限制全部项目的未来写入预算。Compose 实测挂载的对象及工作区卷，未完成上传和排队媒体任务先预留后续写入量。非 Compose 部署需把 `CAPACITY_PATHS` 配成实际对象和工作区文件系统路径。低空间时先清理或扩容再重试。
+
+分片签名不能提供物理硬配额，实际分片超额会被拒绝、撤销并持续核对清理；详见 [#8 验证与残余窗口](docs/verification/issue-8.md)。

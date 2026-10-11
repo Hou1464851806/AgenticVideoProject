@@ -17,12 +17,13 @@ import static org.springframework.http.HttpStatus.*;
 /** Confirmation authorizes one immutable version; an independent direct export intent starts each job. */
 @Service
 public class ExportRequests {
+    private final com.agenticvideo.business.storage.StorageCapacity capacity;
     private final JdbcTemplate database;
     private final ObjectMapper json;
     private final TransactionTemplate transactions;
     private final PreviewRequests revisions;
     private final MultipartStorage storage;
-    public ExportRequests(JdbcTemplate database,ObjectMapper json,PlatformTransactionManager manager,PreviewRequests revisions,MultipartStorage storage){this.database=database;this.json=json;transactions=new TransactionTemplate(manager);this.revisions=revisions;this.storage=storage;}
+    public ExportRequests(JdbcTemplate database,ObjectMapper json,PlatformTransactionManager manager,PreviewRequests revisions,MultipartStorage storage,com.agenticvideo.business.storage.StorageCapacity capacity){this.capacity=capacity;this.database=database;this.json=json;transactions=new TransactionTemplate(manager);this.revisions=revisions;this.storage=storage;}
     public Object confirm(UUID revisionId,UUID actor,String key,JsonNode body) {return confirm(revisionId,actor,key,body,Map.of("type","USER_INTERFACE","explicitIntent","CONFIRM"));}
     public Object confirmFromMessage(UUID revisionId,UUID actor,String key,JsonNode body,UUID message) {return confirm(revisionId,actor,key,body,messageSource(revisionId,actor,message,"CONFIRM"));}
     private Object confirm(UUID revisionId,UUID actor,String key,JsonNode body,Object intentSource) {
@@ -78,8 +79,10 @@ public class ExportRequests {
             var config=Map.ofEntries(Map.entry("profile",profile),Map.entry("width",portrait?shortSide:wide),Map.entry("height",portrait?wide:shortSide),Map.entry("framesPerSecond",30),Map.entry("container","mp4"),Map.entry("videoCodec","h264"),Map.entry("audioCodec","aac"),Map.entry("fit","contain"),Map.entry("videoCrf",23),Map.entry("videoMaxRate",full?8000000:4000000),Map.entry("audioBitrate",full?192000:128000),Map.entry("audioSampleRate",48000),Map.entry("audioChannels",2),Map.entry("subtitleFont","Noto Sans CJK SC"),Map.entry("fontPackage","20230817+repack1-3"));
             UUID request=UUID.randomUUID(),task=UUID.randomUUID(),event=UUID.randomUUID();
             var input=Map.ofEntries(Map.entry("operation","EXPORT"),Map.entry("requestId",request),Map.entry("revisionId",revisionId),Map.entry("outputId",outputId),Map.entry("output",output),Map.entry("configuration",config),Map.entry("rendererVersion",PreviewRequests.RENDERER_VERSION),Map.entry("sources",sources.values()),Map.entry("confirmationId",confirmation),Map.entry("actorUserId",actor));
+            long diskBudget=capacity.renderBudget(json.valueToTree(input));
+            capacity.require(diskBudget);
             database.update("INSERT INTO render_requests(id,project_id,revision_id,output_id,kind,config_json,renderer_version,cache_key,task_id,confirmation_id,actor_user_id,intent_source_json) VALUES (?,?,?,?,'EXPORT',?::jsonb,?,?,?,?,?,?::jsonb)",request,project,revisionId,outputId,encode(config),PreviewRequests.RENDERER_VERSION,digest(encode(input)),task,confirmation,actor,encode(intentSource));
-            database.update("INSERT INTO tasks(id,project_id,type,input_json) VALUES (?,?,'EXPORT_RENDER',?::jsonb)",task,project,encode(input));
+            database.update("INSERT INTO tasks(id,project_id,type,input_json,disk_budget_bytes) VALUES (?,?,'EXPORT_RENDER',?::jsonb,?)",task,project,encode(input),diskBudget);
             database.update("INSERT INTO outbox_events(id,task_id,type,payload_json) VALUES (?,?,'EXPORT_RENDER',jsonb_build_object('schemaVersion','1.0','eventId',?::text,'taskId',?::text,'taskType','EXPORT_RENDER','projectId',?::text,'occurredAt',now()))",event,task,event,task,project);
             Object response=revisions.read(request);remember(project,"EXPORT",key,revisionId,normalized,confirmation,request,response);return response;
         });

@@ -30,6 +30,10 @@ public class TaskController {
     Map<String,Object> fail(@PathVariable UUID id, @Valid @RequestBody Failed request) { return envelope(tasks.fail(id,request)); }
     public record Failed(@NotNull UUID attemptId,@NotBlank String leaseToken,@NotBlank @Size(max=120) String producerKey,
             @NotBlank @Size(max=64) String code,@NotBlank @Size(max=240) String message) {}
+    @PostMapping("/internal/v1/tasks/{id}/space-check")
+    Map<String,Object> spaceCheck(@PathVariable UUID id,@Valid @RequestBody Execution request) {
+        return envelope(tasks.spaceCheck(id,request));
+    }
     @PostMapping("/internal/v1/tasks/{id}/heartbeat")
     Map<String, Object> heartbeat(@PathVariable UUID id, @Valid @RequestBody Execution request) {
         return envelope(tasks.heartbeat(id, request));

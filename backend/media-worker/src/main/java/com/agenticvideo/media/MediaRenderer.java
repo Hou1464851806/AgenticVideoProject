@@ -15,7 +15,7 @@ import software.amazon.awssdk.services.s3.S3Client;
 public class MediaRenderer {
     private final MediaInspection inspection;
     public MediaRenderer(MediaInspection inspection) { this.inspection=inspection; }
-    public Map<String,Object> render(JsonNode input,Path directory,S3Client storage,String bucket,BooleanSupplier stopped) throws Exception {
+    public Map<String,Object> render(JsonNode input,Path directory,S3Client storage,String bucket,BooleanSupplier stopped,long required) throws Exception {
         JsonNode output=input.path("output"),config=input.path("configuration");
         int width=config.path("width").asInt(),height=config.path("height").asInt();
         String profile=config.path("profile").asText();
@@ -32,10 +32,7 @@ public class MediaRenderer {
                 || config.path("audioSampleRate").asInt()!=48000 || config.path("audioChannels").asInt()!=2
                 || !"Noto Sans CJK SC".equals(config.path("subtitleFont").asText()))
             throw new MediaInspection.InvalidMedia("RENDER_CONFIGURATION","合成规格无效");
-        long sourceBytes=0;
-        for(JsonNode source:input.path("sources"))sourceBytes=Math.addExact(sourceBytes,source.path("sizeBytes").asLong());
-        long required=Math.addExact(sourceBytes,Math.addExact(64L*1024*1024,Math.multiplyExact(output.path("durationMs").asLong(),Math.addExact(Math.multiplyExact((long)width,height)*6/1000,config.path("videoMaxRate").asLong()/8000+100))));
-        if(Files.getFileStore(directory).getUsableSpace()<required)throw new MediaInspection.InvalidMedia("PREVIEW_SPACE_LOW","当前执行空间不足，未开始合成");
+        if(Files.getFileStore(directory).getUsableSpace()<required)throw new MediaInspection.InvalidMedia("MEDIA_SPACE_LOW","当前媒体执行空间不足，请清理工作区或扩容后重试");
         Map<String,Path> sources=new HashMap<>();Map<String,JsonNode> mappings=new HashMap<>();int sourceIndex=0;
         for(JsonNode source:input.path("sources")) {
             Path file=directory.resolve("source-"+(sourceIndex++));

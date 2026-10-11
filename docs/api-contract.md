@@ -239,3 +239,9 @@ complete 结果类型为 MEDIA_PREPARED、ANALYSIS_RESULT、INDEX_VERIFIED、AGE
 上传查询新增 `declaredBytes`（原文件大小）、`reservedBytes`（当前字节预留）、`reservedSlots`（素材名额）与 `cleanupStatus`。`CANCELLED`／`EXPIRED` 时名额立即释放，字节在实际清理核对后释放；`PENDING` 与 `CLEANED` 分别表示尚未核实清理和已核实无残留。清理完成后仍持续复核迟到存储事实，发现残留会恢复预留及 PENDING。每次清理仅作用于该撤销会话的服务端对象键，真实 Abort multipart／删除未发布对象，操作在数据库事务之外执行，并以持久 lease 核对结果。
 
 `upload.inactivity-seconds` 默认 86400，最后合法活动续期；读取及被拒绝操作不续期。活动完成 lease 保护正在合法完成的会话。`upload.cleanup-settle-seconds` 默认 30，初次释放等待全部已签发 URL／控制操作期限加排空窗口；持续复核弥补更晚完成的存储请求。`upload.cleanup-interval-ms` 默认 10000。Compose 对应 `UPLOAD_INACTIVITY_SECONDS`、`UPLOAD_CLEANUP_SETTLE_SECONDS`、`UPLOAD_CLEANUP_INTERVAL_MS`。
+
+### 上传限额与媒体执行空间
+
+创建上传以服务端配置的文件、项目原始字节及视频数量限额判断，并在同一事务内预留跨项目未来写入预算；分片签发和完成复查当前限额与实际卷容量。拒绝原因通过 `error.message` 明确说明限制及下一步操作。`STORAGE_SPACE_LOW` 表示无法核对卷或容量不足，不能继续写入；超额真实分片撤销会话并进入持久清理，不发布素材。
+
+`POST /internal/v1/tasks/{id}/space-check` 要求 Worker 认证和 `{attemptId, leaseToken}`，仅当前有效 RUNNING 媒体 attempt 可调用。成功返回 `{requiredBytes}`，供 Worker 在开始下载、探测或渲染前复查本地工作区。无效凭证／状态返回 409；卷核对失败或低空间返回 409 `STORAGE_SPACE_LOW`。低空间媒体执行产生 `MEDIA_SPACE_LOW` 失败原因，保留原版本，不能发布输出。

@@ -71,8 +71,16 @@ public class MediaExecutor {
         Path directory=null;
         try {
             directory=work.create(execution.attemptId);
+            var capacity=business.post("/internal/v1/tasks/"+execution.taskId+"/space-check",Map.of("attemptId",execution.attemptId,"leaseToken",execution.token));
+            if(capacity.status()==409 && "STORAGE_SPACE_LOW".equals(capacity.error().path("code").asText()))
+                throw new MediaInspection.InvalidMedia("MEDIA_SPACE_LOW",capacity.error().path("message").asText());
+            if(capacity.status()==401 || capacity.status()==409)throw new InterruptedException("Execution stopped before media admission");
+            if(capacity.status()!=200)throw new java.io.IOException("Media capacity check unavailable");
+            long required=capacity.data().path("requiredBytes").asLong();
+            if(required<1 || Files.getFileStore(directory).getUsableSpace()<required)
+                throw new MediaInspection.InvalidMedia("MEDIA_SPACE_LOW","当前媒体执行空间不足，请清理工作区或扩容后重试");
             if(java.util.Set.of("PREVIEW","EXPORT").contains(execution.input.path("operation").asText())) {
-                var rendered=renderer.render(execution.input,directory,storage,bucket,execution::stopped);
+                var rendered=renderer.render(execution.input,directory,storage,bucket,execution::stopped,required);
                 if(execution.stopped()) throw new InterruptedException("Execution stopped");
                 report(execution,"complete",Map.of("attemptId",execution.attemptId,"leaseToken",execution.token,"producerKey","rendered","resultType","EXPORT".equals(execution.input.path("operation").asText())?"EXPORT_RENDERED":"PREVIEW_RENDERED","result",rendered));
                 return;

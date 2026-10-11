@@ -14,10 +14,22 @@ public class UploadService {
     private final JdbcTemplate database;
     private final TransactionTemplate transactions;
     private final MultipartStorage storage;
+    private final UploadCleanup cleanup;
+    private final com.agenticvideo.business.storage.StorageCapacity capacity;
     private final long inactivitySeconds;
-    public UploadService(JdbcTemplate database, PlatformTransactionManager manager, MultipartStorage storage,
-            @org.springframework.beans.factory.annotation.Value("${upload.inactivity-seconds:86400}") long inactivitySeconds) {
+    private final long maxFileBytes;
+    private final long maxProjectBytes;
+    private final int maxProjectAssets;
+    public UploadService(JdbcTemplate database, PlatformTransactionManager manager, MultipartStorage storage, UploadCleanup cleanup, com.agenticvideo.business.storage.StorageCapacity capacity,
+            @org.springframework.beans.factory.annotation.Value("${upload.inactivity-seconds:86400}") long inactivitySeconds,
+            @org.springframework.beans.factory.annotation.Value("${upload.max-file-bytes:2147483648}") long maxFileBytes,
+            @org.springframework.beans.factory.annotation.Value("${upload.max-project-bytes:5368709120}") long maxProjectBytes,
+            @org.springframework.beans.factory.annotation.Value("${upload.max-project-assets:10}") int maxProjectAssets) {
         if(inactivitySeconds<1)throw new IllegalArgumentException("Invalid upload inactivity lifetime");
+        if(maxFileBytes<1 || maxFileBytes>PART_BYTES*10000 || maxProjectBytes<1 || maxProjectAssets<1)
+            throw new IllegalArgumentException("Invalid upload limits");
+        this.capacity=capacity;this.cleanup=cleanup;
+        this.maxFileBytes=maxFileBytes;this.maxProjectBytes=maxProjectBytes;this.maxProjectAssets=maxProjectAssets;
         this.database = database; this.transactions = new TransactionTemplate(manager); this.storage = storage;this.inactivitySeconds=inactivitySeconds;
     }
     public Object create(UUID projectId, UUID actorId, UploadController.CreateUpload request) {
@@ -36,14 +48,19 @@ public class UploadService {
             }
             database.queryForObject("SELECT id FROM projects WHERE id = ? FOR UPDATE", UUID.class, projectId);
             var reserved = database.queryForMap("SELECT coalesce(sum(bytes),0) AS bytes, coalesce(sum(asset_slots),0) AS slots FROM storage_reservations WHERE project_id = ? AND state <> 'RELEASED'", projectId);
-            if (request.sizeBytes() > 2L * 1024 * 1024 * 1024 || ((Number) reserved.get("bytes")).longValue() + request.sizeBytes() > 5L * 1024 * 1024 * 1024 || ((Number) reserved.get("slots")).intValue() >= 10)
-                throw new ResponseStatusException(CONFLICT, "超出素材数量或存储限额");
+            if (request.sizeBytes() > maxFileBytes)
+                throw new ResponseStatusException(CONFLICT, "单文件大小超过上限 " + maxFileBytes + " 字节，请压缩或拆分视频后重试");
+            if (((Number) reserved.get("bytes")).longValue() > maxProjectBytes - request.sizeBytes())
+                throw new ResponseStatusException(CONFLICT, "项目原始素材总量超过上限 " + maxProjectBytes + " 字节，请取消未完成上传、删除不需要的素材或新建项目");
+            if (((Number) reserved.get("slots")).longValue() >= maxProjectAssets)
+                throw new ResponseStatusException(CONFLICT, "项目视频数量达到上限 " + maxProjectAssets + "，请取消未完成上传、删除不需要的素材或新建项目");
+            capacity.require(capacity.uploadBudget(request.sizeBytes()));
             UUID uploadId = UUID.randomUUID();
             database.update("INSERT INTO upload_sessions (id,project_id,actor_user_id,idempotency_key,filename,declared_bytes,declared_sha256,part_size_bytes,expected_parts,object_key,writer_token,writer_owner) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                     uploadId, projectId, actorId, request.idempotencyKey(), request.filename(), request.sizeBytes(), request.sha256().toLowerCase(Locale.ROOT), PART_BYTES,
                     (int) ((request.sizeBytes() + PART_BYTES - 1) / PART_BYTES), "originals/" + uploadId, UUID.randomUUID(),
                     request.writerId());
-            database.update("INSERT INTO storage_reservations (id,project_id,upload_id,bytes) VALUES (?,?,?,?)", UUID.randomUUID(), projectId, uploadId, request.sizeBytes());
+            database.update("INSERT INTO storage_reservations (id,project_id,upload_id,bytes,future_bytes) VALUES (?,?,?,?,?)", UUID.randomUUID(), projectId, uploadId, request.sizeBytes(),capacity.uploadBudget(request.sizeBytes()));
             database.update("UPDATE upload_sessions SET expires_at=now()+?*interval '1 second' WHERE id=?",inactivitySeconds,uploadId);
             return uploadId;
         });
@@ -158,6 +175,9 @@ public class UploadService {
         });
     }
     public Object partUrls(Upload upload, UploadController.PartUrls request) {
+        requireWriter(upload,request.writerToken());
+        if(!"UPLOADING".equals(upload.status()))throw new ResponseStatusException(CONFLICT,"当前上传状态不能签发分片");
+        rejectOversizedParts(upload,storage.parts(upload.key(),upload.s3UploadId()));
         return transactions.execute(tx->{
             database.queryForMap("SELECT id FROM upload_sessions WHERE id=? FOR UPDATE",upload.id());
             var current=find(upload.id());
@@ -165,6 +185,8 @@ public class UploadService {
             if (!"UPLOADING".equals(current.status())) throw new ResponseStatusException(CONFLICT, "当前上传状态不能签发分片");
             if (request.partNumbers().stream().anyMatch(n -> n > current.parts()) || new HashSet<>(request.partNumbers()).size() != request.partNumbers().size())
                 throw new ResponseStatusException(BAD_REQUEST, "分片序号无效");
+            checkLimits(current);
+            capacity.require(0);
             renewActivity(current.id());
             database.update("UPDATE upload_sessions SET last_signed_url_expires_at=greatest(coalesce(last_signed_url_expires_at,now()),now()+?*interval '1 second') WHERE id=?",storage.partUrlSeconds(),current.id());
             return Map.of("parts", request.partNumbers().stream().map(number -> Map.of("partNumber", number,
@@ -176,7 +198,9 @@ public class UploadService {
     public Object recordPart(Upload upload, int number, UploadController.PartReport report) {
         requireWriter(upload, report.writerToken());
         if (!List.of("UPLOADING", "PAUSED").contains(upload.status())) throw new ResponseStatusException(CONFLICT, "当前状态不能登记分片");
-        var part = storage.parts(upload.key(), upload.s3UploadId()).stream().filter(p -> p.partNumber() == number).findFirst()
+        var storedParts=storage.parts(upload.key(), upload.s3UploadId());
+        rejectOversizedParts(upload,storedParts);
+        var part = storedParts.stream().filter(p -> p.partNumber() == number).findFirst()
                 .orElseThrow(() -> new ResponseStatusException(CONFLICT, "对象存储中没有该分片"));
         long expected = number == upload.parts() ? upload.bytes() - (number-1L)*PART_BYTES : PART_BYTES;
         if (number < 1 || number > upload.parts() || part.size() != expected || report.sizeBytes() != expected || !part.eTag().equals(report.etag()))
@@ -195,12 +219,19 @@ public class UploadService {
         requireWriter(upload, writer);
         if ("COMPLETED".equals(upload.status())) return view(upload);
         UUID operation = UUID.randomUUID();
-        int claimed = database.update("UPDATE upload_sessions SET status='COMPLETING', operation_token=?,operation_expires_at=now()+interval '30 seconds' WHERE id=? AND expires_at>now() AND status IN ('UPLOADING','COMPLETING') AND (operation_token IS NULL OR operation_expires_at < now())", operation, upload.id());
+        int claimed = transactions.execute(tx -> {
+            database.queryForMap("SELECT id FROM upload_sessions WHERE id=? FOR UPDATE",upload.id());
+            requireWriter(find(upload.id()),writer);
+            checkLimits(upload);
+            capacity.require(0);
+            return database.update("UPDATE upload_sessions SET status='COMPLETING', operation_token=?,operation_expires_at=now()+interval '30 seconds' WHERE id=? AND expires_at>now() AND status IN ('UPLOADING','COMPLETING') AND (operation_token IS NULL OR operation_expires_at < now())", operation, upload.id());
+        });
         if (claimed == 0) return view(find(upload.id()));
         try {
             Long size = storage.objectSize(upload.key());
             if (size == null) {
                 var parts = storage.parts(upload.key(), upload.s3UploadId());
+                rejectOversizedParts(upload,parts);
                 if (parts.size() != upload.parts()) throw new ResponseStatusException(CONFLICT, "分片不完整");
                 long total = 0;
                 for (int i=0; i<parts.size(); i++) {
@@ -217,6 +248,10 @@ public class UploadService {
                     if (storage.objectSize(upload.key()) == null) throw uncertain;
                 }
                 size = storage.objectSize(upload.key());
+            }
+            if (size != null && size > upload.bytes()) {
+                cleanup.cancel(upload.id());
+                throw new ResponseStatusException(CONFLICT,"实际文件超过声明大小，上传已取消并安排残留清理，请核对原文件后重新上传");
             }
             if (size == null || size != upload.bytes()) throw new ResponseStatusException(CONFLICT, "对象大小不匹配");
             transactions.executeWithoutResult(tx -> {
@@ -242,6 +277,23 @@ public class UploadService {
             database.update("UPDATE upload_sessions SET operation_token=NULL,operation_expires_at=NULL WHERE id=? AND operation_token=?", upload.id(), operation);
         }
         return view(find(upload.id()));
+    }
+    private void checkLimits(Upload upload) {
+        if(upload.bytes()>maxFileBytes)throw new ResponseStatusException(CONFLICT,"单文件大小超过当前上限，请取消后压缩或拆分视频再上传");
+        var reserved=database.queryForMap("SELECT coalesce(sum(bytes),0) AS bytes,coalesce(sum(asset_slots),0) AS slots FROM storage_reservations WHERE project_id=? AND state<>'RELEASED'",upload.projectId());
+        if(((Number)reserved.get("bytes")).longValue()>maxProjectBytes || ((Number)reserved.get("slots")).longValue()>maxProjectAssets)
+            throw new ResponseStatusException(CONFLICT,"项目素材预留超过当前限额，请取消不需要的上传或清理素材后重试");
+    }
+    private void rejectOversizedParts(Upload upload, List<software.amazon.awssdk.services.s3.model.Part> parts) {
+        long total=0;
+        for(var part:parts) {
+            long expected=part.partNumber()==upload.parts()?upload.bytes()-(part.partNumber()-1L)*PART_BYTES:PART_BYTES;
+            if(part.partNumber()<1 || part.partNumber()>upload.parts() || part.size()>expected || part.size()>upload.bytes()-total) {
+                cleanup.cancel(upload.id());
+                throw new ResponseStatusException(CONFLICT,"实际分片超过声明大小或分片规则，上传已取消并安排残留清理，请核对原文件后重新上传");
+            }
+            total+=part.size();
+        }
     }
     public Object assets(UUID projectId, boolean includePending) {
         return Map.of("items", database.query("SELECT id,filename,validation_status FROM assets WHERE project_id=? AND (validation_status='VALID' OR ?) ORDER BY id LIMIT 100", (row,index) -> Map.of("id", row.getObject("id"), "filename", row.getString("filename"), "validationStatus", row.getString("validation_status")), projectId, includePending));

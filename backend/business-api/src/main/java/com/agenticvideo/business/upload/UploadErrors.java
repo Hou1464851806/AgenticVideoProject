@@ -16,7 +16,7 @@ class UploadErrors {
     }
     @ExceptionHandler(ResponseStatusException.class)
     ResponseEntity<?> rejected(ResponseStatusException failure) {
-        String code = switch (failure.getStatusCode().value()) {
+        String code = failure instanceof com.agenticvideo.business.storage.StorageCapacity.SpaceUnavailable ? "STORAGE_SPACE_LOW" : switch (failure.getStatusCode().value()) {
             case 404 -> "RESOURCE_NOT_FOUND";
             case 409 -> "UPLOAD_CONFLICT";
             default -> "INVALID_REQUEST";

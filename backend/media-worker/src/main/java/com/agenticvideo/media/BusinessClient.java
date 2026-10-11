@@ -24,7 +24,8 @@ public class BusinessClient {
                 .header("Authorization", "Bearer " + token).header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build();
         var response = http.send(request, HttpResponse.BodyHandlers.ofString());
-        return new Reply(response.statusCode(), json.readTree(response.body()).path("data"));
+        var bodyNode=json.readTree(response.body());
+        return new Reply(response.statusCode(), bodyNode.path("data"),bodyNode.path("error"));
     }
-    public record Reply(int status, JsonNode data) {}
+    public record Reply(int status, JsonNode data,JsonNode error) {}
 }
