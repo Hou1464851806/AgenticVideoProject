@@ -1,6 +1,6 @@
 # Agent 视频工作区
 
-使用 Vue 3 和 Spring Boot 提供同源浏览器入口。业务数据保存在 PostgreSQL；独立 Java 媒体 Worker 通过 RabbitMQ 领取任务，使用 FFmpeg 验证视频与提取音频；独立 Python Agent 服务调用百炼异步语音识别。服务划分遵循 [架构设计](docs/architecture.md)。
+使用 Vue 3 和 Spring Boot 提供同源浏览器入口。业务数据保存在 PostgreSQL；独立 Java 媒体 Worker 通过 RabbitMQ 领取任务，使用 FFmpeg 验证视频与提取音频；独立 Python Agent 服务调用百炼异步语音识别，并用 DeepSeek 进行有界素材查询。服务划分遵循 [架构设计](docs/architecture.md)。
 
 ## 本机启动
 
@@ -24,6 +24,12 @@ PostgreSQL 使用 `postgres_data` 持久卷。`docker compose restart` 保留账
 
 素材库提供“查找原句”：输入人名、数字或原句，查看语音证据卡、邻近原文并定位原视频。当前仅有字面查询；未命中会列出语音分析覆盖，尚未具备语义检索能力。
 
+## 制作会话查询
+
+在 `.env` 配置 `DEEPSEEK_API_KEY` 后重新启动。默认模型为 `deepseek-flash`。在对话区选择新会话的固定素材范围，创建制作会话；发送自然语言查询时可明确引用范围内素材。回答附语音原文与观察时间，点击引用可回看原视频。不同制作会话的公开历史、上下文和输入草稿独立，查询无需关联剪辑方案。
+
+同会话运行中可编辑草稿，完成后再发送；重复发送同一请求返回原轮次和任务。Agent 通过 Spring 授权工具读取证据，每轮最多 6 次模型请求和 12 次业务工具调用；目前只支持已有语音原文，未命中不证明原视频不存在相关内容。私有运行 checkpoint 保存在独立 `agent_state` 卷（`/state`），执行临时目录位于 `agent_work` 卷（`/work`），业务消息、引用、任务和模型用量保存在 PostgreSQL。模型调用回执不明确时停止自动重新提交。
+
 ## 开发验证
 
 安装 JDK 17、Maven 3.9.9 和 Node.js 24，保持 Docker Desktop 运行：
@@ -36,7 +42,7 @@ npm run build
 npm run test:e2e
 ```
 
-Compose 镜像构建完成并配置模型凭据后，在仓库根目录运行 `node scripts/test-models.mjs`，从固定视频提取测试音频并验证真实百炼句／字词响应。测试会调用付费接口，并保留测试任务标识供重复查询。完整浏览器套件也包含真实模型与网络故障验证。
+Compose 镜像构建完成并配置模型凭据后，在仓库根目录运行 `node scripts/test-models.mjs`，从固定视频提取测试音频并验证真实百炼句／字词响应。测试会调用付费接口，并保留测试任务标识供重复查询。完整浏览器套件也包含真实百炼、DeepSeek 工具协议、多会话与多标签页验证，以及网络故障验证。
 
 Java 集成测试启动独立的真实 PostgreSQL、Silo 和 RabbitMQ 容器。浏览器测试使用已安装的 Google Chrome，并要求 Compose 服务先启动；它验证登录持久性、两账号项目隔离、窄屏入口、多文件直传、响应丢失恢复、真实媒体校验及 Range 播放。恢复测试会强制中断媒体 Worker，再验证任务恢复、临时目录清理、重复通知和进程取消。如果测试进程的 PATH 中没有 Docker，可通过 `DOCKER_BIN=/usr/local/bin/docker npm run test:e2e` 指定 CLI。
 

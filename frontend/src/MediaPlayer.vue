@@ -28,16 +28,19 @@ onMounted(()=> { informationTimer=setInterval(()=> {
 },1000); });
 onUnmounted(()=>clearInterval(informationTimer));
 const video = ref<HTMLVideoElement | null>(null);
+const seconds = ref('0');
 const source = ref(props.playback.url);
 let refreshed = false;
 let initialSeconds = props.playback.startMs === undefined ? undefined : props.playback.startMs / 1000;
 let restore: { seconds: number; playing: boolean } | undefined;
 watch(() => props.playback, playback => {
+  const sameSource = source.value === playback.url;
   source.value = playback.url;
   initialSeconds = playback.startMs === undefined ? undefined : playback.startMs / 1000;
   refreshed = false;
   restore = undefined;
   error.value = '';
+  if (sameSource && (video.value?.readyState ?? 0) >= 1) applyInitialPosition();
 });
 async function refreshAccess() {
   if (refreshed) { error.value = '视频无法播放，请重新选择素材或稍后重试'; return; }
@@ -54,19 +57,23 @@ async function refreshAccess() {
     if (props.playback.assetId === assetId) error.value = failure instanceof Error ? failure.message : '无法续期播放权限';
   }
 }
-function loaded() {
-  if (!restore && initialSeconds !== undefined && video.value) {
-    video.value.currentTime = Math.max(0, Math.min(video.value.duration, initialSeconds));
+function applyInitialPosition() {
+  if (initialSeconds !== undefined && video.value) {
+    const position = Math.max(0, Math.min(video.value.duration, initialSeconds));
+    video.value.currentTime = position;
+    seconds.value = String(position);
     initialSeconds = undefined;
     void video.value.play().catch(() => {});
   }
+}
+function loaded() {
+  if (!restore) applyInitialPosition();
   if (restore && video.value) {
     video.value.currentTime = restore.seconds;
     if (restore.playing) void video.value.play();
     restore = undefined;
   }
 }
-const seconds = ref('0');
 function seek() {
   const requested = Number(seconds.value);
   if (!video.value || !Number.isFinite(requested)) return;

@@ -116,6 +116,10 @@ SearchHit 基线：assetId、retrievalUnitId、evidenceIds、sourceKind、text�
 
 ## 制作会话与消息
 
+当前 #15 已接入创建／列出会话、读取公开消息、接纳查询轮次及浏览器操作。创建参数为 `title`、`assetIds`（最多 100 个本项目有效素材，省略表示空范围）；会话范围创建后固定。轮次 POST 必须带 `Idempotency-Key`，支持 `content`、ASSET／EVIDENCE `references`、可选 `context.assetIds`，后者只能收窄会话范围并在接纳时冻结。纯查询当前不接受方案／输出上下文。消息响应包含 `items`、最近 `latestTask`；公开消息含 `id`、`messageSeq`、`role`、`content`、验证后的 `references`。后续快照／SSE、澄清及方案能力仍按对应任务实施。
+
+`AGENT_TURN` 的 message／turn／task／Outbox 在锁定会话的同一事务保存；相同键及规范化 JSON 内容返回同一组标识，同键不同内容或活动轮次冲突返回 409。内部 tool／provider-call／complete 入口均验证当前尝试及有效租约，模型不能传入项目身份覆盖任务范围。业务工具有 12 次上限，模型提交有 6 次上限；已保存成功回执复用，未确认回执停止自动重复付费。发布出处必须出现在本轮授权检索／上下文工具回执中，不能仅凭已知证据 ID 引用。公开消息不包含原始工具协议、reasoning_content 或私有 checkpoint。
+
 | 方法与路径 | 语义 |
 | --- | --- |
 | POST /api/v1/projects/{projectId}/conversations | title、可选 planId；创建制作会话，后端分配 graph 关联 |

@@ -3,8 +3,8 @@ export class ApiFailure extends Error {
 }
 
 /** Browser calls only the same-origin business API. */
-export async function request<T>(path: string, method = 'GET', data?: unknown): Promise<T> {
-  const headers: Record<string, string> = {};
+export async function request<T>(path: string, method = 'GET', data?: unknown, extraHeaders: Record<string,string> = {}): Promise<T> {
+  const headers: Record<string, string> = { ...extraHeaders };
   if (method !== 'GET') {
     const csrf = await request<{ csrfToken: string }>('/auth/csrf');
     headers['X-XSRF-TOKEN'] = csrf.csrfToken;

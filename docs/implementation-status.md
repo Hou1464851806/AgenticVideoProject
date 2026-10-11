@@ -2,7 +2,7 @@
 
 本轮按 ready-for-agent 的 32 张子任务实施；#1 为汇总需求。实施起点为 `63efde7`，在当前 main 分支逐票提交。
 
-按用户要求，#10 完成并提交后暂停，等待用户亲自体验及反馈。下一张可开始的 P0 任务为 #15。
+按用户最新要求，#15 已完成并通过全套验证后暂停实施，保留服务供用户亲自体验。恢复后下一张可开始的 P0 任务为 #20。
 
 已确认测试边界：公开 HTTP 接口为主，关键 PostgreSQL／对象存储／消息／媒体／模型边界使用真实集成；浏览器验证用户操作闭环。
 
@@ -21,7 +21,7 @@
 | [#12](https://github.com/Hou1464851806/AgenticVideoProject/issues/12) [T11] 查询画面与可见文字并核查观察时刻 | P1 | #11 | 待实施 |
 | [#13](https://github.com/Hou1464851806/AgenticVideoProject/issues/13) [T12] 在预算内复查候选，超预算先询问 | P1 | #12 | 待实施 |
 | [#14](https://github.com/Hou1464851806/AgenticVideoProject/issues/14) [T13] 只恢复失败分析阶段并重建检索索引 | P1 | #12 | 待实施 |
-| [#15](https://github.com/Hou1464851806/AgenticVideoProject/issues/15) [T14] 在独立制作会话中对话查询素材 | P0 | #10 | 待实施 |
+| [#15](https://github.com/Hou1464851806/AgenticVideoProject/issues/15) [T14] 在独立制作会话中对话查询素材 | P0 | #10 | 实现与验证完成，见 [记录](verification/issue-15.md) |
 | [#16](https://github.com/Hou1464851806/AgenticVideoProject/issues/16) [T15] 刷新或断线后恢复对话进度与结果 | P1 | #15 | 待实施 |
 | [#17](https://github.com/Hou1464851806/AgenticVideoProject/issues/17) [T16] 停止对话任务并关联原需求重试失败 | P1 | #15 | 待实施 |
 | [#18](https://github.com/Hou1464851806/AgenticVideoProject/issues/18) [T17] 纠正制作需求简报并回答关联澄清 | P1 | #15 | 待实施 |

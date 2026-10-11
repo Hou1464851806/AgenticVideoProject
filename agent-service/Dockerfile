@@ -3,6 +3,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
 COPY agent-service/requirements.lock ./requirements.lock
 RUN pip install --no-cache-dir -r requirements.lock && useradd --uid 10001 --create-home agent && mkdir /work && chown agent:agent /work
+RUN mkdir /state && chown agent:agent /state
 COPY agent-service/agent_service ./agent_service
 USER agent
 EXPOSE 8082

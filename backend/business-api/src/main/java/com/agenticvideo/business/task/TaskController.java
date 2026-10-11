@@ -11,7 +11,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-class TaskController {
+public class TaskController {
     private final TaskExecution tasks;
     private final ProjectAccess access;
     TaskController(TaskExecution tasks, ProjectAccess access) { this.tasks = tasks; this.access = access; }
@@ -45,6 +45,11 @@ class TaskController {
         return org.springframework.http.ResponseEntity.accepted().body(envelope(tasks.cancel(id)));
     }
     public record Execution(@NotNull UUID attemptId, @NotBlank String leaseToken) {}
+    @PostMapping("/internal/v1/tasks/{id}/tool")
+    Map<String,Object> tool(@PathVariable UUID id,@Valid @RequestBody Tool request) { return envelope(tasks.tool(id,request)); }
+    public record Tool(@NotNull UUID attemptId,@NotBlank String leaseToken,
+            @NotBlank @Size(max=120) String producerKey,@NotBlank String name,
+            @NotNull com.fasterxml.jackson.databind.JsonNode arguments) {}
     @PostMapping("/internal/v1/tasks/{id}/provider-call")
     Map<String,Object> provider(@PathVariable UUID id,@Valid @RequestBody ProviderCall request) { return envelope(tasks.provider(id,request)); }
     public record ProviderCall(@NotNull UUID attemptId,@NotBlank String leaseToken,@NotBlank String action,@NotNull com.fasterxml.jackson.databind.JsonNode data) {}

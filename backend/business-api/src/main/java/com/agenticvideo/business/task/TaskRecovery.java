@@ -35,7 +35,7 @@ class TaskRecovery {
         for(var candidate:expired) {
             UUID attempt=(UUID)candidate.get("current_attempt_id");
             try {
-                String path=("CONTENT_ANALYZE".equals(candidate.get("type"))?agentUrl:workerUrl)+"/internal/v1/executions/"+attempt;
+                String path=(java.util.List.of("CONTENT_ANALYZE","AGENT_TURN").contains(candidate.get("type"))?agentUrl:workerUrl)+"/internal/v1/executions/"+attempt;
                 var reply=http.send(HttpRequest.newBuilder(URI.create(path)).timeout(Duration.ofSeconds(3)).header("Authorization","Bearer "+token).GET().build(),HttpResponse.BodyHandlers.ofString());
                 if(reply.statusCode()!=200) continue;
                 String state=json.readTree(reply.body()).path("state").asText();

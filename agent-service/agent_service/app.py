@@ -18,6 +18,7 @@ from fastapi import FastAPI, Header, HTTPException
 from botocore.config import Config
 
 from .bailian import BailianAsr, ProviderError, SubmissionUncertain
+from .conversation import run_conversation, ConversationUnverified
 
 TOKEN = os.environ.get("INTERNAL_WORKER_TOKEN", "")
 BUSINESS = os.environ.get("BUSINESS_URL", "http://business-api:8080")
@@ -99,6 +100,9 @@ class Execution:
         heartbeat = threading.Thread(target=self.heartbeat, daemon=True)
         heartbeat.start()
         try:
+            if "conversationId" in self.input:
+                run_conversation(self, Path(os.environ.get("AGENT_STATE_DIRECTORY", "/state")))
+                return
             if not os.environ.get("DASHSCOPE_API_KEY"):
                 raise Unverified("未配置百炼凭据，真实语音分析未验证")
             call = self.provider("LOOKUP")
@@ -168,6 +172,13 @@ class Execution:
         except LostAttempt:
             pass
         except Exception as failure:
+            if "conversationId" in self.input:
+                try:
+                    self.post("fail", {"producerKey": "conversation-failed", "code": "CONVERSATION_UNVERIFIED" if isinstance(failure, ConversationUnverified) else "CONVERSATION_FAILED",
+                        "message": str(failure) if isinstance(failure, ConversationUnverified) else "对话执行未完成，未发布正式答复"})
+                except Exception:
+                    pass
+                return
             code = "ASR_PROVIDER_FAILED" if isinstance(failure, ModelFailed) else "ASR_UNVERIFIED" if isinstance(failure, Unverified) else "ANALYSIS_EXECUTION_FAILED"
             message = str(failure) if isinstance(failure, (Unverified, ModelFailed)) else "语音执行暂时失败；保留提供方任务身份后恢复"
             try:
