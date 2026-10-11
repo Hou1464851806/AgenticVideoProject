@@ -247,3 +247,10 @@ complete 结果类型为 MEDIA_PREPARED、ANALYSIS_RESULT、INDEX_VERIFIED、AGE
 创建上传以服务端配置的文件、项目原始字节及视频数量限额判断，并在同一事务内预留跨项目未来写入预算；分片签发和完成复查当前限额与实际卷容量。拒绝原因通过 `error.message` 明确说明限制及下一步操作。`STORAGE_SPACE_LOW` 表示无法核对卷或容量不足，不能继续写入；超额真实分片撤销会话并进入持久清理，不发布素材。
 
 `POST /internal/v1/tasks/{id}/space-check` 要求 Worker 认证和 `{attemptId, leaseToken}`，仅当前有效 RUNNING 媒体 attempt 可调用。成功返回 `{requiredBytes}`，供 Worker 在开始下载、探测或渲染前复查本地工作区。无效凭证／状态返回 409；卷核对失败或低空间返回 409 `STORAGE_SPACE_LOW`。低空间媒体执行产生 `MEDIA_SPACE_LOW` 失败原因，保留原版本，不能发布输出。
+
+## 视觉证据（#12）
+
+- `POST /assets/{id}/vision-analysis`：项目所有者启动或取得已在执行的独立视觉任务，202；成功观察不会重新付费。
+- `POST /projects/{id}/search` 可用 `sourceKinds: ["SPEECH"|"VISUAL"|"VISIBLE_TEXT"]` 控制来源，省略保持语音。视觉命中及上下文返回 `observedAtMs` / `FRAME_OBSERVATION`，不返回 startMs/endMs。视觉 coverage 包含稀疏 sampling 和独立阶段／索引状态。
+- `POST /evidence/{id}/frame-access`：仅当前有效分析及项目所有者可签发 300 秒佐证帧链接，返回观察时刻。
+- `/assets/{id}/evidence` 的 `vision` 包含帧、视觉观察、模型调用记录和稀疏覆盖。语音 observations 单独返回；units 明确 sourceKind，视觉使用观察点。

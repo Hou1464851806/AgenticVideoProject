@@ -38,14 +38,14 @@ class TaskDispatch {
         // RabbitMQ is a wake-up channel; a successful publish does not prove a task was claimed.
         database.update("""
                 UPDATE outbox_events e SET status='PENDING',available_at=now(),published_at=NULL
-                FROM tasks t WHERE e.task_id=t.id AND t.status='PENDING' AND e.type IN ('MEDIA_PREPARE','CONTENT_ANALYZE','INDEX_BUILD','AGENT_TURN','PREVIEW_RENDER','EXPORT_RENDER')
+                FROM tasks t WHERE e.task_id=t.id AND t.status='PENDING' AND e.type IN ('MEDIA_PREPARE','CONTENT_ANALYZE','INDEX_BUILD','VISION_PREPARE','VISION_ANALYZE','AGENT_TURN','PREVIEW_RENDER','EXPORT_RENDER')
                 AND e.status='PUBLISHED' AND e.published_at < now()-make_interval(secs => ?)
                 """, pendingRenotifySeconds);
         UUID claim = UUID.randomUUID();
         var events = database.queryForList("""
                 WITH candidates AS (
                     SELECT id FROM outbox_events
-                    WHERE type IN ('MEDIA_PREPARE','CONTENT_ANALYZE','INDEX_BUILD','AGENT_TURN','PREVIEW_RENDER','EXPORT_RENDER') AND available_at<=now()
+                    WHERE type IN ('MEDIA_PREPARE','CONTENT_ANALYZE','INDEX_BUILD','VISION_PREPARE','VISION_ANALYZE','AGENT_TURN','PREVIEW_RENDER','EXPORT_RENDER') AND available_at<=now()
                     AND (status='PENDING' OR status='PUBLISHING' AND lease_expires_at<now())
                     ORDER BY available_at FOR UPDATE SKIP LOCKED LIMIT 10
                 )
@@ -60,7 +60,7 @@ class TaskDispatch {
                 properties.setMessageId(event.get("id").toString());
                 Message message = new Message(event.get("payload_json").toString().getBytes(StandardCharsets.UTF_8), properties);
                 broker.invoke(channel -> {
-                    channel.send("", java.util.List.of("CONTENT_ANALYZE","INDEX_BUILD","AGENT_TURN").contains(event.get("type"))?"analysis.v1":"media.v1", message);
+                    channel.send("", java.util.List.of("CONTENT_ANALYZE","INDEX_BUILD","VISION_ANALYZE","AGENT_TURN").contains(event.get("type"))?"analysis.v1":"media.v1", message);
                     channel.waitForConfirmsOrDie(5000);
                     return null;
                 });

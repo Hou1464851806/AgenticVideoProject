@@ -120,6 +120,10 @@ class Execution:
         heartbeat = threading.Thread(target=self.heartbeat, daemon=True)
         heartbeat.start()
         try:
+            if self.input.get("operation") == "VISION_ANALYZE":
+                from .vision import analyze_vision
+                analyze_vision(self)
+                return
             if self.input.get("operation") == "INDEX_BUILD":
                 from .search_index import build_index
                 build_index(self)
@@ -199,6 +203,12 @@ class Execution:
             except Exception:
                 pass
         except Exception as failure:
+            if self.input.get("operation") == "VISION_ANALYZE":
+                try:
+                    self.post("fail", {"producerKey":"vision-failed", "code":"VISION_UNVERIFIED", "message":str(failure) if isinstance(failure, RuntimeError) else "视觉分析未可靠完成；语音能力仍可使用"})
+                except Exception:
+                    pass
+                return
             if self.input.get("operation") == "INDEX_BUILD":
                 try:
                     self.post("fail", {"producerKey": "index-failed", "code": "INDEX_UNVERIFIED",

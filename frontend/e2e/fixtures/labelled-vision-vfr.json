@@ -1,0 +1,26 @@
+{
+  "kind": "MANUALLY_LABELLED_SYNTHETIC_VFR",
+  "durationMs": 7120,
+  "frames": [
+    {
+      "observedAtMs": 0,
+      "scene": "红色矩形",
+      "visibleText": "证据42"
+    },
+    {
+      "observedAtMs": 2320,
+      "scene": "蓝色矩形",
+      "visibleText": "画面17"
+    },
+    {
+      "observedAtMs": 4760,
+      "scene": "红色矩形",
+      "visibleText": "证据42"
+    },
+    {
+      "observedAtMs": 7080,
+      "scene": "红色矩形",
+      "visibleText": "证据42"
+    }
+  ]
+}

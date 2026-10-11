@@ -19,6 +19,7 @@ import static org.springframework.http.HttpStatus.*;
 @Service
 public class TaskExecution {
     private final com.agenticvideo.business.search.SearchIndexes indexes;
+    private final com.agenticvideo.business.analysis.VisualAnalysis vision;
     private final com.agenticvideo.business.storage.StorageCapacity capacity;
     private final JdbcTemplate database;
     private final TransactionTemplate transactions;
@@ -28,11 +29,11 @@ public class TaskExecution {
     private final com.agenticvideo.business.conversation.ConversationTurns conversations;
     private final com.agenticvideo.business.plan.EditPlans plans;
     private final com.agenticvideo.business.render.RenderArtifacts artifacts;
-    TaskExecution(com.agenticvideo.business.search.SearchIndexes indexes,JdbcTemplate database, PlatformTransactionManager manager, ObjectMapper json,
+    TaskExecution(com.agenticvideo.business.analysis.VisualAnalysis vision,com.agenticvideo.business.search.SearchIndexes indexes,JdbcTemplate database, PlatformTransactionManager manager, ObjectMapper json,
             @Value("${internal.worker-token:}") String secret, com.agenticvideo.business.analysis.SpeechAnalysis speech,
             com.agenticvideo.business.conversation.ConversationTurns conversations,
             com.agenticvideo.business.plan.EditPlans plans,com.agenticvideo.business.render.RenderArtifacts artifacts,com.agenticvideo.business.storage.StorageCapacity capacity) {
-        this.indexes=indexes;this.capacity=capacity;
+        this.vision=vision;this.indexes=indexes;this.capacity=capacity;
         this.database = database; this.transactions = new TransactionTemplate(manager); this.json = json; this.secret = secret;this.speech=speech;
         this.conversations = conversations;
         this.plans = plans;
@@ -49,7 +50,7 @@ public class TaskExecution {
             var rows = database.queryForList("SELECT * FROM tasks WHERE id=? FOR UPDATE", id);
             if (rows.isEmpty()) throw new ResponseStatusException(NOT_FOUND, "任务不存在");
             var task = rows.get(0);
-            if (!java.util.List.of("MEDIA_PREPARE","CONTENT_ANALYZE","INDEX_BUILD","AGENT_TURN","PREVIEW_RENDER","EXPORT_RENDER").contains(task.get("type"))) throw new ResponseStatusException(CONFLICT, "执行器不能领取此任务类型");
+            if (!java.util.List.of("MEDIA_PREPARE","VISION_PREPARE","VISION_ANALYZE","CONTENT_ANALYZE","VISION_ANALYZE","INDEX_BUILD","AGENT_TURN","PREVIEW_RENDER","EXPORT_RENDER").contains(task.get("type"))) throw new ResponseStatusException(CONFLICT, "执行器不能领取此任务类型");
             if ("RUNNING".equals(task.get("status"))) {
                 var attempt = database.queryForMap("SELECT *, lease_expires_at>now() AS valid FROM task_attempts WHERE id=?", task.get("current_attempt_id"));
                 if (request.executorId().equals(attempt.get("executor_id")) && request.claimRequestId().equals(attempt.get("claim_request_id")) && Boolean.TRUE.equals(attempt.get("valid")))
@@ -61,6 +62,7 @@ public class TaskExecution {
             int number = database.queryForObject("SELECT coalesce(max(attempt_number),0)+1 FROM task_attempts WHERE task_id=?", Integer.class, id);
             database.update("INSERT INTO task_attempts (id,task_id,attempt_number,executor_id,claim_request_id,lease_token_hash,lease_expires_at) VALUES (?,?,?,?,?,?,now()+interval '60 seconds')", attemptId, id, number, request.executorId(), request.claimRequestId(), hash(token(attemptId)));
             database.update("UPDATE tasks SET status='RUNNING',current_attempt_id=? WHERE id=?", attemptId, id);
+            if(java.util.Set.of("VISION_PREPARE","VISION_ANALYZE").contains(task.get("type")))database.update("UPDATE analysis_stages SET status='RUNNING',error_json=NULL WHERE task_id=? AND stage_key='VISION'",id);
             if("CONTENT_ANALYZE".equals(task.get("type"))) database.update("UPDATE analysis_stages SET status='RUNNING',error_json=NULL,updated_at=now() WHERE task_id=? AND stage_key='ASR'",id);
             task.put("status", "RUNNING");
             plans.bindAttempt(id, attemptId);
@@ -84,7 +86,7 @@ public class TaskExecution {
             var task=locked(id);
             requireAttempt(task,request.attemptId(),request.leaseToken(),true);
             if(!"RUNNING".equals(task.get("status")))throw new ResponseStatusException(CONFLICT,"任务没有有效执行资格");
-            if(!java.util.Set.of("MEDIA_PREPARE","PREVIEW_RENDER","EXPORT_RENDER").contains(task.get("type")))
+            if(!java.util.Set.of("MEDIA_PREPARE","VISION_PREPARE","PREVIEW_RENDER","EXPORT_RENDER").contains(task.get("type")))
                 throw new ResponseStatusException(CONFLICT,"任务不属于媒体执行");
             capacity.require(0);
             long required=((Number)task.get("disk_budget_bytes")).longValue();
@@ -112,6 +114,7 @@ public class TaskExecution {
             String state = task.get("status").toString();
             String next = switch(state) { case "PENDING" -> "CANCELLED"; case "RUNNING" -> "CANCEL_REQUESTED"; default -> state; };
             database.update("UPDATE tasks SET status=? WHERE id=?", next, id);
+            if("CANCELLED".equals(next))database.update("UPDATE analysis_stages SET status='CANCELLED',updated_at=now() WHERE task_id=? AND stage_key='VISION'",id);
             if (java.util.Set.of("CANCELLED", "FAILED", "SUCCEEDED").contains(next)) plans.release(id);
             return Map.of("taskId", id, "status", next);
         });
@@ -125,6 +128,7 @@ public class TaskExecution {
             if (!"CANCEL_REQUESTED".equals(task.get("status"))) throw new ResponseStatusException(CONFLICT, "任务没有有效取消请求");
             database.update("UPDATE task_attempts SET status='CANCELLED' WHERE id=?", request.attemptId());
             database.update("UPDATE tasks SET status='CANCELLED' WHERE id=?", id);
+            database.update("UPDATE analysis_stages SET status='CANCELLED',updated_at=now() WHERE task_id=? AND stage_key='VISION'",id);
             plans.release(id);
             return Map.of("status", "CANCELLED");
         });
@@ -148,6 +152,8 @@ public class TaskExecution {
         return transactions.execute(tx -> {
             var task = locked(id);
             if (!("MEDIA_PREPARED".equals(request.resultType()) && "MEDIA_PREPARE".equals(task.get("type")))
+                    && !("VISION_FRAMES_PREPARED".equals(request.resultType()) && "VISION_PREPARE".equals(task.get("type")))
+                    && !("VISION_ANALYZED".equals(request.resultType()) && "VISION_ANALYZE".equals(task.get("type")))
                     && !("INDEX_BUILT".equals(request.resultType()) && "INDEX_BUILD".equals(task.get("type")))
                     && !("SPEECH_ANALYZED".equals(request.resultType()) && "CONTENT_ANALYZE".equals(task.get("type")))
                     && !("PREVIEW_RENDERED".equals(request.resultType()) && "PREVIEW_RENDER".equals(task.get("type")))
@@ -213,7 +219,18 @@ public class TaskExecution {
                 database.update("UPDATE tasks SET status='SUCCEEDED',result_json=?::jsonb WHERE id=?",result,id);
                 database.update("UPDATE task_attempts SET status='SUCCEEDED' WHERE id=?",request.attemptId());
                 database.update("INSERT INTO execution_reports(task_id,attempt_id,report_kind,producer_key,payload_json,outcome_json,result_type) VALUES (?,?,'COMPLETE',?,?::jsonb,?::jsonb,?)",id,request.attemptId(),request.producerKey(),result,receipt,request.resultType());
+                indexes.includeNewObservations(id);
                 return outcome;
+            }
+            if(java.util.Set.of("VISION_PREPARE","VISION_ANALYZE").contains(task.get("type"))){
+                UUID visualAsset=UUID.fromString(input.path("assetId").asText());
+                if("VISION_PREPARE".equals(task.get("type")))vision.acceptFrames(visualAsset,UUID.fromString(input.path("analysisId").asText()),request.result());
+                else vision.publish(task,input);
+                database.update("UPDATE tasks SET status='SUCCEEDED',result_json=?::jsonb WHERE id=?",result,id);
+                database.update("UPDATE task_attempts SET status='SUCCEEDED' WHERE id=?",request.attemptId());
+                database.update("INSERT INTO execution_reports(task_id,attempt_id,report_kind,producer_key,payload_json,outcome_json,result_type) VALUES (?,?,'COMPLETE',?,?::jsonb,'{\"status\":\"SUCCEEDED\"}'::jsonb,?)",id,request.attemptId(),request.producerKey(),result,request.resultType());
+                if("VISION_PREPARE".equals(task.get("type")))vision.enqueue(visualAsset);
+                return Map.of("status","SUCCEEDED","assetId",visualAsset);
             }
             UUID assetId = UUID.fromString(input.path("assetId").asText());
             if("CONTENT_ANALYZE".equals(task.get("type"))) {
@@ -243,7 +260,7 @@ public class TaskExecution {
     public Object fail(UUID id,TaskController.Failed request) {
         return transactions.execute(tx -> {
             var task=locked(id);
-            if(!java.util.List.of("MEDIA_PREPARE","CONTENT_ANALYZE","INDEX_BUILD","AGENT_TURN","PREVIEW_RENDER","EXPORT_RENDER").contains(task.get("type"))) throw new ResponseStatusException(CONFLICT,"任务结果类型不匹配");
+            if(!java.util.List.of("MEDIA_PREPARE","VISION_PREPARE","VISION_ANALYZE","CONTENT_ANALYZE","VISION_ANALYZE","INDEX_BUILD","AGENT_TURN","PREVIEW_RENDER","EXPORT_RENDER").contains(task.get("type"))) throw new ResponseStatusException(CONFLICT,"任务结果类型不匹配");
             String payload;
             try { payload=json.writeValueAsString(Map.of("code",request.code(),"message",request.message())); }
             catch(java.io.IOException invalid) { throw new IllegalStateException(invalid); }
@@ -265,6 +282,13 @@ public class TaskExecution {
                 database.update("INSERT INTO execution_reports(task_id,attempt_id,report_kind,producer_key,payload_json,outcome_json) VALUES (?,?,'FAIL',?,?::jsonb,?::jsonb)",
                         id, request.attemptId(), request.producerKey(), payload, outcome);
                 return Map.of("status", "FAILED");
+            }
+            if(java.util.Set.of("VISION_PREPARE","VISION_ANALYZE").contains(task.get("type"))){
+                database.update("UPDATE task_attempts SET status='FAILED' WHERE id=?",request.attemptId());
+                database.update("UPDATE tasks SET status='FAILED',result_json=?::jsonb WHERE id=?",payload,id);
+                database.update("UPDATE analysis_stages SET status=?,error_json=?::jsonb,updated_at=now() WHERE task_id=? AND stage_key='VISION'","VISION_UNVERIFIED".equals(request.code())?"UNVERIFIED":"FAILED",payload,id);
+                database.update("INSERT INTO execution_reports(task_id,attempt_id,report_kind,producer_key,payload_json,outcome_json) VALUES (?,?,'FAIL',?,?::jsonb,'{\"status\":\"FAILED\"}'::jsonb)",id,request.attemptId(),request.producerKey(),payload);
+                return Map.of("status","FAILED");
             }
             if("INDEX_BUILD".equals(task.get("type"))) {
                 database.update("UPDATE task_attempts SET status='FAILED' WHERE id=?",request.attemptId());
@@ -327,7 +351,8 @@ public class TaskExecution {
         return transactions.execute(tx -> {
             var task=locked(id);
             requireAttempt(task,request.attemptId(),request.leaseToken(),true);
-            if(!java.util.List.of("CONTENT_ANALYZE","INDEX_BUILD","AGENT_TURN").contains(task.get("type")) || !"RUNNING".equals(task.get("status"))) throw new ResponseStatusException(CONFLICT,"当前任务没有模型调用资格");
+            if(!java.util.List.of("CONTENT_ANALYZE","VISION_ANALYZE","INDEX_BUILD","AGENT_TURN").contains(task.get("type")) || !"RUNNING".equals(task.get("status"))) throw new ResponseStatusException(CONFLICT,"当前任务没有模型调用资格");
+            if ("VISION_ANALYZE".equals(task.get("type")))return vision.provider(task,request.attemptId(),request.action(),request.data());
             if ("INDEX_BUILD".equals(task.get("type"))) return indexes.batch(task,request.attemptId(),request.action(),request.data());
             if ("AGENT_TURN".equals(task.get("type"))) return conversations.provider(task, request.attemptId(), request.action(), request.data());
             try { return speech.provider(id,request.attemptId(),json.readTree(task.get("input_json").toString()),request.action(),request.data()); }

@@ -7,7 +7,7 @@ const props = defineProps<{ projectId: string; editingBase?: PlanBase | null }>(
 const emit = defineEmits<{ play: [value: Playback]; plan: [value: PlanSelection]; session: [value: string]; exported: [requestId:string] }>();
 type Session = { id: string; title: string; assetIds: string[] };
 type Asset = { id: string; filename: string };
-type Citation = { type: string; id: string; assetId?: string; text?: string; startMs?: number; endMs?: number; planId?: string; revisionNumber?: number };
+type Citation = { type: string; id: string; assetId?: string; text?: string; startMs?: number; endMs?: number; observedAtMs?:number; sourceKind?:string; planId?: string; revisionNumber?: number };
 type Message = { id: string; role: string; content: string; references: Citation[] };
 type History = { items: Message[]; latestTask: { taskId: string; status: string; failure?: {code:string;message:string} | null } | null };
 const sessions = ref<Session[]>([]);
@@ -100,7 +100,7 @@ async function send() {
 }
 async function inspect(citation: Citation) {
   if (!citation.assetId) return;
-  try { emit('play', { ...await request<Playback>(`/assets/${citation.assetId}/playback-access`, 'POST', {}), startMs: citation.startMs ?? 0 }); }
+  try { emit('play', { ...await request<Playback>(`/assets/${citation.assetId}/playback-access`, 'POST', {}), startMs: citation.observedAtMs ?? citation.startMs ?? 0 }); }
   catch (failure) { error.value = failure instanceof Error ? failure.message : '无法核查原视频'; }
 }
 onMounted(async () => {
@@ -142,7 +142,7 @@ onUnmounted(() => { alive = false; clearInterval(timer); });
             @click="emit('plan',{planId:result.planId!,revisionId:result.id,sessionId:selected})">查看方案 V{{ result.revisionNumber }}</button>
           <button v-for="result in message.references.filter(item => item.type === 'EXPORT_REQUEST')" :key="result.id" class="secondary" @click="emit('exported',result.id)">查看正式导出</button>
           <div v-for="citation in message.references.filter(item => item.type === 'EVIDENCE')" :key="citation.id" class="citation">
-            <p>语音原文：{{ citation.text }}</p><small>{{ ((citation.startMs ?? 0)/1000).toFixed(2) }}–{{ ((citation.endMs ?? 0)/1000).toFixed(2) }} 秒 · 模型观察，建议回看核查</small>
+            <p>{{citation.sourceKind==='VISUAL'?'画面观察':citation.sourceKind==='VISIBLE_TEXT'?'可见文字':'语音原文'}}：{{ citation.text }}</p><small v-if="citation.observedAtMs!==undefined">{{(citation.observedAtMs/1000).toFixed(2)}} 秒 · 帧观察时刻</small><small v-else>{{ ((citation.startMs ?? 0)/1000).toFixed(2) }}–{{ ((citation.endMs ?? 0)/1000).toFixed(2) }} 秒 · 模型观察，建议回看核查</small>
             <button class="secondary" @click="inspect(citation)">核查引用原视频</button>
           </div>
         </article>

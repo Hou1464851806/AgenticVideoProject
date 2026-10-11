@@ -157,8 +157,10 @@ public class ConversationTurns {
             if (rows.isEmpty() || !scope.contains((UUID)rows.get(0).get("asset_id")))
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "答复引用不在固定素材范围内");
             var row = rows.get(0);
-            references.add(Map.of("type", "EVIDENCE", "id", id, "assetId", row.get("asset_id"),
-                    "text", row.get("text"), "startMs", row.get("start_ms"), "endMs", row.get("end_ms"), "sourceKind", row.get("source_kind")));
+            var reference=new java.util.LinkedHashMap<String,Object>();reference.put("type","EVIDENCE");reference.put("id",id);reference.put("assetId",row.get("asset_id"));reference.put("text",row.get("text"));reference.put("sourceKind",row.get("source_kind"));
+            if("SPEECH".equals(row.get("source_kind"))){reference.put("startMs",row.get("start_ms"));reference.put("endMs",row.get("end_ms"));}
+            else{reference.put("observedAtMs",row.get("start_ms"));reference.put("temporalPrecision","FRAME_OBSERVATION");}
+            references.add(reference);
         }
         UUID message = UUID.randomUUID();
         if (result.has("planRevision")) {
@@ -188,7 +190,7 @@ public class ConversationTurns {
         var arguments = request.arguments();
         var fields = switch (name) {
             case "list_assets" -> java.util.Set.<String>of();
-            case "search_evidence" -> java.util.Set.of("query");
+            case "search_evidence" -> java.util.Set.of("query","sourceKinds");
             case "read_evidence_context" -> java.util.Set.of("evidenceId");
             default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "工具不受支持");
         };
@@ -230,11 +232,19 @@ public class ConversationTurns {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "检索词必须是最多 256 字符的文本");
             var assets=new java.util.ArrayList<UUID>();for(var asset:input.path("assetIds"))assets.add(identifier(asset.asText()));
             String query=arguments.path("query").asText();
-            var found=evidenceSearch.search((UUID)task.get("project_id"),query,query.isBlank(),20,assets);
+            var kinds=new java.util.ArrayList<String>();
+            if(arguments.has("sourceKinds")){
+                var requested=arguments.path("sourceKinds");
+                if(!requested.isArray()||requested.isEmpty()||requested.size()>3)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"证据类型必须为非空列表，最多三项");
+                for(var kind:requested){if(!kind.isTextual()||!java.util.Set.of("SPEECH","VISUAL","VISIBLE_TEXT").contains(kind.asText()))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"证据类型无效");kinds.add(kind.asText());}
+            }else kinds.add("SPEECH");
+            var found=evidenceSearch.search((UUID)task.get("project_id"),query,query.isBlank(),20,assets,kinds);
             var hits=new java.util.ArrayList<Object>();
             for(var unit:found.rows()) {
                 for(var evidence:database.queryForList("SELECT e.id FROM unit_evidence_refs ref JOIN evidence_segments e ON e.id=ref.evidence_id WHERE ref.unit_id=? AND e.analysis_id=? AND e.project_id=? ORDER BY ref.ordinal",UUID.class,unit.get("id"),unit.get("analysis_id"),task.get("project_id"))) {
-                    var hit=new java.util.LinkedHashMap<String,Object>();hit.put("evidenceId",evidence);hit.put("retrievalUnitId",unit.get("id"));hit.put("assetId",unit.get("asset_id"));hit.put("filename",unit.get("filename"));hit.put("text",unit.get("text"));hit.put("startMs",unit.get("start_ms"));hit.put("endMs",unit.get("end_ms"));hit.put("sourceKind",unit.get("source_kind"));
+                    var hit=new java.util.LinkedHashMap<String,Object>();hit.put("evidenceId",evidence);hit.put("retrievalUnitId",unit.get("id"));hit.put("assetId",unit.get("asset_id"));hit.put("filename",unit.get("filename"));hit.put("text",unit.get("text"));hit.put("sourceKind",unit.get("source_kind"));
+                    if("SPEECH".equals(unit.get("source_kind"))){hit.put("startMs",unit.get("start_ms"));hit.put("endMs",unit.get("end_ms"));hit.put("temporalPrecision","MODEL_TIMESTAMPS");}
+                    else{hit.put("observedAtMs",unit.get("start_ms"));hit.put("temporalPrecision","FRAME_OBSERVATION");}
                     if(unit.containsKey("channelRanks"))hit.put("channelRanks",unit.get("channelRanks"));
                     hits.add(hit);
                 }
@@ -257,7 +267,8 @@ public class ConversationTurns {
                     """, task.get("project_id"), target.get("asset_id"), target.get("analysis_id"), target.get("source_kind"),
                     ((Number)target.get("ordinal")).intValue()-5, ((Number)target.get("ordinal")).intValue()+5);
             for (var observation : observations) {
-                observation.put("words", timings.words(observation));
+                if("SPEECH".equals(observation.get("sourceKind")))observation.put("words", timings.words(observation));
+                else{observation.put("observedAtMs",observation.get("startMs"));observation.put("temporalPrecision","FRAME_OBSERVATION");observation.remove("startMs");observation.remove("endMs");}
                 for (String field : List.of("start_ms","end_ms","audio_start_ms","observation_json")) observation.remove(field);
             }
             result = input.has("editing") ? Map.of("observations", observations, "candidateWindow", plans.candidateWindow(input,target,observations))

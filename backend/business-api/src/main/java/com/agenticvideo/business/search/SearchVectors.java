@@ -60,8 +60,12 @@ public class SearchVectors {
         if("bm25".equals(using))body.put("params",Map.of("idf",Map.of("corpus",corpus)));
         return request("POST","/collections/"+COLLECTION+"/points/query",body).path("result").path("points");
     }
-    public static Object scope(UUID project,List<String> generations) {
-        return Map.of("must",List.of(Map.of("key","projectId","match",Map.of("value",project.toString())),
-                Map.of("key","generationId","match",Map.of("any",generations))));
+    public static Object scope(UUID project,List<String> generations) {return scope(project,generations,null);}
+    public static Object scope(UUID project,List<String> generations,List<String> kinds) {
+        var must=new java.util.ArrayList<Object>();
+        must.add(Map.of("key","projectId","match",Map.of("value",project.toString())));
+        must.add(Map.of("key","generationId","match",Map.of("any",generations)));
+        if(kinds!=null)must.add(Map.of("key","sourceKind","match",Map.of("any",kinds)));
+        return Map.of("must",must);
     }
 }

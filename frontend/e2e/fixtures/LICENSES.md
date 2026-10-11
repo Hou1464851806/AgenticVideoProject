@@ -11,3 +11,7 @@
 `labelled-speech.mp4` is generated with the macOS Eddy Chinese voice and combined with a green H.264 video. Its known script and independently measured stream start times are recorded in `labelled-speech.json`. It is a transfer and timing fixture, not a natural speaker accuracy benchmark.
 
 Other video fixtures are locally generated FFmpeg test patterns and tones.
+
+`labelled-vision-vfr.mp4` is a locally drawn red/blue rectangle fixture with Noto Sans CJK SC text (SIL Open Font License 1.1), encoded losslessly with irregular frame PTS. Its independently measured frame times and manually assigned scene/text labels are in `labelled-vision-vfr.json`. No audio is present.
+
+`speech-mention-only.mp4` uses the same red rectangle / 证据42 image and macOS Eddy zh_CN generated speech: “视频里提到一只猫，但当前画面只有红色矩形。” The image contains no cat. It verifies that audio mentions do not become visual observations; it is not a natural speech accuracy benchmark.

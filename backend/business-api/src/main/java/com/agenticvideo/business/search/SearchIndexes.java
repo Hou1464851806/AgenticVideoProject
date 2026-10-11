@@ -108,6 +108,11 @@ public class SearchIndexes {
         throw new ResponseStatusException(BAD_REQUEST,"不支持的索引批次操作");
     }
     public record Verified(UUID taskId,UUID generationId) {}
+    public void includeNewObservations(UUID taskId) {
+        var generation=database.queryForMap("SELECT asset_id,analysis_id,units_json FROM search_index_generations WHERE task_id=?",taskId);
+        boolean changed=Boolean.TRUE.equals(database.queryForObject("SELECT EXISTS(SELECT 1 FROM retrieval_units WHERE analysis_id=? AND id NOT IN (SELECT (value->>'unitId')::uuid FROM jsonb_array_elements(?::jsonb)))",Boolean.class,generation.get("analysis_id"),generation.get("units_json").toString()));
+        if(changed)enqueue((UUID)generation.get("asset_id"));
+    }
     public Verified verify(Map<String,Object> task) {
         var generation=database.queryForMap("SELECT * FROM search_index_generations WHERE task_id=?",task.get("id"));
         UUID id=(UUID)generation.get("id"),asset=(UUID)generation.get("asset_id");

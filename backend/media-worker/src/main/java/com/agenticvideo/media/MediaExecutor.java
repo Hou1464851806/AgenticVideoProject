@@ -27,15 +27,16 @@ public class MediaExecutor {
     private final ScheduledExecutorService heartbeats = Executors.newSingleThreadScheduledExecutor();
     private final BusinessClient business;
     private final MediaInspection inspection;
+    private final RepresentativeFrames frames;
     private final MediaRenderer renderer;
     private final WorkDirectories work;
     private final ObjectMapper json;
     private final S3Client storage;
     private final String bucket;
-    MediaExecutor(BusinessClient business, MediaInspection inspection, WorkDirectories work, ObjectMapper json, MediaRenderer renderer,
+    MediaExecutor(RepresentativeFrames frames,BusinessClient business, MediaInspection inspection, WorkDirectories work, ObjectMapper json, MediaRenderer renderer,
             @Value("${worker.storage-endpoint}") String endpoint, @Value("${worker.storage-access-key}") String access,
             @Value("${worker.storage-secret-key}") String secret, @Value("${worker.storage-bucket}") String bucket) {
-        this.renderer=renderer; this.business=business; this.inspection=inspection; this.work=work; this.json=json; this.bucket=bucket;
+        this.frames=frames;this.renderer=renderer; this.business=business; this.inspection=inspection; this.work=work; this.json=json; this.bucket=bucket;
         storage = S3Client.builder().endpointOverride(java.net.URI.create(endpoint)).region(Region.US_EAST_1)
                 .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(access,secret)))
                 .forcePathStyle(true).build();
@@ -94,6 +95,12 @@ public class MediaExecutor {
                 }
             }
             var result=inspection.inspect(source,execution.input.path("sizeBytes").asLong(),execution.input.path("sha256").asText(),execution::stopped);
+            if("VISION_PREPARE".equals(execution.input.path("operation").asText())){
+                var prepared=prepareFrames(execution,source,result);
+                if(execution.stopped())throw new InterruptedException("Execution stopped");
+                report(execution,"complete",Map.of("attemptId",execution.attemptId,"leaseToken",execution.token,"producerKey","vision-frames-prepared","resultType","VISION_FRAMES_PREPARED","result",prepared));
+                return;
+            }
             var published=new java.util.LinkedHashMap<String,Object>(result);
             @SuppressWarnings("unchecked") var mapping=(Map<String,Object>)result.get("timeMapping");
             if(Boolean.TRUE.equals(mapping.get("hasAudio"))) {
@@ -103,6 +110,9 @@ public class MediaExecutor {
                 storage.putObject(b -> b.bucket(bucket).key(key).contentType("audio/wav"),software.amazon.awssdk.core.sync.RequestBody.fromFile(directory.resolve("audio.wav")));
                 audio.put("objectKey",key);published.put("derivedAudio",audio);
             }
+            try { published.put("representativeFrames",prepareFrames(execution,source,result)); }
+            catch(InterruptedException cancelled){throw cancelled;}
+            catch(Exception unavailable){published.put("visionFailure",Map.of("code","VISION_FRAMES_FAILED","message","代表帧提取暂时失败；媒体验证和语音分析仍可使用"));}
             if(execution.stopped()) throw new InterruptedException("Execution stopped");
             report(execution,"complete",Map.of("attemptId",execution.attemptId,"leaseToken",execution.token,"producerKey","media-prepared","resultType","MEDIA_PREPARED","result",published));
         } catch(InterruptedException stopped) {
@@ -124,6 +134,20 @@ public class MediaExecutor {
             }
             active.remove(execution.attemptId,execution); claims.remove(execution.taskId); slot.release();
         }
+    }
+    private Map<String,Object> prepareFrames(Execution execution,Path source,Map<String,Object> media)throws Exception{
+        @SuppressWarnings("unchecked") var mapping=(Map<String,Object>)media.get("timeMapping");
+        var result=new java.util.LinkedHashMap<String,Object>(frames.extract(source,((Number)media.get("durationMs")).longValue(),((Number)mapping.get("formatStartMs")).longValue(),execution::stopped));
+        var manifest=new java.util.ArrayList<Object>();
+        for(Object item:(java.util.List<?>)result.get("frames")){
+            @SuppressWarnings("unchecked") var frame=new java.util.LinkedHashMap<String,Object>((Map<String,Object>)item);
+            String name=String.format(java.util.Locale.ROOT,"frame-%03d.jpg",((Number)frame.get("ordinal")).intValue());
+            String key="derived/frames/"+execution.input.path("assetId").asText()+"/"+execution.attemptId+"/"+name;
+            if(execution.stopped())throw new InterruptedException("Execution stopped");
+            storage.putObject(b->b.bucket(bucket).key(key).contentType("image/jpeg"),software.amazon.awssdk.core.sync.RequestBody.fromFile(source.getParent().resolve(name)));
+            frame.put("objectKey",key);manifest.add(frame);
+        }
+        result.put("frames",manifest);return result;
     }
     private void heartbeat(Execution execution) {
         try {

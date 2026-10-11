@@ -15,7 +15,8 @@ public class SpeechAnalysis {
     private final JdbcTemplate database;
     private final ObjectMapper json;
     private final SpeechTimings timings;
-    public SpeechAnalysis(JdbcTemplate database,ObjectMapper json,SpeechTimings timings,com.agenticvideo.business.search.SearchIndexes indexes) { this.indexes=indexes; this.database=database;this.json=json;this.timings=timings; }
+    private final VisualAnalysis vision;
+    public SpeechAnalysis(JdbcTemplate database,ObjectMapper json,SpeechTimings timings,com.agenticvideo.business.search.SearchIndexes indexes,VisualAnalysis vision) { this.vision=vision; this.indexes=indexes; this.database=database;this.json=json;this.timings=timings; }
     public void initialize(UUID assetId, UUID projectId, JsonNode media) {
         UUID analysisId=UUID.randomUUID();
         boolean audio=media.path("timeMapping").path("hasAudio").asBoolean();
@@ -35,6 +36,7 @@ public class SpeechAnalysis {
             database.update("UPDATE analysis_stages SET task_id=? WHERE analysis_id=? AND stage_key IN ('ASR','UNITS')",task,analysisId);
             database.update("INSERT INTO outbox_events (id,task_id,type,payload_json) VALUES (?,?,'CONTENT_ANALYZE',jsonb_build_object('schemaVersion','1.0','eventId',?::text,'taskId',?::text,'taskType','CONTENT_ANALYZE','projectId',?::text,'occurredAt',now()))",event,task,event,task,projectId);
         }
+        vision.initialize(assetId,analysisId,media);
     }
     public Object provider(UUID taskId,UUID attempt,JsonNode input,String action,JsonNode data) {
         UUID analysis=UUID.fromString(input.path("analysisId").asText());
@@ -127,12 +129,13 @@ public class SpeechAnalysis {
     }
     public Object evidence(UUID asset) {
         var observations=new ArrayList<Object>();
-        for(var row:database.queryForList("SELECT e.* FROM evidence_segments e JOIN asset_analysis_heads h ON h.analysis_id=e.analysis_id WHERE h.asset_id=? ORDER BY e.ordinal",asset)) {
+        for(var row:database.queryForList("SELECT e.* FROM evidence_segments e JOIN asset_analysis_heads h ON h.analysis_id=e.analysis_id WHERE h.asset_id=? AND e.source_kind='SPEECH' ORDER BY e.ordinal",asset)) {
             var words=timings.words(row);
             observations.add(Map.of("id",row.get("id"),"sourceKind",row.get("source_kind"),"text",row.get("text"),"startMs",row.get("start_ms"),"endMs",row.get("end_ms"),
                     "audioStartMs",row.get("audio_start_ms"),"words",words,"analysisId",row.get("analysis_id"),"temporalPrecision","MODEL_TIMESTAMPS"));
         }
-        var units=database.queryForList("SELECT u.id,u.text,u.start_ms AS \"startMs\",u.end_ms AS \"endMs\" FROM retrieval_units u JOIN asset_analysis_heads h ON h.analysis_id=u.analysis_id WHERE h.asset_id=? ORDER BY u.start_ms",asset);
+        var units=database.queryForList("SELECT u.id,u.text,u.source_kind AS \"sourceKind\",u.start_ms AS \"startMs\",u.end_ms AS \"endMs\" FROM retrieval_units u JOIN asset_analysis_heads h ON h.analysis_id=u.analysis_id WHERE h.asset_id=? ORDER BY u.start_ms",asset);
+        for(var unit:units)if(!"SPEECH".equals(unit.get("sourceKind"))){unit.put("observedAtMs",unit.remove("startMs"));unit.remove("endMs");unit.put("temporalPrecision","FRAME_OBSERVATION");}
         var summaries=database.queryForList("SELECT s.summary_json FROM asset_summaries s JOIN asset_analysis_heads h ON h.analysis_id=s.analysis_id WHERE h.asset_id=?",asset);
         var calls=new ArrayList<Object>();
         for(var row:database.queryForList("SELECT c.* FROM model_calls c JOIN asset_analysis_heads h ON h.analysis_id=c.analysis_id WHERE h.asset_id=?",asset)) {
@@ -142,7 +145,7 @@ public class SpeechAnalysis {
             if("FAILED".equals(row.get("status")) && row.get("result_json")!=null)item.put("failure",parse(row.get("result_json")));
             calls.add(item);
         }
-        return Map.of("observations",observations,"units",units,"summary",summaries.isEmpty()?Map.of():parse(summaries.get(0).get("summary_json")),"providerCalls",calls);
+        return Map.of("observations",observations,"units",units,"summary",summaries.isEmpty()?Map.of():parse(summaries.get(0).get("summary_json")),"providerCalls",calls,"vision",vision.view(asset));
     }
     private JsonNode parse(Object data) { try { return json.readTree(data.toString()); } catch(java.io.IOException invalid) { throw new IllegalStateException(invalid); } }
     private ResponseStatusException conflict(String message) { return new ResponseStatusException(CONFLICT,message); }

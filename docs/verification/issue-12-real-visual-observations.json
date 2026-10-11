@@ -1,0 +1,153 @@
+{
+  "fixture": "labelled-vision-vfr.mp4",
+  "manuallyLabelled": true,
+  "frames": [
+    {
+      "id": "6b74cfd1-c897-4467-9438-171a1a3b2664",
+      "ordinal": 0,
+      "observedAtMs": 0,
+      "sourcePts": "0",
+      "sha256": "c7e3291f3a763f7323acc30438a55243b92d66a55a94784f21db1bd638e42252"
+    },
+    {
+      "id": "25630477-a08f-4bd3-9461-8a82655bdc77",
+      "ordinal": 1,
+      "observedAtMs": 2320,
+      "sourcePts": "2.32",
+      "sha256": "2bde8bf3c8cea2bd6bfc46bf853e9e0893471c7d80d50c5e982c6f3f2977b2b7"
+    },
+    {
+      "id": "ef800361-c388-41a4-bd6d-ef6f3820a395",
+      "ordinal": 2,
+      "observedAtMs": 4760,
+      "sourcePts": "4.76",
+      "sha256": "c7e3291f3a763f7323acc30438a55243b92d66a55a94784f21db1bd638e42252"
+    },
+    {
+      "id": "2c714e00-535a-4b08-9b2e-52bc30f2de83",
+      "ordinal": 3,
+      "observedAtMs": 7080,
+      "sourcePts": "7.08",
+      "sha256": "c7e3291f3a763f7323acc30438a55243b92d66a55a94784f21db1bd638e42252"
+    }
+  ],
+  "observations": [
+    {
+      "id": "50a038c7-89ea-433f-92ae-71309bd6939d",
+      "sourceKind": "VISIBLE_TEXT",
+      "text": "证据42",
+      "observedAtMs": 0,
+      "frameId": "6b74cfd1-c897-4467-9438-171a1a3b2664",
+      "modelCallId": "df6af036-fe29-48e5-864e-24950cceb62c"
+    },
+    {
+      "id": "10eb2f5c-d450-4529-9f07-505eea5d5a6e",
+      "sourceKind": "VISUAL",
+      "text": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+      "observedAtMs": 0,
+      "frameId": "6b74cfd1-c897-4467-9438-171a1a3b2664",
+      "modelCallId": "df6af036-fe29-48e5-864e-24950cceb62c"
+    },
+    {
+      "id": "1701f386-647e-45d8-be27-4b0558e2fc12",
+      "sourceKind": "VISIBLE_TEXT",
+      "text": "画面17",
+      "observedAtMs": 2320,
+      "frameId": "25630477-a08f-4bd3-9461-8a82655bdc77",
+      "modelCallId": "670aa4a1-b9d4-449f-b9bc-7c22d51067f3"
+    },
+    {
+      "id": "97c6b101-ab46-47b9-ade7-816e571dcf4b",
+      "sourceKind": "VISUAL",
+      "text": "白色背景上有一个位于左上方的纯蓝色矩形色块，下方有黑色文字区域（但该文字属于屏幕标注，非画面内物体）。",
+      "observedAtMs": 2320,
+      "frameId": "25630477-a08f-4bd3-9461-8a82655bdc77",
+      "modelCallId": "670aa4a1-b9d4-449f-b9bc-7c22d51067f3"
+    },
+    {
+      "id": "405f446e-2665-4361-b4c3-a09793004565",
+      "sourceKind": "VISIBLE_TEXT",
+      "text": "证据42",
+      "observedAtMs": 4760,
+      "frameId": "ef800361-c388-41a4-bd6d-ef6f3820a395",
+      "modelCallId": "df6af036-fe29-48e5-864e-24950cceb62c"
+    },
+    {
+      "id": "d8de8f60-8a31-4825-96c0-e3e124f993b6",
+      "sourceKind": "VISUAL",
+      "text": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+      "observedAtMs": 4760,
+      "frameId": "ef800361-c388-41a4-bd6d-ef6f3820a395",
+      "modelCallId": "df6af036-fe29-48e5-864e-24950cceb62c"
+    },
+    {
+      "id": "6bcb24af-1269-4f32-94cf-01a1909dddea",
+      "sourceKind": "VISIBLE_TEXT",
+      "text": "证据42",
+      "observedAtMs": 7080,
+      "frameId": "2c714e00-535a-4b08-9b2e-52bc30f2de83",
+      "modelCallId": "df6af036-fe29-48e5-864e-24950cceb62c"
+    },
+    {
+      "id": "397f66e6-945e-4c9d-8d05-3d3780fdd857",
+      "sourceKind": "VISUAL",
+      "text": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+      "observedAtMs": 7080,
+      "frameId": "2c714e00-535a-4b08-9b2e-52bc30f2de83",
+      "modelCallId": "df6af036-fe29-48e5-864e-24950cceb62c"
+    }
+  ],
+  "providerCalls": [
+    {
+      "id": "670aa4a1-b9d4-449f-b9bc-7c22d51067f3",
+      "model": "qwen3-vl-plus",
+      "status": "SUCCEEDED",
+      "requestId": "03d950fd-637d-9a2d-88f9-b6264033b36d",
+      "usage": {
+        "image_tokens": 512,
+        "input_tokens": 597,
+        "total_tokens": 649,
+        "output_tokens": 52,
+        "input_tokens_details": {
+          "text_tokens": 85,
+          "image_tokens": 512
+        },
+        "output_tokens_details": {
+          "text_tokens": 52
+        },
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      }
+    },
+    {
+      "id": "df6af036-fe29-48e5-864e-24950cceb62c",
+      "model": "qwen3-vl-plus",
+      "status": "SUCCEEDED",
+      "requestId": "fead7a30-e809-91aa-9b53-50a2a1076da2",
+      "usage": {
+        "image_tokens": 512,
+        "input_tokens": 597,
+        "total_tokens": 645,
+        "output_tokens": 48,
+        "input_tokens_details": {
+          "text_tokens": 85,
+          "image_tokens": 512
+        },
+        "output_tokens_details": {
+          "text_tokens": 48
+        },
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      }
+    }
+  ],
+  "coverage": {
+    "kind": "SPARSE_FRAMES",
+    "rule": "real-pts-interval-v1",
+    "complete": false,
+    "maxFrames": 25,
+    "intervalMs": 2000
+  }
+}

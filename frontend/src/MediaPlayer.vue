@@ -8,7 +8,7 @@ const information = ref<{ mediaInfo: { streams: Stream[] }; timeMapping: { hasAu
 const error = ref('');
 const stream = computed(() => information.value?.mediaInfo.streams.find(value => value.codec_type === 'video'));
 const codec = computed(() => stream.value?.codec_name === 'h264' ? 'H.264' : stream.value?.codec_name.toUpperCase());
-const stageNames: Record<string,string> = { MEDIA:'媒体',ASR:'语音',INDEX:'索引' };
+const stageNames: Record<string,string> = { MEDIA:'媒体',ASR:'语音',VISION:'画面',INDEX:'索引' };
 const stageStates: Record<string,string> = { SUCCEEDED:'已就绪',NOT_APPLICABLE:'不适用',NOT_STARTED:'尚未开始',PENDING:'等待执行',RUNNING:'正在分析',FAILED:'失败',UNVERIFIED:'未验证',CANCELLED:'已取消' };
 type Observation = { id: string; text: string; startMs: number; endMs: number };
 const evidence = ref<{ observations: Observation[]; summary: { text?: string } } | null>(null);
@@ -24,7 +24,7 @@ async function refreshInformation(id: string) {
 watch(() => props.playback.assetId, id => { information.value=null;evidence.value=null;void refreshInformation(id); }, { immediate: true });
 let informationTimer: ReturnType<typeof setInterval> | undefined;
 onMounted(()=> { informationTimer=setInterval(()=> {
-  if(['PENDING','RUNNING'].includes(information.value?.analysis?.stages.ASR??'')) void refreshInformation(props.playback.assetId);
+  if(Object.values(information.value?.analysis?.stages??{}).some(state=>['PENDING','RUNNING'].includes(state))) void refreshInformation(props.playback.assetId);
 },1000); });
 onUnmounted(()=>clearInterval(informationTimer));
 const video = ref<HTMLVideoElement | null>(null);

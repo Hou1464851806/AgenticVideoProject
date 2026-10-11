@@ -15,13 +15,17 @@ async function play(id: string) {
   try { emit('play', await request<Playback>(`/assets/${id}/playback-access`, 'POST', {})); }
   catch (failure) { error.value = failure instanceof Error ? failure.message : '无法播放素材'; }
 }
+async function analyzeVision(id:string){
+  try{await request(`/assets/${id}/vision-analysis`,'POST',{});error.value='已安排画面分析；可在播放器查看独立状态。';}
+  catch(failure){error.value=failure instanceof Error?failure.message:'无法安排画面分析';}
+}
 onMounted(() => { void refresh(); timer = setInterval(refresh, 1000); });
 onUnmounted(() => clearInterval(timer));
 </script>
 <template>
   <section v-if="items.length" class="library">
     <h3>可用素材</h3>
-    <button v-for="asset in items" :key="asset.id" @click="play(asset.id)">播放 {{ asset.filename }}</button>
+    <div v-for="asset in items" :key="asset.id"><button @click="play(asset.id)">播放 {{ asset.filename }}</button><button @click="analyzeVision(asset.id)">分析画面 {{asset.filename}}</button></div>
   </section>
   <p v-if="error" role="alert">{{ error }}</p>
 </template>
