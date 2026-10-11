@@ -16,6 +16,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import static org.junit.jupiter.api.Assertions.*;
 
 @Testcontainers
+@org.springframework.test.annotation.DirtiesContext(classMode=org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties="app.auth.max-attempts=100")
 class ExportApiIntegrationTest {
     @Container static final PostgreSQLContainer<?> POSTGRES=new PostgreSQLContainer<>("postgres:18.6-bookworm");
@@ -33,6 +34,10 @@ class ExportApiIntegrationTest {
     @org.springframework.beans.factory.annotation.Autowired org.springframework.jdbc.core.JdbcTemplate fixtures;
     private final ObjectMapper json=new ObjectMapper();
 
+    private final java.util.List<BrowserApi> owners=new java.util.ArrayList<>();
+    @org.junit.jupiter.api.AfterEach void releaseQueuedTestBudgets() throws Exception {
+        for(var owner:owners)for(var task:new java.util.ArrayList<>(owner.tasks))owner.post("/tasks/"+task+"/cancel",Map.of());
+    }
     @Test void aConfirmationBelongsToOneVersionAndOnlyExplicitAuthorizedExportStartsRendering() throws Exception {
         BrowserApi owner=signedIn("export-owner"),other=signedIn("export-other");
         UUID project=UUID.fromString(data(owner.post("/projects",Map.of("name","确认与明确导出"))).path("id").asText());Plan plan=planFixture(project);
@@ -59,6 +64,7 @@ class ExportApiIntegrationTest {
         assertEquals(render,data(owner.post("/revisions/"+plan.first()+"/export-requests",exportBody,exportKey)));
         assertEquals("EXPORT_RENDER",data(owner.get("/tasks/"+render.path("taskId").asText())).path("type").asText());
         assertEquals(1280,render.path("configuration").path("width").asInt());assertEquals(720,render.path("configuration").path("height").asInt());
+        assertEquals(202,owner.post("/tasks/"+render.path("taskId").asText()+"/cancel",Map.of()).statusCode());
         JsonNode another=data(owner.post("/revisions/"+plan.first()+"/export-requests",exportBody));
         assertNotEquals(render.path("requestId").asText(),another.path("requestId").asText());assertNotEquals(render.path("taskId").asText(),another.path("taskId").asText());
         var history=owner.get("/revisions/"+plan.first()+"/export-requests");assertEquals(200,history.statusCode(),history.body());
@@ -186,13 +192,14 @@ class ExportApiIntegrationTest {
         return new Plan(first,second,output,asset);
     }
     private JsonNode data(HttpResponse<String> reply) throws Exception {return json.readTree(reply.body()).path("data");}
-    private BrowserApi signedIn(String username) throws Exception {BrowserApi browser=new BrowserApi();var body=Map.of("username",username,"password","export-browser-password");assertEquals(201,browser.post("/auth/register",body).statusCode());assertEquals(200,browser.post("/auth/login",body).statusCode());return browser;}
+    private BrowserApi signedIn(String username) throws Exception {BrowserApi browser=new BrowserApi();owners.add(browser);var body=Map.of("username",username,"password","export-browser-password");assertEquals(201,browser.post("/auth/register",body).statusCode());assertEquals(200,browser.post("/auth/login",body).statusCode());return browser;}
     private final class BrowserApi {
+        final java.util.Set<String> tasks=new java.util.LinkedHashSet<>();
         final HttpClient client=HttpClient.newBuilder().cookieHandler(new CookieManager(null,CookiePolicy.ACCEPT_ALL)).build();
         HttpResponse<String> patch(String path,Object body) throws Exception {String csrf=data(get("/auth/csrf")).path("csrfToken").asText();return client.send(HttpRequest.newBuilder(URI.create("http://localhost:"+port+"/api/v1"+path)).header("Content-Type","application/json").header("X-XSRF-TOKEN",csrf).method("PATCH",HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build(),HttpResponse.BodyHandlers.ofString());}
         HttpResponse<String> delete(String path,Object body) throws Exception {String csrf=data(get("/auth/csrf")).path("csrfToken").asText();return client.send(HttpRequest.newBuilder(URI.create("http://localhost:"+port+"/api/v1"+path)).header("Content-Type","application/json").header("X-XSRF-TOKEN",csrf).header("Idempotency-Key",UUID.randomUUID().toString()).method("DELETE",HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build(),HttpResponse.BodyHandlers.ofString());}
         HttpResponse<String> get(String path) throws Exception {return client.send(HttpRequest.newBuilder(URI.create("http://localhost:"+port+"/api/v1"+path)).GET().build(),HttpResponse.BodyHandlers.ofString());}
         HttpResponse<String> post(String path,Object body) throws Exception {return post(path,body,UUID.randomUUID().toString());}
-        HttpResponse<String> post(String path,Object body,String key) throws Exception {String csrf=data(get("/auth/csrf")).path("csrfToken").asText();return client.send(HttpRequest.newBuilder(URI.create("http://localhost:"+port+"/api/v1"+path)).header("Content-Type","application/json").header("X-XSRF-TOKEN",csrf).header("Idempotency-Key",key).POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build(),HttpResponse.BodyHandlers.ofString());}
+        HttpResponse<String> post(String path,Object body,String key) throws Exception {String csrf=data(get("/auth/csrf")).path("csrfToken").asText();var reply=client.send(HttpRequest.newBuilder(URI.create("http://localhost:"+port+"/api/v1"+path)).header("Content-Type","application/json").header("X-XSRF-TOKEN",csrf).header("Idempotency-Key",key).POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body))).build(),HttpResponse.BodyHandlers.ofString());String task=data(reply).path("taskId").asText();if(!task.isBlank())tasks.add(task);return reply;}
     }
 }

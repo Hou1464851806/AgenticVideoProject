@@ -44,13 +44,20 @@ test('literal speech query returns the current source evidence and a candidate w
   }
   await expect(page.getByRole('heading',{name:'原句检索',exact:true})).toBeVisible();
   await expect.poll(async ()=>(await(await page.request.get(`/api/v1/assets/${assetId}`)).json()).data.analysis?.stages.ASR,{timeout:660000}).toBe('SUCCEEDED');
+  const indexStatus=(await(await page.request.get(`/api/v1/assets/${assetId}`)).json()).data.analysis?.stages.INDEX;
+  if(indexStatus!=='SUCCEEDED'){
+    const token=(await(await page.request.get('/api/v1/auth/csrf')).json()).data.csrfToken;
+    const rebuild=await page.request.post(`/api/v1/assets/${assetId}/search-index`,{headers:{'X-XSRF-TOKEN':token},data:{}});
+    expect(rebuild.status()).toBe(202);
+  }
+  await expect.poll(async ()=>(await(await page.request.get(`/api/v1/assets/${assetId}`)).json()).data.analysis?.stages.INDEX,{timeout:180000}).toBe('SUCCEEDED');
   const evidence=(await(await page.request.get(`/api/v1/assets/${assetId}/evidence`)).json()).data;
   const projectId=new URL(page.url()).searchParams.get('project');
   const csrf=(await(await page.request.get('/api/v1/auth/csrf')).json()).data.csrfToken;
   const response=await page.request.post(`/api/v1/projects/${projectId}/search`,{headers:{'X-XSRF-TOKEN':csrf},data:{query:'素材',literalPhrase:true,limit:10}});
   expect(response.status()).toBe(200);
   const result=(await response.json()).data;
-  expect(result.channels).toEqual(['LITERAL']);expect(result.semanticAvailable).toBe(false);
+  expect(result.channels).toEqual(['LITERAL']);expect(result.semanticAvailable).toBe(true);
   expect(result.hits.length).toBeGreaterThan(0);
   for(const hit of result.hits){
     expect(hit).toMatchObject({assetId,sourceKind:'SPEECH',temporalPrecision:'MODEL_TIMESTAMPS',contextAvailable:true});
@@ -73,7 +80,7 @@ test('literal speech query returns the current source evidence and a candidate w
   const card=page.getByRole('article',{name:'语音检索证据'}).first();
   await expect(card).toContainText('labelled-speech.mp4');
   await expect(card).toContainText('素材');
-  await expect(page.getByText('当前仅支持原文查找，语义检索尚未就绪',{exact:true})).toBeVisible();
+  await expect(page.getByRole('region',{name:'语音查询覆盖'})).toContainText('语义索引：已就绪');
   await card.getByRole('button',{name:'查看邻近上下文',exact:true}).click({timeout:5000});
   await expect(card.getByRole('region',{name:'邻近原文'})).toContainText('张明');
   await card.getByRole('button',{name:'核查原视频',exact:true}).click();

@@ -1,5 +1,12 @@
 name: agenticvideo
 services:
+  qdrant:
+    image: qdrant/qdrant:v1.19.2@sha256:b7b0444c4c351c970b98e90a6f89c2ee4287c65b44e52b4cb503fa5b2aa927ad
+    platform: linux/arm64
+    volumes:
+      - qdrant_data:/qdrant/storage
+    mem_limit: 512m
+    cpus: 1
   postgres:
     image: postgres:18.6-bookworm@sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c
     platform: linux/arm64
@@ -84,6 +91,7 @@ services:
       STORAGE_ACCESS_KEY: agentic-storage
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      QDRANT_URL: http://qdrant:6333
       DASHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/api/v1}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}
@@ -119,6 +127,9 @@ services:
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
       INTERNAL_WORKER_TOKEN: ${INTERNAL_WORKER_TOKEN}
       TASKS_DISPATCH_ENABLED: 'true'
+      QDRANT_URL: http://qdrant:6333
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
+      DASHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/api/v1}
       MODEL_RECORD_REQUEST_MAX_BYTES: ${MODEL_RECORD_REQUEST_MAX_BYTES:-16777216}
       MODEL_RECORD_RESPONSE_MAX_BYTES: ${MODEL_RECORD_RESPONSE_MAX_BYTES:-4194304}
       APP_ALLOWED_ORIGIN: ${APP_ALLOWED_ORIGIN:-http://localhost:8080}
@@ -152,6 +163,7 @@ services:
     mem_limit: 768m
     cpus: 1.5
 volumes:
+  qdrant_data:
   postgres_data:
   silo_data:
   rabbitmq_data:

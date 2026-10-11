@@ -1,6 +1,6 @@
 # HTTP 接口契约
 
-状态：依据 Q58 已确认设计整理的可实施规格 v1；尚未生成应用端点或 OpenAPI 文件。既有文档中的路径示意以本文 `/api/v1` 和 `/internal/v1` 命名为准。字段校验、鉴权、幂等和结果发布语义为必须实现的契约，模型／媒体参数通过配置与集成验证固定。
+状态：依据 Q58 已确认设计整理的可实施规格 v1；应用按下述逐票实施说明交付，表中其余端点仍是后续设计，尚未生成 OpenAPI 文件。既有文档中的路径示意以本文 `/api/v1` 和 `/internal/v1` 命名为准。字段校验、鉴权、幂等和结果发布语义为必须实现的契约，模型／媒体参数通过配置与集成验证固定。
 
 ## 通用协议
 
@@ -109,6 +109,8 @@
 当前 #9 已实现 `GET /api/v1/assets/{assetId}/evidence`：只返回当前有效分析版本的 observations、units、navigation summary 和安全的 providerCalls。observations 包含句段及字词的音频时间与原素材时间；模型调用记录包含提供方任务 ID、模型、状态、实际返回用量或明确失败码。不存在权限的素材返回 404。`GET /api/v1/assets/{assetId}` 的 analysis.stages／errors 独立表示媒体、语音、检索单元与索引；无音轨为 NOT_APPLICABLE，缺凭据或提交是否接纳不明确为 UNVERIFIED，明确提供方失败为 FAILED。语音完成尚不表示语义索引就绪。
 
 当前 #10 已实现项目内 `POST /search` 的原文字面通道：query（1–256 字符）、literalPhrase、limit（1–50，默认 20）。响应为 hits、channels=[LITERAL]、semanticAvailable=false、coverage.assets；命中包含源 SHA-256、analysisId、检索单元与原始证据引用，candidateWindow.purpose=RETRIEVAL。当前尚不支持语义查询或其分数。上下文入口限定当前可访问证据，boundedWindowMs 为每侧扩展毫秒（默认 5000，最多 30000），每侧最多五条原始邻句。覆盖信息的 startMs／endMs 是素材范围，processedRanges 才表示已成功分析的音轨时间；范围无法确认时返回空数组并在界面解释。
+
+当前 #11 已实现主题检索：`literalPhrase=false` 使用 Dense、BM25、LITERAL 三路 RRF，返回 channels、semanticAvailable、rankings，以及命中的 rrfScore / channelRanks。字面模式仍只匹配原文；有有效索引时 semanticAvailable=true。coverage.assets 增加 indexStatus。召回前强制账号、项目、当前分析及已发布索引代次；Agent 另加固定素材范围，BM25 的 IDF 语料仍限定当前项目。`POST /api/v1/assets/{assetId}/search-index` 返回 202 和 taskId / generationId，重复活跃构建复用任务；`GET` 返回 publishedGeneration 及最近代次状态。新代次未核验、取消或失效时不能替换可查询 head，语音证据仍可字面查询。assetIds / sourceKinds / timeRange 查询入参尚待对应后续票实现。
 
 深度检索由 Agent 的受控 CONTENT_REFINE 工具在预算内请求；超预算澄清，不开放任意模型参数／全素材高密度调用给浏览器。普通查询 API 也限制查询长度、返回量与频率。
 

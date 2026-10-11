@@ -11,10 +11,11 @@ import static org.springframework.http.HttpStatus.CONFLICT;
 /** Immutable speech observations, rebuildable units, and navigation summaries are distinct records. */
 @Service
 public class SpeechAnalysis {
+    private final com.agenticvideo.business.search.SearchIndexes indexes;
     private final JdbcTemplate database;
     private final ObjectMapper json;
     private final SpeechTimings timings;
-    public SpeechAnalysis(JdbcTemplate database,ObjectMapper json,SpeechTimings timings) { this.database=database;this.json=json;this.timings=timings; }
+    public SpeechAnalysis(JdbcTemplate database,ObjectMapper json,SpeechTimings timings,com.agenticvideo.business.search.SearchIndexes indexes) { this.indexes=indexes; this.database=database;this.json=json;this.timings=timings; }
     public void initialize(UUID assetId, UUID projectId, JsonNode media) {
         UUID analysisId=UUID.randomUUID();
         boolean audio=media.path("timeMapping").path("hasAudio").asBoolean();
@@ -113,6 +114,7 @@ public class SpeechAnalysis {
         var summaryJson=json.createObjectNode().put("kind","EXTRACTIVE").put("text",summary.toString()).put("purpose","NAVIGATION");
         database.update("INSERT INTO asset_summaries (analysis_id,summary_json,evidence_refs_json) VALUES (?,?::jsonb,?::jsonb)",analysis,summaryJson.toString(),json.valueToTree(references).toString());
         database.update("UPDATE analysis_stages SET status='SUCCEEDED',error_json=NULL,updated_at=now() WHERE analysis_id=? AND stage_key IN ('ASR','UNITS')",analysis);
+        indexes.enqueue(asset);
     }
     public Object stages(UUID asset) {
         var result=new LinkedHashMap<String,Object>();

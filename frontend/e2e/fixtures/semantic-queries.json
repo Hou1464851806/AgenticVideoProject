@@ -1,0 +1,12 @@
+{
+  "corpus": "labelled-speech.mp4; known Chinese script manually assigned relevance by sentence meaning",
+  "note": "Small synthetic transfer fixture, not a production accuracy benchmark. Holdout queries are fixed before measurement; no weights or cutoffs are tuned against them.",
+  "queries": [
+    {"split":"development","query":"张明","relevantText":"我叫张明"},
+    {"split":"development","query":"三个","relevantText":"三个视频制作步骤"},
+    {"split":"development","query":"把视频传到项目里","relevantText":"上传素材"},
+    {"split":"holdout","query":"检查转写内容是不是准确","relevantText":"核查原文"},
+    {"split":"holdout","query":"制作完成后生成成片文件","relevantText":"导出"},
+    {"split":"holdout","query":"一共包含几个制作环节","relevantText":"三个视频制作步骤"}
+  ]
+}

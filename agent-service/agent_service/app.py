@@ -60,7 +60,7 @@ def business(path, body, retries=3):
     for attempt in range(retries):
         try:
             response = requests.post(BUSINESS + path, json=body,
-                headers={"Authorization": "Bearer " + TOKEN}, timeout=(2, 5))
+                headers={"Authorization": "Bearer " + TOKEN}, timeout=(2, 150 if path.endswith("/tool") else 5))
             if response.status_code in (401, 409):
                 raise LostAttempt()
             if response.status_code == 200:
@@ -120,6 +120,10 @@ class Execution:
         heartbeat = threading.Thread(target=self.heartbeat, daemon=True)
         heartbeat.start()
         try:
+            if self.input.get("operation") == "INDEX_BUILD":
+                from .search_index import build_index
+                build_index(self)
+                return
             if "conversationId" in self.input:
                 run_conversation(self, Path(os.environ.get("AGENT_STATE_DIRECTORY", "/state")))
                 return
@@ -190,8 +194,18 @@ class Execution:
                 if self.stop.wait(2):
                     raise LostAttempt()
         except LostAttempt:
-            pass
+            try:
+                self.cancelled = self.post("heartbeat", {}).get("action") == "STOP"
+            except Exception:
+                pass
         except Exception as failure:
+            if self.input.get("operation") == "INDEX_BUILD":
+                try:
+                    self.post("fail", {"producerKey": "index-failed", "code": "INDEX_UNVERIFIED",
+                                      "message": "语义索引构建未完成；已保存证据和成功向量批次，可单独重建索引"})
+                except Exception:
+                    pass
+                return
             if "conversationId" in self.input:
                 try:
                     self.post("fail", {"producerKey": "conversation-failed", "code": failure.code if isinstance(failure, BusinessRejected) else "CONVERSATION_UNVERIFIED" if isinstance(failure, ConversationUnverified) else "CONVERSATION_FAILED",

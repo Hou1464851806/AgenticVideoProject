@@ -10,26 +10,22 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 class SearchController {
+    private final EvidenceSearch search;
     private final JdbcTemplate database;
     private final ProjectAccess access;
-    SearchController(JdbcTemplate database, ProjectAccess access) { this.database=database;this.access=access; }
+    SearchController(EvidenceSearch search,JdbcTemplate database, ProjectAccess access) { this.search=search; this.database=database;this.access=access; }
 
     @PostMapping("/api/v1/projects/{projectId}/search")
     Map<String,Object> search(@PathVariable UUID projectId,@Valid @RequestBody Query input,Authentication account) {
         access.requireOwned(projectId,account);
         var hits=new ArrayList<Object>();
-        var rows=database.queryForList("""
-                SELECT u.*,a.filename,a.sha256 FROM retrieval_units u
-                JOIN assets a ON a.id=u.asset_id AND a.project_id=u.project_id
-                JOIN asset_analysis_heads h ON h.asset_id=a.id AND h.analysis_id=u.analysis_id
-                JOIN asset_analysis_revisions r ON r.id=h.analysis_id AND r.source_sha256=a.sha256
-                WHERE u.project_id=? AND a.validation_status='VALID' AND u.source_kind='SPEECH'
-                AND position(? in u.text)>0 ORDER BY a.id,u.start_ms,u.id LIMIT ?
-                """,projectId,input.query(),input.limit()==null?20:input.limit());
+        var found=search.search(projectId,input.query(),Boolean.TRUE.equals(input.literalPhrase()),input.limit()==null?20:input.limit(),null);
+        var rows=found.rows();
         for(var row:rows) {
             var hit=new LinkedHashMap<String,Object>();
             hit.put("assetId",row.get("asset_id"));hit.put("filename",row.get("filename"));hit.put("sourceSha256",row.get("sha256"));
             hit.put("analysisId",row.get("analysis_id"));hit.put("retrievalUnitId",row.get("id"));hit.put("text",row.get("text"));
+            if(row.containsKey("rrfScore")){hit.put("rrfScore",row.get("rrfScore"));hit.put("channelRanks",row.get("channelRanks"));}
             hit.put("sourceKind","SPEECH");hit.put("startMs",row.get("start_ms"));hit.put("endMs",row.get("end_ms"));
             hit.put("temporalPrecision","MODEL_TIMESTAMPS");hit.put("contextAvailable",true);
             hit.put("candidateWindow",Map.of("startMs",row.get("start_ms"),"endMs",row.get("end_ms"),"purpose","RETRIEVAL"));
@@ -38,10 +34,11 @@ class SearchController {
         }
         var coverage=new ArrayList<Object>();
         for(var row:database.queryForList("""
-                SELECT a.id,a.filename,a.duration_ms,a.media_info_json,a.time_mapping_json,s.status FROM assets a
+                SELECT a.id,a.filename,a.duration_ms,a.media_info_json,a.time_mapping_json,s.status,COALESCE(ix.status,'NOT_STARTED') AS index_status FROM assets a
                 JOIN asset_analysis_heads h ON h.asset_id=a.id
                 JOIN asset_analysis_revisions r ON r.id=h.analysis_id AND r.source_sha256=a.sha256
                 JOIN analysis_stages s ON s.analysis_id=h.analysis_id AND s.stage_key='ASR'
+                LEFT JOIN analysis_stages ix ON ix.analysis_id=h.analysis_id AND ix.stage_key='INDEX'
                 WHERE a.project_id=? AND a.validation_status='VALID' ORDER BY a.id
                 """,projectId)) {
             var ranges=new ArrayList<Object>();
@@ -58,9 +55,9 @@ class SearchController {
                     break;
                 }
             }
-            coverage.add(Map.of("assetId",row.get("id"),"filename",row.get("filename"),"sourceKind","SPEECH","status",row.get("status"),"startMs",0,"endMs",row.get("duration_ms"),"processedRanges",ranges));
+            coverage.add(Map.of("assetId",row.get("id"),"filename",row.get("filename"),"sourceKind","SPEECH","status",row.get("status"),"indexStatus",row.get("index_status"),"startMs",0,"endMs",row.get("duration_ms"),"processedRanges",ranges));
         }
-        return Map.of("data",Map.of("hits",hits,"channels",List.of("LITERAL"),"semanticAvailable",false,"coverage",Map.of("assets",coverage)),"requestId",UUID.randomUUID());
+        return Map.of("data",Map.of("hits",hits,"channels",found.channels(),"semanticAvailable",found.semanticAvailable(),"rankings",found.rankings(),"coverage",Map.of("assets",coverage)),"requestId",UUID.randomUUID());
     }
     @GetMapping("/api/v1/evidence/{evidenceId}/context")
     Map<String,Object> context(@PathVariable UUID evidenceId,@RequestParam(defaultValue="5000") long boundedWindowMs,Authentication account) {

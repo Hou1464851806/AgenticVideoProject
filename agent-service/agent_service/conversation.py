@@ -34,7 +34,7 @@ def function(name, description, properties, required):
 
 TOOLS = [
     function("list_assets", "查看本次固定范围内素材及语音分析状态。", {}, []),
-    function("search_evidence", "检索已发布语音原文。仅原文匹配，无语义搜索；query为空可浏览原句。未命中不证明视频不存在相关内容。",
+    function("search_evidence", "检索固定素材范围内已发布的语音证据；索引就绪时使用中文主题、近义表达及词项融合，保留姓名和数字。query为空可浏览原句。检查返回的semanticAvailable和coverage；未命中不证明视频不存在相关内容。",
              {"query": {"type": "string"}}, ["query"]),
     function("read_evidence_context", "读取命中证据附近原句，核查上下文。",
              {"evidenceId": {"type": "string"}}, ["evidenceId"]),

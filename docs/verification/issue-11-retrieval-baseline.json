@@ -1,0 +1,327 @@
+{
+  "measuredAt": "2026-10-11T10:38:13.941Z",
+  "assetId": "ebfde11b-44ac-46cc-ac5c-074a1795e25d",
+  "corpus": "labelled-speech.mp4; known Chinese script manually assigned relevance by sentence meaning",
+  "note": "Small synthetic transfer fixture, not a production accuracy benchmark. Holdout queries are fixed before measurement; no weights or cutoffs are tuned against them.",
+  "queries": [
+    {
+      "split": "development",
+      "query": "张明",
+      "relevantText": "我叫张明"
+    },
+    {
+      "split": "development",
+      "query": "三个",
+      "relevantText": "三个视频制作步骤"
+    },
+    {
+      "split": "development",
+      "query": "把视频传到项目里",
+      "relevantText": "上传素材"
+    },
+    {
+      "split": "holdout",
+      "query": "检查转写内容是不是准确",
+      "relevantText": "核查原文"
+    },
+    {
+      "split": "holdout",
+      "query": "制作完成后生成成片文件",
+      "relevantText": "导出"
+    },
+    {
+      "split": "holdout",
+      "query": "一共包含几个制作环节",
+      "relevantText": "三个视频制作步骤"
+    }
+  ],
+  "measurements": [
+    {
+      "split": "development",
+      "query": "张明",
+      "relevantText": "我叫张明",
+      "relevantUnitIds": [
+        "02c1a62f-5eba-4084-9f27-9812b81bac4c"
+      ],
+      "metrics": {
+        "DENSE": {
+          "ranking": [
+            "02c1a62f-5eba-4084-9f27-9812b81bac4c",
+            "7b99a108-cdba-41ac-98b2-54c124de2a62",
+            "c16669fb-42a4-46c9-a2a6-58fc065f718b",
+            "4e687a7c-d85f-4436-8177-fafbdd0aac3a",
+            "a87868f9-5727-4e2f-8d72-093ee759f4e0"
+          ],
+          "firstRelevantRank": 1,
+          "reciprocalRank": 1,
+          "recallAt1": 1,
+          "recallAt3": 1,
+          "recallAt5": 1
+        },
+        "BM25": {
+          "ranking": [
+            "02c1a62f-5eba-4084-9f27-9812b81bac4c"
+          ],
+          "firstRelevantRank": 1,
+          "reciprocalRank": 1,
+          "recallAt1": 1,
+          "recallAt3": 1,
+          "recallAt5": 1
+        },
+        "RRF": {
+          "ranking": [
+            "02c1a62f-5eba-4084-9f27-9812b81bac4c",
+            "7b99a108-cdba-41ac-98b2-54c124de2a62",
+            "c16669fb-42a4-46c9-a2a6-58fc065f718b",
+            "4e687a7c-d85f-4436-8177-fafbdd0aac3a",
+            "a87868f9-5727-4e2f-8d72-093ee759f4e0"
+          ],
+          "firstRelevantRank": 1,
+          "reciprocalRank": 1,
+          "recallAt1": 1,
+          "recallAt3": 1,
+          "recallAt5": 1
+        }
+      }
+    },
+    {
+      "split": "development",
+      "query": "三个",
+      "relevantText": "三个视频制作步骤",
+      "relevantUnitIds": [
+        "7b99a108-cdba-41ac-98b2-54c124de2a62"
+      ],
+      "metrics": {
+        "DENSE": {
+          "ranking": [
+            "7b99a108-cdba-41ac-98b2-54c124de2a62",
+            "a87868f9-5727-4e2f-8d72-093ee759f4e0",
+            "c16669fb-42a4-46c9-a2a6-58fc065f718b",
+            "4e687a7c-d85f-4436-8177-fafbdd0aac3a",
+            "02c1a62f-5eba-4084-9f27-9812b81bac4c"
+          ],
+          "firstRelevantRank": 1,
+          "reciprocalRank": 1,
+          "recallAt1": 1,
+          "recallAt3": 1,
+          "recallAt5": 1
+        },
+        "BM25": {
+          "ranking": [
+            "7b99a108-cdba-41ac-98b2-54c124de2a62"
+          ],
+          "firstRelevantRank": 1,
+          "reciprocalRank": 1,
+          "recallAt1": 1,
+          "recallAt3": 1,
+          "recallAt5": 1
+        },
+        "RRF": {
+          "ranking": [
+            "7b99a108-cdba-41ac-98b2-54c124de2a62",
+            "a87868f9-5727-4e2f-8d72-093ee759f4e0",
+            "c16669fb-42a4-46c9-a2a6-58fc065f718b",
+            "4e687a7c-d85f-4436-8177-fafbdd0aac3a",
+            "02c1a62f-5eba-4084-9f27-9812b81bac4c"
+          ],
+          "firstRelevantRank": 1,
+          "reciprocalRank": 1,
+          "recallAt1": 1,
+          "recallAt3": 1,
+          "recallAt5": 1
+        }
+      }
+    },
+    {
+      "split": "development",
+      "query": "把视频传到项目里",
+      "relevantText": "上传素材",
+      "relevantUnitIds": [
+        "4e687a7c-d85f-4436-8177-fafbdd0aac3a"
+      ],
+      "metrics": {
+        "DENSE": {
+          "ranking": [
+            "7b99a108-cdba-41ac-98b2-54c124de2a62",
+            "4e687a7c-d85f-4436-8177-fafbdd0aac3a",
+            "a87868f9-5727-4e2f-8d72-093ee759f4e0",
+            "c16669fb-42a4-46c9-a2a6-58fc065f718b",
+            "02c1a62f-5eba-4084-9f27-9812b81bac4c"
+          ],
+          "firstRelevantRank": 2,
+          "reciprocalRank": 0.5,
+          "recallAt1": 0,
+          "recallAt3": 1,
+          "recallAt5": 1
+        },
+        "BM25": {
+          "ranking": [
+            "7b99a108-cdba-41ac-98b2-54c124de2a62"
+          ],
+          "firstRelevantRank": null,
+          "reciprocalRank": 0,
+          "recallAt1": 0,
+          "recallAt3": 0,
+          "recallAt5": 0
+        },
+        "RRF": {
+          "ranking": [
+            "7b99a108-cdba-41ac-98b2-54c124de2a62",
+            "4e687a7c-d85f-4436-8177-fafbdd0aac3a",
+            "a87868f9-5727-4e2f-8d72-093ee759f4e0",
+            "c16669fb-42a4-46c9-a2a6-58fc065f718b",
+            "02c1a62f-5eba-4084-9f27-9812b81bac4c"
+          ],
+          "firstRelevantRank": 2,
+          "reciprocalRank": 0.5,
+          "recallAt1": 0,
+          "recallAt3": 1,
+          "recallAt5": 1
+        }
+      }
+    },
+    {
+      "split": "holdout",
+      "query": "检查转写内容是不是准确",
+      "relevantText": "核查原文",
+      "relevantUnitIds": [
+        "c16669fb-42a4-46c9-a2a6-58fc065f718b"
+      ],
+      "metrics": {
+        "DENSE": {
+          "ranking": [
+            "c16669fb-42a4-46c9-a2a6-58fc065f718b",
+            "a87868f9-5727-4e2f-8d72-093ee759f4e0",
+            "4e687a7c-d85f-4436-8177-fafbdd0aac3a",
+            "7b99a108-cdba-41ac-98b2-54c124de2a62",
+            "02c1a62f-5eba-4084-9f27-9812b81bac4c"
+          ],
+          "firstRelevantRank": 1,
+          "reciprocalRank": 1,
+          "recallAt1": 1,
+          "recallAt3": 1,
+          "recallAt5": 1
+        },
+        "BM25": {
+          "ranking": [],
+          "firstRelevantRank": null,
+          "reciprocalRank": 0,
+          "recallAt1": 0,
+          "recallAt3": 0,
+          "recallAt5": 0
+        },
+        "RRF": {
+          "ranking": [
+            "c16669fb-42a4-46c9-a2a6-58fc065f718b",
+            "a87868f9-5727-4e2f-8d72-093ee759f4e0",
+            "4e687a7c-d85f-4436-8177-fafbdd0aac3a",
+            "7b99a108-cdba-41ac-98b2-54c124de2a62",
+            "02c1a62f-5eba-4084-9f27-9812b81bac4c"
+          ],
+          "firstRelevantRank": 1,
+          "reciprocalRank": 1,
+          "recallAt1": 1,
+          "recallAt3": 1,
+          "recallAt5": 1
+        }
+      }
+    },
+    {
+      "split": "holdout",
+      "query": "制作完成后生成成片文件",
+      "relevantText": "导出",
+      "relevantUnitIds": [
+        "a87868f9-5727-4e2f-8d72-093ee759f4e0"
+      ],
+      "metrics": {
+        "DENSE": {
+          "ranking": [
+            "a87868f9-5727-4e2f-8d72-093ee759f4e0",
+            "7b99a108-cdba-41ac-98b2-54c124de2a62",
+            "4e687a7c-d85f-4436-8177-fafbdd0aac3a",
+            "c16669fb-42a4-46c9-a2a6-58fc065f718b",
+            "02c1a62f-5eba-4084-9f27-9812b81bac4c"
+          ],
+          "firstRelevantRank": 1,
+          "reciprocalRank": 1,
+          "recallAt1": 1,
+          "recallAt3": 1,
+          "recallAt5": 1
+        },
+        "BM25": {
+          "ranking": [
+            "7b99a108-cdba-41ac-98b2-54c124de2a62"
+          ],
+          "firstRelevantRank": null,
+          "reciprocalRank": 0,
+          "recallAt1": 0,
+          "recallAt3": 0,
+          "recallAt5": 0
+        },
+        "RRF": {
+          "ranking": [
+            "7b99a108-cdba-41ac-98b2-54c124de2a62",
+            "a87868f9-5727-4e2f-8d72-093ee759f4e0",
+            "4e687a7c-d85f-4436-8177-fafbdd0aac3a",
+            "c16669fb-42a4-46c9-a2a6-58fc065f718b",
+            "02c1a62f-5eba-4084-9f27-9812b81bac4c"
+          ],
+          "firstRelevantRank": 2,
+          "reciprocalRank": 0.5,
+          "recallAt1": 0,
+          "recallAt3": 1,
+          "recallAt5": 1
+        }
+      }
+    },
+    {
+      "split": "holdout",
+      "query": "一共包含几个制作环节",
+      "relevantText": "三个视频制作步骤",
+      "relevantUnitIds": [
+        "7b99a108-cdba-41ac-98b2-54c124de2a62"
+      ],
+      "metrics": {
+        "DENSE": {
+          "ranking": [
+            "7b99a108-cdba-41ac-98b2-54c124de2a62",
+            "4e687a7c-d85f-4436-8177-fafbdd0aac3a",
+            "a87868f9-5727-4e2f-8d72-093ee759f4e0",
+            "c16669fb-42a4-46c9-a2a6-58fc065f718b",
+            "02c1a62f-5eba-4084-9f27-9812b81bac4c"
+          ],
+          "firstRelevantRank": 1,
+          "reciprocalRank": 1,
+          "recallAt1": 1,
+          "recallAt3": 1,
+          "recallAt5": 1
+        },
+        "BM25": {
+          "ranking": [
+            "7b99a108-cdba-41ac-98b2-54c124de2a62"
+          ],
+          "firstRelevantRank": 1,
+          "reciprocalRank": 1,
+          "recallAt1": 1,
+          "recallAt3": 1,
+          "recallAt5": 1
+        },
+        "RRF": {
+          "ranking": [
+            "7b99a108-cdba-41ac-98b2-54c124de2a62",
+            "4e687a7c-d85f-4436-8177-fafbdd0aac3a",
+            "a87868f9-5727-4e2f-8d72-093ee759f4e0",
+            "c16669fb-42a4-46c9-a2a6-58fc065f718b",
+            "02c1a62f-5eba-4084-9f27-9812b81bac4c"
+          ],
+          "firstRelevantRank": 1,
+          "reciprocalRank": 1,
+          "recallAt1": 1,
+          "recallAt3": 1,
+          "recallAt5": 1
+        }
+      }
+    }
+  ],
+  "crossProjectLeakCount": 0
+}

@@ -10,7 +10,11 @@ export async function renderSeed(page:Page) {
   };
   if(existsSync(file)) {
     const seed=JSON.parse(readFileSync(file,'utf8'));
-    if((await post('/auth/login',{username:seed.username,password:'analysis-browser-password'})).ok() && (await page.request.get(`/api/v1/assets/${seed.assetId}`)).ok())return seed;
+    if((await post('/auth/login',{username:seed.username,password:'analysis-browser-password'})).ok() && (await page.request.get(`/api/v1/assets/${seed.assetId}`)).ok()){
+      const library=await page.request.get(`/api/v1/projects/${seed.projectId}/assets?includePending=true`);
+      // The Compose fixture uses the real default ten-video limit; leave room for another test upload.
+      if(library.ok() && (await library.json()).data.items.length<10)return seed;
+    }
   }
   const username=`preview-real-${Date.now()}`;
   expect((await post('/auth/register',{username,password:'analysis-browser-password'})).status()).toBe(201);

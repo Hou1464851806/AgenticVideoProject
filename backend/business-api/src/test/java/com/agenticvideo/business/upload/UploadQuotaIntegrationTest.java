@@ -49,6 +49,21 @@ class UploadQuotaIntegrationTest {
         properties.add("storage.secret-key", () -> "integration-password-strong");
     }
     @LocalServerPort int port;
+    private final java.util.List<UploadTestApi> owners=new java.util.ArrayList<>();
+    @org.junit.jupiter.api.AfterEach void releaseOwnedReservations() throws Exception {
+        for(var owner:owners)for(var project:json(owner.get("/projects")).path("data").path("items"))cleanup(owner,project.path("id").asText());
+    }
+    private void cleanup(UploadTestApi owner,String project) throws Exception {
+        for(var upload:json(owner.get("/projects/"+project+"/uploads")).path("data").path("items")) {
+            String id=upload.path("uploadId").asText();
+            assertEquals(200,owner.post("/uploads/"+id+"/cancel","{}").statusCode());
+            long deadline=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(15);
+            while(!"CLEANED".equals(json(owner.get("/uploads/"+id)).path("data").path("cleanupStatus").asText())) {
+                if(System.nanoTime()>deadline)throw new AssertionError("Test upload did not finish public cleanup");
+                Thread.sleep(100);
+            }
+        }
+    }
 
     @Test
     void configuredFileLimitAcceptsItsBoundaryAndRejectsOneExtraByteWithAnActionableReason() throws Exception {
@@ -77,6 +92,7 @@ class UploadQuotaIntegrationTest {
             org.junit.jupiter.api.Assertions.assertTrue(json(rejected).path("error").path("message").asText().contains("项目原始素材总量"), rejected.body());
         }
         finally { executor.shutdownNow(); }
+        cleanup(owner,bytesProject);
         String slotsProject = json(owner.post("/projects", "{\"name\":\"数量限额\"}")).path("data").path("id").asText();
         assertEquals(201, owner.post("/projects/" + slotsProject + "/uploads", uploadBody(owner, 1, "slot-one")).statusCode());
         assertEquals(201, owner.post("/projects/" + slotsProject + "/uploads", uploadBody(owner, 1, "slot-two")).statusCode());
@@ -91,7 +107,7 @@ class UploadQuotaIntegrationTest {
     }
 
     private UploadTestApi signedIn(String username) throws Exception {
-        return UploadTestApi.signedIn(port,username);
+        var owner=UploadTestApi.signedIn(port,username);owners.add(owner);return owner;
     }
 
     private JsonNode json(HttpResponse<String> response) throws Exception {

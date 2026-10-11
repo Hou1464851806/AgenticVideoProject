@@ -13,6 +13,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ConversationTurns {
+    private final com.agenticvideo.business.search.EvidenceSearch evidenceSearch;
     private final long requestMaxBytes;
     private final long responseMaxBytes;
     private final JdbcTemplate database;
@@ -22,11 +23,12 @@ public class ConversationTurns {
     private final com.agenticvideo.business.analysis.SpeechTimings timings;
     private final com.agenticvideo.business.render.ProductionCommands production;
 
-    public ConversationTurns(JdbcTemplate database, ObjectMapper json, PlatformTransactionManager manager,
+    public ConversationTurns(com.agenticvideo.business.search.EvidenceSearch evidenceSearch,JdbcTemplate database, ObjectMapper json, PlatformTransactionManager manager,
             com.agenticvideo.business.plan.EditPlans plans, com.agenticvideo.business.analysis.SpeechTimings timings, com.agenticvideo.business.render.ProductionCommands production,
             @org.springframework.beans.factory.annotation.Value("${conversation.model-record.request-max-bytes:16777216}") long requestMaxBytes,
             @org.springframework.beans.factory.annotation.Value("${conversation.model-record.response-max-bytes:4194304}") long responseMaxBytes) {
         if (requestMaxBytes < 1 || responseMaxBytes < 1) throw new IllegalArgumentException("模型记录字节上限必须为正数");
+        this.evidenceSearch=evidenceSearch;
         this.requestMaxBytes = requestMaxBytes;
         this.responseMaxBytes = responseMaxBytes;
         this.database = database;
@@ -180,7 +182,7 @@ public class ConversationTurns {
         catch (IllegalArgumentException failure) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "引用标识不符合要求"); }
     }
 
-    public Object tool(Map<String, Object> task, com.fasterxml.jackson.databind.JsonNode input,
+    public ToolPreparation prepareTool(Map<String, Object> task,
             com.agenticvideo.business.task.TaskController.Tool request) {
         String name = request.name();
         var arguments = request.arguments();
@@ -195,13 +197,22 @@ public class ConversationTurns {
             if (!fields.contains(field)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "工具不能覆盖业务权限范围");
         });
         String payload = encode(Map.of("name", name, "arguments", arguments));
-        var previous = database.queryForList("SELECT result_json,request_json=?::jsonb AS same_request FROM conversation_tool_receipts WHERE task_id=? AND producer_key=?", payload, task.get("id"), request.producerKey());
+        var previous = database.queryForList("SELECT *,request_json=?::jsonb AS same_request FROM conversation_tool_receipts WHERE task_id=? AND producer_key=?", payload, task.get("id"), request.producerKey());
         if (!previous.isEmpty()) {
             if (!Boolean.TRUE.equals(previous.get(0).get("same_request"))) throw new ResponseStatusException(HttpStatus.CONFLICT, "工具幂等键内容不同");
-            return decode(previous.get(0).get("result_json"));
+            if("SUCCEEDED".equals(previous.get(0).get("status")))return new ToolPreparation(payload,decode(previous.get(0).get("result_json")));
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"工具调用正在执行或结果未确认，不能自动重复提交");
         }
         if (database.queryForObject("SELECT count(*) FROM conversation_tool_receipts WHERE task_id=?", Integer.class, task.get("id")) >= 12)
             throw new ResponseStatusException(HttpStatus.CONFLICT, "本轮工具调用预算已耗尽");
+        if("search_evidence".equals(name)&&(!arguments.path("query").isTextual()||arguments.path("query").asText().length()>256))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"检索词必须是最多 256 字符的文本");
+        if("read_evidence_context".equals(name))identifier(arguments.path("evidenceId").asText());
+        database.update("INSERT INTO conversation_tool_receipts(task_id,attempt_id,producer_key,request_json,result_json,status) VALUES (?,?,?,?::jsonb,NULL,'PENDING')",task.get("id"),request.attemptId(),request.producerKey(),payload);
+        return new ToolPreparation(payload,null);
+    }
+    public record ToolPreparation(String payload,Object cached) {}
+    public Object executeTool(Map<String,Object> task,com.fasterxml.jackson.databind.JsonNode input,com.agenticvideo.business.task.TaskController.Tool request) {
+        String name=request.name();var arguments=request.arguments();
         String scope = input.path("assetIds").toString();
         Object result;
         if ("list_assets".equals(name)) {
@@ -217,19 +228,19 @@ public class ConversationTurns {
         } else if ("search_evidence".equals(name)) {
             if (!arguments.path("query").isTextual() || arguments.path("query").asText().length() > 256)
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "检索词必须是最多 256 字符的文本");
-            var rows = database.queryForList("""
-                    SELECT e.id AS "evidenceId",e.asset_id AS "assetId",a.filename,e.text,
-                        e.start_ms AS "startMs",e.end_ms AS "endMs",e.source_kind AS "sourceKind"
-                    FROM evidence_segments e JOIN assets a ON a.id=e.asset_id AND a.project_id=e.project_id
-                    JOIN asset_analysis_heads h ON h.asset_id=a.id AND h.analysis_id=e.analysis_id
-                    JOIN asset_analysis_revisions r ON r.id=h.analysis_id AND r.source_sha256=a.sha256
-                    WHERE e.project_id=? AND a.validation_status='VALID' AND e.source_kind='SPEECH'
-                    AND e.asset_id IN (SELECT value::uuid FROM jsonb_array_elements_text(?::jsonb))
-                    AND position(? in e.text)>0 ORDER BY a.id,e.start_ms,e.id LIMIT 21
-                    """, task.get("project_id"), scope, arguments.path("query").asText());
-            result = Map.of("hits", rows.size() > 20 ? rows.subList(0,20) : rows,
-                    "truncated", rows.size() > 20, "channels", List.of("LITERAL"), "semanticAvailable", false,
-                    "coverage", "仅检索固定素材范围内已发布的语音原文；未命中不能证明原视频不存在相关内容");
+            var assets=new java.util.ArrayList<UUID>();for(var asset:input.path("assetIds"))assets.add(identifier(asset.asText()));
+            String query=arguments.path("query").asText();
+            var found=evidenceSearch.search((UUID)task.get("project_id"),query,query.isBlank(),20,assets);
+            var hits=new java.util.ArrayList<Object>();
+            for(var unit:found.rows()) {
+                for(var evidence:database.queryForList("SELECT e.id FROM unit_evidence_refs ref JOIN evidence_segments e ON e.id=ref.evidence_id WHERE ref.unit_id=? AND e.analysis_id=? AND e.project_id=? ORDER BY ref.ordinal",UUID.class,unit.get("id"),unit.get("analysis_id"),task.get("project_id"))) {
+                    var hit=new java.util.LinkedHashMap<String,Object>();hit.put("evidenceId",evidence);hit.put("retrievalUnitId",unit.get("id"));hit.put("assetId",unit.get("asset_id"));hit.put("filename",unit.get("filename"));hit.put("text",unit.get("text"));hit.put("startMs",unit.get("start_ms"));hit.put("endMs",unit.get("end_ms"));hit.put("sourceKind",unit.get("source_kind"));
+                    if(unit.containsKey("channelRanks"))hit.put("channelRanks",unit.get("channelRanks"));
+                    hits.add(hit);
+                }
+            }
+            result=Map.of("hits",hits,"truncated",found.rows().size()==20,"channels",found.channels(),"semanticAvailable",found.semanticAvailable(),
+                    "coverage","仅检索固定素材范围内已发布的证据；未命中不能证明原视频不存在相关内容","indexGenerations",found.generations());
         } else {
             UUID evidence = identifier(arguments.path("evidenceId").asText());
             var targets = database.queryForList("""
@@ -252,8 +263,36 @@ public class ConversationTurns {
             result = input.has("editing") ? Map.of("observations", observations, "candidateWindow", plans.candidateWindow(input,target,observations))
                     : Map.of("observations", observations);
         }
-        database.update("INSERT INTO conversation_tool_receipts(task_id,attempt_id,producer_key,request_json,result_json) VALUES (?,?,?,?::jsonb,?::jsonb)",
-                task.get("id"), request.attemptId(), request.producerKey(), payload, encode(result));
+        return result;
+    }
+    public Object recordTool(Map<String,Object> task,com.fasterxml.jackson.databind.JsonNode input,com.agenticvideo.business.task.TaskController.Tool request,ToolPreparation preparation,Object result) {
+        var receipt=database.queryForMap("SELECT *,request_json=?::jsonb AS same_request FROM conversation_tool_receipts WHERE task_id=? AND producer_key=?",preparation.payload(),task.get("id"),request.producerKey());
+        if(!Boolean.TRUE.equals(receipt.get("same_request")))throw new ResponseStatusException(HttpStatus.CONFLICT,"工具幂等键内容不同");
+        if("SUCCEEDED".equals(receipt.get("status")))return decode(receipt.get("result_json"));
+        if(!request.attemptId().equals(receipt.get("attempt_id")))throw new ResponseStatusException(HttpStatus.CONFLICT,"工具调用尝试已经失效");
+        var value=json.valueToTree(result);String scope=input.path("assetIds").toString();
+        for(var key:List.of("hits","observations"))for(var observation:value.path(key)) {
+            var current=database.queryForList("""
+                    SELECT e.id FROM evidence_segments e JOIN assets a ON a.id=e.asset_id AND a.project_id=e.project_id
+                    JOIN asset_analysis_heads h ON h.asset_id=a.id AND h.analysis_id=e.analysis_id
+                    JOIN asset_analysis_revisions r ON r.id=h.analysis_id AND r.source_sha256=a.sha256
+                    WHERE e.id=? AND e.project_id=? AND a.validation_status='VALID'
+                    AND e.asset_id IN (SELECT value::uuid FROM jsonb_array_elements_text(?::jsonb)) FOR SHARE OF a,h
+                    """,identifier(observation.path("evidenceId").asText()),task.get("project_id"),scope);
+            if(current.isEmpty())throw new ResponseStatusException(HttpStatus.CONFLICT,"检索期间素材或分析代次已变化，请重新检索");
+        }
+        for(var generation:value.path("indexGenerations")) {
+            var current=database.queryForList("""
+                    SELECT g.id FROM search_index_heads sh JOIN search_index_generations g ON g.id=sh.generation_id
+                    JOIN assets a ON a.id=sh.asset_id AND a.validation_status='VALID'
+                    JOIN asset_analysis_heads h ON h.asset_id=a.id AND h.analysis_id=g.analysis_id
+                    WHERE g.id=? AND g.project_id=? FOR SHARE OF sh,a,h
+                    """,identifier(generation.asText()),task.get("project_id"));
+            if(current.isEmpty())throw new ResponseStatusException(HttpStatus.CONFLICT,"检索期间索引代次已变化，请重新检索");
+        }
+        boolean live=Boolean.TRUE.equals(database.queryForObject("SELECT EXISTS(SELECT 1 FROM tasks t JOIN task_attempts a ON a.id=t.current_attempt_id WHERE t.id=? AND t.status='RUNNING' AND a.lease_expires_at>clock_timestamp())",Boolean.class,task.get("id")));
+        if(!live)throw new ResponseStatusException(HttpStatus.CONFLICT,"工具回执已经失去有效执行权");
+        database.update("UPDATE conversation_tool_receipts SET result_json=?::jsonb,status='SUCCEEDED' WHERE task_id=? AND producer_key=?",encode(result),task.get("id"),request.producerKey());
         return result;
     }
 

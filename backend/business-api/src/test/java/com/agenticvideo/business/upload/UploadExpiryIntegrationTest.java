@@ -99,6 +99,7 @@ class UploadExpiryIntegrationTest {
             assertEquals(202,result.statusCode(),result.body());assertEquals("COMPLETED",json(result).path("data").path("status").asText());
             assertEquals(409,owner.post("/uploads/"+id+"/cancel","{}").statusCode());
             assertEquals(1,json(owner.get("/projects/"+project+"/assets?includePending=true")).path("data").path("items").size());
+            assertEquals(202,owner.post("/tasks/"+json(result).path("data").path("validationTaskId").asText()+"/cancel","{}").statusCode());
         }finally{PROXY.fault.set(SiloFaultProxy.Fault.NONE);PROXY.release.countDown();}
     }
 
