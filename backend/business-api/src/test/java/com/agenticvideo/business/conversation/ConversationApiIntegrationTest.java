@@ -3,6 +3,8 @@ package com.agenticvideo.business.conversation;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.CookieManager;
+import java.util.Map;
+import java.util.List;
 import java.net.CookiePolicy;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -219,6 +221,32 @@ class ConversationApiIntegrationTest {
         var completed = internal(task, "complete", publication);
         assertEquals(200, completed.statusCode(), completed.body());
         assertEquals(evidence.toString(), json(owner.get("/conversations/" + session + "/messages")).path("data").path("items").get(1).path("references").get(0).path("id").asText());
+    }
+
+    @Test
+    void largeModelRecordsRemainReplayableWithoutTheOldCharacterLimit() throws Exception {
+        BrowserApi owner = signedIn("large-record-owner");
+        String project = json(owner.post("/projects", "{\"name\":\"长上下文\"}")).path("data").path("id").asText();
+        String session = json(owner.post("/projects/" + project + "/conversations", "{\"title\":\"长证据\"}")).path("data").path("id").asText();
+        String task = json(owner.post("/conversations/" + session + "/turns", "{\"content\":\"核查长素材\"}", "large-record")).path("data").path("taskId").asText();
+        JsonNode claim = json(internal(task, "claim", Map.of("executorId", "large-record", "claimRequestId", java.util.UUID.randomUUID()))).path("data");
+        var request = new java.util.HashMap<String,Object>();
+        request.put("attemptId", claim.path("attemptId").asText()); request.put("leaseToken", claim.path("leaseToken").asText());
+        Object payload = Map.of("model", "deepseek-flash", "messages", List.of(Map.of("role", "tool", "content", "原文".repeat(60000))));
+        request.put("action", "PREPARE"); request.put("data", Map.of("callNumber", 1, "request", payload));
+        var accepted = internal(task, "provider-call", request);
+        assertEquals(200, accepted.statusCode(), accepted.body());
+        assertEquals(true, json(accepted).path("data").path("canSubmit").asBoolean());
+        assertEquals("UNCERTAIN", json(internal(task, "provider-call", request)).path("data").path("status").asText());
+        Object response = Map.of("message", Map.of("content", "答复".repeat(60000)), "usage", Map.of("prompt_tokens", 120000));
+        request.put("action", "SUCCEEDED"); request.put("data", Map.of("callNumber", 1, "response", response));
+        assertEquals(200, internal(task, "provider-call", request).statusCode());
+        request.put("action", "PREPARE"); request.put("data", Map.of("callNumber", 1, "request", payload));
+        var replay = json(internal(task, "provider-call", request)).path("data");
+        assertEquals(false, replay.path("canSubmit").asBoolean());
+        assertEquals(new ObjectMapper().valueToTree(response), replay.path("response"));
+        request.put("data", Map.of("callNumber", 1, "request", Map.of("model", "different")));
+        assertEquals(409, internal(task, "provider-call", request).statusCode());
     }
 
     private HttpResponse<String> internal(String task, String action, Object body) throws Exception {

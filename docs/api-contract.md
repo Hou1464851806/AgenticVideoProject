@@ -228,3 +228,7 @@ complete 结果类型为 MEDIA_PREPARED、ANALYSIS_RESULT、INDEX_VERIFIED、AGE
 - `POST /artifacts/{id}/playback-access` 与 `POST /artifacts/{id}/download-access` 在项目鉴权及文件存在校验后签发五分钟 URL；下载带服务器生成的 attachment 文件名，不删除文件。
 - `GET /artifacts/{id}` 返回正式产物状态及实际 `storedBytes`；`DELETE` 同路径必须提交 `{explicitIntent:"DELETE"}`。删除意图持久化后才移除对象并核查不存在；存储故障保持 `DELETE_PENDING`，独立扫描重试，不误报释放空间。原素材不在该删除路径内。
 - 制作会话的直接 USER 消息支持 `确认当前版本`／`确认V1`，以及另行 `导出当前版本 720p`／`导出V1 1080p`；多条成片时要求 `第1条` 等明确选择。问句、否定、合并确认与导出等不匹配指令只澄清，不进入 Agent 或正式渲染。未明确清晰度时使用 720p。确认和导出保存实际 USER 消息身份，Agent 回复不能制造授权。
+
+## 模型调用记录大小
+
+内部 provider-call 的 data.request／data.response 按紧凑 JSON 的 UTF-8 字节计数，默认上限分别为 16777216／4194304，可通过 MODEL_RECORD_REQUEST_MAX_BYTES／MODEL_RECORD_RESPONSE_MAX_BYTES 覆盖。等于上限允许；超限返回 413、MODEL_RECORD_TOO_LARGE、retryable=false，details 为 recordKind、actualBytes、limitBytes。它是解析后记录字段限制，不是 Token 预算或 HTTP 全请求限制。公开 messages 的 latestTask.failure 仅在该类失败时提供 code/message；其他失败仍使用原有公开提示。

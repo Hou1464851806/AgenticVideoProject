@@ -59,7 +59,8 @@ public class ConversationController {
         data.put("items", database.query("SELECT id,message_seq,role,content,references_json FROM conversation_messages WHERE conversation_id=? ORDER BY message_seq",
                 (row, index) -> Map.of("id", row.getObject("id", UUID.class), "messageSeq", row.getLong("message_seq"),
                         "role", row.getString("role"), "content", row.getString("content"), "references", parse(row.getString("references_json"))), conversationId));
-        var tasks = database.queryForList("SELECT t.id AS \"taskId\",t.status FROM conversation_turns r JOIN tasks t ON t.id=r.task_id WHERE r.conversation_id=? ORDER BY r.created_at DESC LIMIT 1", conversationId);
+        var tasks = database.queryForList("SELECT t.id AS \"taskId\",t.status, CASE WHEN t.status='FAILED' AND t.result_json->>'code'='MODEL_RECORD_TOO_LARGE' THEN jsonb_build_object('code',t.result_json->>'code','message',t.result_json->>'message') END AS failure FROM conversation_turns r JOIN tasks t ON t.id=r.task_id WHERE r.conversation_id=? ORDER BY r.created_at DESC LIMIT 1", conversationId);
+        for (var task : tasks) if (task.get("failure") != null) task.put("failure", parse(task.get("failure").toString()));
         data.put("latestTask", tasks.isEmpty() ? null : tasks.get(0));
         data.put("view", database.queryForMap("SELECT view_plan_id AS \"planId\",view_revision_id AS \"revisionId\",view_row_version AS \"rowVersion\" FROM conversations WHERE id=?", conversationId));
         return response(data);

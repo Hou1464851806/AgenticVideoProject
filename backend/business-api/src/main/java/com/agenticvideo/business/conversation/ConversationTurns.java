@@ -13,6 +13,8 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ConversationTurns {
+    private final long requestMaxBytes;
+    private final long responseMaxBytes;
     private final JdbcTemplate database;
     private final ObjectMapper json;
     private final TransactionTemplate transactions;
@@ -21,7 +23,12 @@ public class ConversationTurns {
     private final com.agenticvideo.business.render.ProductionCommands production;
 
     public ConversationTurns(JdbcTemplate database, ObjectMapper json, PlatformTransactionManager manager,
-            com.agenticvideo.business.plan.EditPlans plans, com.agenticvideo.business.analysis.SpeechTimings timings, com.agenticvideo.business.render.ProductionCommands production) {
+            com.agenticvideo.business.plan.EditPlans plans, com.agenticvideo.business.analysis.SpeechTimings timings, com.agenticvideo.business.render.ProductionCommands production,
+            @org.springframework.beans.factory.annotation.Value("${conversation.model-record.request-max-bytes:16777216}") long requestMaxBytes,
+            @org.springframework.beans.factory.annotation.Value("${conversation.model-record.response-max-bytes:4194304}") long responseMaxBytes) {
+        if (requestMaxBytes < 1 || responseMaxBytes < 1) throw new IllegalArgumentException("模型记录字节上限必须为正数");
+        this.requestMaxBytes = requestMaxBytes;
+        this.responseMaxBytes = responseMaxBytes;
         this.database = database;
         this.json = json;
         this.transactions = new TransactionTemplate(manager);
@@ -255,9 +262,10 @@ public class ConversationTurns {
         if (number < 1 || number > 6) throw new ResponseStatusException(HttpStatus.CONFLICT, "本轮模型调用预算已耗尽");
         var rows = database.queryForList("SELECT * FROM conversation_model_calls WHERE task_id=? AND call_number=? FOR UPDATE", task.get("id"), number);
         if ("PREPARE".equals(action)) {
-            if (!data.path("request").isObject() || data.path("request").toString().length() > 100000)
+            if (!data.path("request").isObject())
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "模型请求不符合预算要求");
             String payload = data.path("request").toString();
+            requireRecordSize(payload, requestMaxBytes, "REQUEST");
             if (!rows.isEmpty()) {
                 var call = rows.get(0);
                 Boolean same = database.queryForObject("SELECT request_json=?::jsonb FROM conversation_model_calls WHERE id=?", Boolean.class, payload, call.get("id"));
@@ -275,9 +283,10 @@ public class ConversationTurns {
             database.update("UPDATE conversation_model_calls SET status='UNCERTAIN' WHERE id=? AND status='SUBMITTING'", call.get("id"));
             return Map.of("status", "UNCERTAIN");
         }
-        if (!"SUCCEEDED".equals(action) || !data.path("response").isObject() || data.path("response").toString().length() > 100000)
+        if (!"SUCCEEDED".equals(action) || !data.path("response").isObject())
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "模型回执格式不符合要求");
         String response = data.path("response").toString();
+        requireRecordSize(response, responseMaxBytes, "RESPONSE");
         if ("SUCCEEDED".equals(call.get("status"))) {
             if (!Boolean.TRUE.equals(database.queryForObject("SELECT response_json=?::jsonb FROM conversation_model_calls WHERE id=?", Boolean.class, response, call.get("id"))))
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "模型回执内容不同");
@@ -287,6 +296,11 @@ public class ConversationTurns {
                     response, data.path("response").path("usage").toString(), call.get("id"));
         }
         return Map.of("status", "SUCCEEDED");
+    }
+
+    private void requireRecordSize(String payload, long limit, String kind) {
+        long actual = payload.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
+        if (actual > limit) throw new ModelRecordTooLarge(kind, actual, limit);
     }
 
     private Object decode(Object value) {

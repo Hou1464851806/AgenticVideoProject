@@ -42,6 +42,20 @@ class Unverified(RuntimeError):
     pass
 
 
+class BusinessRejected(RuntimeError):
+    def __init__(self, error):
+        self.code = "BUSINESS_REQUEST_REJECTED"
+        message = "业务请求被拒绝，未自动重复提交；请核查请求条件。"
+        details = error.get("details", {})
+        if error.get("code") == "MODEL_RECORD_TOO_LARGE" and isinstance(details, dict):
+            actual, limit, kind = details.get("actualBytes"), details.get("limitBytes"), details.get("recordKind")
+            if type(actual) is int and type(limit) is int and actual >= 0 and limit > 0 and kind in {"REQUEST", "RESPONSE"}:
+                self.code = "MODEL_RECORD_TOO_LARGE"
+                label = "请求" if kind == "REQUEST" else "响应"
+                message = f"模型{label}记录为 {actual} 字节，超过配置上限 {limit} 字节；请调整记录上限。"
+        super().__init__(message)
+
+
 def business(path, body, retries=3):
     for attempt in range(retries):
         try:
@@ -51,6 +65,12 @@ def business(path, body, retries=3):
                 raise LostAttempt()
             if response.status_code == 200:
                 return response.json()["data"]
+            if 400 <= response.status_code < 500 and response.status_code not in (408, 429):
+                try:
+                    error = response.json().get("error", {})
+                except (ValueError, AttributeError):
+                    error = {}
+                raise BusinessRejected(error if isinstance(error, dict) else {})
         except requests.RequestException:
             pass
         if attempt + 1 < retries:
@@ -174,8 +194,8 @@ class Execution:
         except Exception as failure:
             if "conversationId" in self.input:
                 try:
-                    self.post("fail", {"producerKey": "conversation-failed", "code": "CONVERSATION_UNVERIFIED" if isinstance(failure, ConversationUnverified) else "CONVERSATION_FAILED",
-                        "message": str(failure) if isinstance(failure, ConversationUnverified) else "对话执行未完成，未发布正式答复"})
+                    self.post("fail", {"producerKey": "conversation-failed", "code": failure.code if isinstance(failure, BusinessRejected) else "CONVERSATION_UNVERIFIED" if isinstance(failure, ConversationUnverified) else "CONVERSATION_FAILED",
+                        "message": str(failure) if isinstance(failure, (ConversationUnverified, BusinessRejected)) else "对话执行未完成，未发布正式答复"})
                 except Exception:
                     pass
                 return

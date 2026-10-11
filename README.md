@@ -73,3 +73,7 @@ Java 集成测试启动独立的真实 PostgreSQL、Silo 和 RabbitMQ 容器。�
 2026-10-10 实测宿主为 arm64、16 GiB 内存，Docker Linux VM 分配 8,217,341,952 字节（约 7.65 GiB），实施前 Data 卷可用约 13 GiB。当前 Compose 限制 PostgreSQL、Silo、RabbitMQ、媒体 Worker 分别为 512 MiB / 1 CPU，业务入口为 768 MiB / 1.5 CPU；后续组件加入时需重新核对总预算。宿主空闲空间与 Docker 卷余量分别测量，不能把这个初始快照当作后续上传容量保证。
 
 当前 P0 阶段的完整功能和推荐体验顺序见 [功能说明](docs/current-features.md)。
+
+### 模型调用记录大小配置
+
+`MODEL_RECORD_REQUEST_MAX_BYTES` 默认 16777216（16 MiB），`MODEL_RECORD_RESPONSE_MAX_BYTES` 默认 4194304（4 MiB）。二者控制内部登记 JSON 字段的 UTF-8 序列化字节数，均须为正数；超限会明确反馈而不反复提交。修改运行配置后重建 business-api 容器生效。这不是模型 Token 窗口设置；调用记录仍完整保存在 PostgreSQL。修复范围和验证见 [记录](docs/verification/model-record-limits.md)。

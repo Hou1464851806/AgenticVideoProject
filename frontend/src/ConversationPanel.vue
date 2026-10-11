@@ -9,7 +9,7 @@ type Session = { id: string; title: string; assetIds: string[] };
 type Asset = { id: string; filename: string };
 type Citation = { type: string; id: string; assetId?: string; text?: string; startMs?: number; endMs?: number; planId?: string; revisionNumber?: number };
 type Message = { id: string; role: string; content: string; references: Citation[] };
-type History = { items: Message[]; latestTask: { taskId: string; status: string } | null };
+type History = { items: Message[]; latestTask: { taskId: string; status: string; failure?: {code:string;message:string} | null } | null };
 const sessions = ref<Session[]>([]);
 const assets = ref<Asset[]>([]);
 const scope = ref<string[]>([]);
@@ -148,7 +148,7 @@ onUnmounted(() => { alive = false; clearInterval(timer); });
         </article>
       </div>
       <p v-if="running" role="status">正在处理需求；可以继续编辑草稿，完成后再发送。</p>
-      <p v-else-if="latestTask?.status === 'FAILED'" role="alert">本次对话未完成，未发布正式答复。</p>
+      <p v-else-if="latestTask?.status === 'FAILED'" role="alert">{{ latestTask.failure?.code === 'MODEL_RECORD_TOO_LARGE' ? latestTask.failure.message : '本次对话未完成，未发布正式答复。' }}</p>
       <form @submit.prevent="send">
         <label for="intent-select">需求类型</label><select id="intent-select" v-model="settings.mode"><option value="QUERY">查询素材</option><option value="GENERATE_PLAN">生成讲话方案</option></select>
         <fieldset v-if="settings.mode === 'GENERATE_PLAN'"><legend>本次明确制作条件</legend>
