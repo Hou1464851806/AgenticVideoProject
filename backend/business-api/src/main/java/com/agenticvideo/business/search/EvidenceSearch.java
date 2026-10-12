@@ -39,12 +39,14 @@ public class EvidenceSearch {
         var groups=generations.stream().collect(java.util.stream.Collectors.groupingBy(row->row.get("collection_name").toString()));
         var channelRanks=new LinkedHashMap<String,Map<String,Integer>>();
         channelRanks.put("DENSE",new HashMap<>());channelRanks.put("BM25",new HashMap<>());
+        var queryVectors=new HashMap<String,com.fasterxml.jackson.databind.JsonNode>();
         for(var group:groups.values()) {
             var ids=group.stream().filter(row->scopedIds.contains(row.get("id").toString())).map(row->row.get("id").toString()).toList();
             if(ids.isEmpty())continue;
             var profile=vectors.profile(group.get(0));
             Object filter=SearchVectors.scope(project,ids,sourceKinds),corpus=SearchVectors.scope(project,group.stream().map(row->row.get("id").toString()).toList());
-            var dense=vectors.query(vectors.embed(query,profile),"dense",filter,corpus,50,profile.collection());
+            var vector=queryVectors.computeIfAbsent(profile.model()+":"+profile.dimension(),configuration->vectors.embed(project,query,profile));
+            var dense=vectors.query(vector,"dense",filter,corpus,50,profile.collection());
             var bm25=vectors.query(vectors.document(query,profile),"bm25",filter,corpus,50,profile.collection());
             for(var channel:Map.of("DENSE",dense,"BM25",bm25).entrySet())for(int i=0;i<channel.getValue().size();i++)
                 channelRanks.get(channel.getKey()).merge(channel.getValue().get(i).path("payload").path("unitId").asText(),i+1,Math::min);

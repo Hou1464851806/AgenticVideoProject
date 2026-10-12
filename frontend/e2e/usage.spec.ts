@@ -1,0 +1,66 @@
+import {test,expect} from '@playwright/test';
+import {renderSeed} from './fixtures/render-seed';
+
+test('project usage panel shows empty categories and saves optional warning thresholds across refresh',async({page})=>{
+  await renderSeed(page);
+  const csrf=(await(await page.request.get('/api/v1/auth/csrf')).json()).data.csrfToken;
+  const project=(await(await page.request.post('/api/v1/projects',{headers:{'X-XSRF-TOKEN':csrf},data:{name:`用量面板-${Date.now()}`}})).json()).data;
+  await page.goto(`/?project=${project.id}`);
+  await page.getByRole('button',{name:'查看存储与模型用量',exact:true}).click();
+  const panel=page.getByRole('region',{name:'存储与模型用量',exact:true});
+  for(const category of ['原始素材','派生媒体','低清预览','正式成片'])await expect(panel.getByRole('row').filter({has:page.getByRole('cell',{name:category,exact:true})})).toContainText('0 B');
+  await expect(panel.getByText('模型调用：0',{exact:true})).toBeVisible();
+  await panel.getByLabel('估算费用预警阈值（元）',{exact:true}).fill('0.000001');
+  await panel.getByLabel('模型调用次数预警阈值',{exact:true}).fill('1');
+  await panel.getByRole('button',{name:'保存预警阈值',exact:true}).click();
+  await expect(panel.getByText('预警阈值已保存',{exact:true})).toBeVisible();
+  await page.reload();await page.getByRole('button',{name:'查看存储与模型用量',exact:true}).click();
+  await expect(panel.getByLabel('模型调用次数预警阈值',{exact:true})).toHaveValue('1');
+  await panel.getByLabel('估算费用预警阈值（元）',{exact:true}).fill('');await panel.getByLabel('模型调用次数预警阈值',{exact:true}).fill('');
+  await panel.getByRole('button',{name:'保存预警阈值',exact:true}).click();await expect(panel.getByText('预警阈值已保存',{exact:true})).toBeVisible();
+});
+
+test('real provider usage and physical categories match while preview export and vector reuse add no model calls',async({page})=>{
+  test.setTimeout(300000);await renderSeed(page);
+  const {randomUUID}=await import('node:crypto');const {execFileSync}=await import('node:child_process');
+  const post=async(path:string,data:unknown)=>{const csrf=(await(await page.request.get('/api/v1/auth/csrf')).json()).data.csrfToken;return page.request.post('/api/v1'+path,{headers:{'X-XSRF-TOKEN':csrf,'Idempotency-Key':randomUUID()},data});};
+  const project=(await(await post('/projects',{name:`实际用量-${Date.now()}`})).json()).data;
+  await page.goto(`/?project=${project.id}`);const uploaded=page.waitForResponse(reply=>reply.url().endsWith('/complete'));
+  await page.getByLabel('选择视频',{exact:true}).setInputFiles('e2e/fixtures/labelled-speech.mp4');const transfer=await uploaded;const uploadId=transfer.url().split('/').at(-2)!;const asset=(await transfer.json()).data.assetId;
+  const stages=async()=>(await(await page.request.get(`/api/v1/assets/${asset}`)).json()).data.analysis?.stages;
+  await expect.poll(async()=>(await stages())?.INDEX,{timeout:120000}).toBe('SUCCEEDED');
+  expect((await post(`/assets/${asset}/vision-analysis`,{})).status()).toBe(202);
+  await expect.poll(async()=>(await stages()).VISION,{timeout:120000}).toBe('SUCCEEDED');
+  await expect.poll(async()=>(await stages()).INDEX,{timeout:120000}).toBe('SUCCEEDED');
+  const session=(await(await post(`/projects/${project.id}/conversations`,{title:'费用核查',assetIds:[asset]})).json()).data.id;
+  const turn=(await(await post(`/conversations/${session}/turns`,{content:'讲述者叫什么名字？只依据语音原文回答并引用证据。',references:[{type:'ASSET',id:asset}]})).json()).data.taskId;
+  await expect.poll(async()=>(await(await page.request.get(`/api/v1/tasks/${turn}`)).json()).data.status,{timeout:120000}).toBe('SUCCEEDED');
+  expect((await post(`/projects/${project.id}/search`,{query:'把视频传到项目里',literalPhrase:false})).status()).toBe(200);
+  const usage=async()=>(await(await page.request.get(`/api/v1/projects/${project.id}/usage`)).json()).data;
+  const before=await usage();
+  for(const purpose of ['ASR','VISION','AGENT','INDEX_EMBEDDING','QUERY_EMBEDDING'])expect(before.models.items.some((call:{purpose:string;usageBasis:string;estimatedCostCny:number|null})=>call.purpose===purpose&&call.usageBasis==='REPORTED'&&call.estimatedCostCny!==null)).toBe(true);
+  expect(before.models.estimatedCostCny).toBeGreaterThan(0);
+  const plan=randomUUID(),revision=randomUUID(),task=randomUUID(),output=randomUUID();
+  const content={schemaVersion:'1.0',outputs:[{outputId:output,title:'已有分析复用验证',durationMs:4000,clips:[{clipId:randomUUID(),assetId:asset,sourceInMs:2000,sourceOutMs:6000,audio:'original',evidenceIds:[],reason:'验证已有版本的无模型渲染'}],render:{profile:'LANDSCAPE_720',width:1280,height:720,fit:'contain'},subtitles:{enabled:true,cues:[{startMs:0,endMs:2000,text:'原声与中文字幕。'}]}}]};
+  const docker=process.env.DOCKER_BIN??'docker';const encoded=Buffer.from(JSON.stringify(content)).toString('base64');
+  execFileSync(docker,['compose','exec','-T','postgres','psql','-U','agentic_video','-d','agentic_video','-v','ON_ERROR_STOP=1'],{input:`BEGIN;
+INSERT INTO tasks(id,project_id,type,status,input_json) VALUES ('${task}','${project.id}','AGENT_TURN','SUCCEEDED','{}');
+INSERT INTO edit_plans(id,project_id,title,next_revision_number) VALUES ('${plan}','${project.id}','已有分析复用验证',2);
+INSERT INTO plan_revisions(id,project_id,plan_id,revision_number,source_task_id,content_json) VALUES ('${revision}','${project.id}','${plan}',1,'${task}',convert_from(decode('${encoded}','base64'),'UTF8')::jsonb);
+INSERT INTO revision_asset_refs(revision_id,asset_id) VALUES ('${revision}','${asset}');COMMIT;`,stdio:'pipe'});
+  const complete=async(taskId:string)=>expect.poll(async()=>(await(await page.request.get(`/api/v1/tasks/${taskId}`)).json()).data.status,{timeout:120000}).toBe('SUCCEEDED');
+  const preview=(await(await post(`/revisions/${revision}/previews`,{outputId:output,previewProfile:'LOW_360'})).json()).data;await complete(preview.taskId);
+  expect((await(await post(`/revisions/${revision}/previews`,{outputId:output,previewProfile:'LOW_360'})).json()).data.taskId).toBe(preview.taskId);
+  const confirmation=(await(await post(`/revisions/${revision}/confirmations`,{explicitIntent:'CONFIRM'})).json()).data.confirmationId;
+  const exported=(await(await post(`/revisions/${revision}/export-requests`,{outputIds:[output],confirmationId:confirmation,exportProfile:'HD_720',explicitIntent:'EXPORT'})).json()).data;await complete(exported.taskId);
+  const rebuilt=(await(await post(`/assets/${asset}/search-index`,{})).json()).data;await complete(rebuilt.taskId);
+  const after=await usage();expect(after.models.callCount).toBe(before.models.callCount);expect(after.models.estimatedCostCny).toBe(before.models.estimatedCostCny);expect(after.models.reusedBatchCount).toBeGreaterThan(before.models.reusedBatchCount);
+  const code='import os,boto3,json,sys; s=boto3.client("s3",endpoint_url=os.environ["STORAGE_ENDPOINT"],aws_access_key_id=os.environ["STORAGE_ACCESS_KEY"],aws_secret_access_key=os.environ["STORAGE_SECRET_KEY"]); bucket=os.environ.get("STORAGE_BUCKET","originals"); prefixes=json.loads(sys.argv[1]); print(json.dumps({name:sum(obj["Size"] for prefix in group for page in s.get_paginator("list_objects_v2").paginate(Bucket=bucket,Prefix=prefix) for obj in page.get("Contents",[])) for name,group in prefixes.items()}))';
+  const physical=JSON.parse(execFileSync(docker,['compose','exec','-T','agent-service','python','-c',code,JSON.stringify({ORIGINAL:[`originals/${uploadId}`],DERIVED:[`derived/audio/${asset}/`,`derived/frames/${asset}/`],PREVIEW:[`previews/${preview.requestId}/`],EXPORT:[`exports/${exported.requestId}/`]})],{stdio:'pipe'}).toString());
+  for(const category of ['ORIGINAL','DERIVED','PREVIEW','EXPORT']){expect(after.storage[category].storedBytes).toBe(physical[category]);expect(physical[category]).toBeGreaterThan(0);expect(after.storage[category].reservedBytes).toBe(0);}
+  await page.goto(`/?project=${project.id}`);await page.getByRole('button',{name:'查看存储与模型用量',exact:true}).click();
+  const panel=page.getByRole('region',{name:'存储与模型用量',exact:true});
+  await panel.getByLabel('估算费用预警阈值（元）',{exact:true}).fill('0.000001');await panel.getByLabel('模型调用次数预警阈值',{exact:true}).fill('1');await panel.getByRole('button',{name:'保存预警阈值',exact:true}).click();
+  await expect(panel.getByText(/估算费用已达到预警阈值/)).toBeVisible();await expect(panel.getByText(/模型调用次数已达到预警阈值/)).toBeVisible();
+  await expect(panel.getByRole('heading',{name:'模型调用记录',exact:true})).toBeVisible();
+});

@@ -37,7 +37,15 @@ INSERT INTO revision_asset_refs(revision_id,asset_id) VALUES ('${revision}','${s
   const probe=JSON.parse(execFileSync(docker,['run','--rm','--entrypoint','ffprobe','-v',`${directory}:/verification:ro`,'agenticvideo-media-worker','-v','error','-show_streams','-show_format','-of','json','/verification/preview.mp4'],{stdio:'pipe'}).toString());
   expect(probe.streams.find((item:{codec_type:string})=>item.codec_type==='audio')).toMatchObject({codec_name:'aac',channels:2,sample_rate:'48000'});
   execFileSync(docker,['run','--rm','--entrypoint','ffmpeg','-v',`${directory}:/verification`,'agenticvideo-media-worker','-nostdin','-v','error','-i','/verification/preview.mp4','-ss','1','-frames:v','1','-y','/verification/captions.png'],{stdio:'pipe'});
+  // The reusable project may restore a conversation's old selection before accepting a new one.
+  const sessions=(await(await page.request.get(`/api/v1/projects/${seed.projectId}/conversations`)).json()).data.items;
+  const saved=sessions.length?(await(await page.request.get(`/api/v1/conversations/${sessions[sessions.length-1].id}/messages`)).json()).data.view:null;
   await page.goto(`/?project=${seed.projectId}`);
+  if(saved?.planId&&saved?.revisionId){
+    await expect(page.getByLabel('查看方案',{exact:true})).toHaveValue(saved.planId);
+    await expect(page.getByLabel('查看版本',{exact:true})).toHaveValue(saved.revisionId);
+    await expect(page.getByRole('button',{name:'确认当前版本',exact:true})).toBeVisible();
+  }
   await page.getByLabel('查看方案',{exact:true}).selectOption(plan);
   await page.getByLabel('查看版本',{exact:true}).selectOption(revision);
   await page.getByRole('button',{name:'生成低清效果预览',exact:true}).click();

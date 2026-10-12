@@ -2,6 +2,8 @@
 import { onMounted, onUnmounted, ref } from 'vue';
 import { request } from './api';
 import UploadPanel from './UploadPanel.vue';
+import UsagePanel from './UsagePanel.vue';
+const showUsage=ref(false);
 import AssetLibrary, { type Playback } from './AssetLibrary.vue';
 import MediaPlayer from './MediaPlayer.vue';
 import SpeechSearch from './SpeechSearch.vue';
@@ -56,6 +58,7 @@ async function openProject(id: string, updateLocation = true) {
   busy.value = true;
   error.value = '';
   selected.value = null;
+  showUsage.value=false;
   sessionId.value = ''; planSelection.value = null; editingBase.value = null;
   try {
     selected.value = await request<Project>(`/projects/${encodeURIComponent(id)}`);
@@ -72,6 +75,7 @@ async function openProject(id: string, updateLocation = true) {
 
 function backToProjects() {
   selected.value = null;
+  showUsage.value=false;
   sessionId.value = ''; planSelection.value = null; editingBase.value = null;
   error.value = '';
   const url = new URL(location.href);
@@ -110,6 +114,8 @@ onUnmounted(() => window.removeEventListener('popstate', restoreSelection));
     </template>
     <template v-else>
       <div class="project-header"><div><p class="eyebrow">私有项目</p><h1>{{ selected.name }}</h1></div><button class="secondary" @click="backToProjects">返回项目列表</button></div>
+      <button @click="showUsage=!showUsage">{{showUsage?'收起存储与模型用量':'查看存储与模型用量'}}</button>
+      <UsagePanel v-if="showUsage" :key="`usage-${selected.id}`" :project-id="selected.id" />
       <div class="workspace-tabs" role="tablist" aria-label="工作区区域">
         <button id="tab-assets" role="tab" :aria-selected="activePane === 'assets'" aria-controls="panel-assets" @click="activePane = 'assets'">素材</button>
         <button id="tab-conversation" role="tab" :aria-selected="activePane === 'conversation'" aria-controls="panel-conversation" @click="activePane = 'conversation'">对话</button>

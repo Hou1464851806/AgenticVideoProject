@@ -34,9 +34,10 @@ public class SearchVectors {
     private final ObjectMapper json;
     private final HttpClient client=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
     private final String qdrant,key,provider;
-    SearchVectors(ObjectMapper json,@Value("${QDRANT_URL:http://localhost:6333}") String qdrant,
+    private final com.agenticvideo.business.usage.QueryModelCalls calls;
+    SearchVectors(com.agenticvideo.business.usage.QueryModelCalls calls,ObjectMapper json,@Value("${QDRANT_URL:http://localhost:6333}") String qdrant,
             @Value("${DASHSCOPE_API_KEY:}") String key,@Value("${DASHSCOPE_BASE_URL:https://dashscope.aliyuncs.com/api/v1}") String provider) {
-        this.json=json;this.qdrant=qdrant;this.key=key;this.provider=provider;
+        this.calls=calls;this.json=json;this.qdrant=qdrant;this.key=key;this.provider=provider;
     }
     public JsonNode request(String method,String path,Object body) {
         return call(method,qdrant+path,body,null);
@@ -52,11 +53,14 @@ public class SearchVectors {
         } catch(java.io.IOException failure) {throw new ResponseStatusException(SERVICE_UNAVAILABLE,"检索连接暂不可用");}
         catch(InterruptedException stopped) {Thread.currentThread().interrupt();throw new ResponseStatusException(SERVICE_UNAVAILABLE,"检索已中断");}
     }
-    public JsonNode embed(String text) {return embed(text,profile(null,null,null));}
-    public JsonNode embed(String text,Profile profile) {
+    public JsonNode embed(UUID project,String text,Profile profile) {
         if(key.isBlank())throw new ResponseStatusException(SERVICE_UNAVAILABLE,"语义检索模型凭据尚未配置");
-        var result=call("POST",provider+"/services/embeddings/text-embedding/text-embedding",
-                Map.of("model",profile.model(),"input",Map.of("texts",List.of(text)),"parameters",Map.of("dimension",profile.dimension(),"text_type","query")),key);
+        UUID receipt=calls.begin(project,profile.model(),text.getBytes(java.nio.charset.StandardCharsets.UTF_8).length);
+        JsonNode result;
+        try {result=call("POST",provider+"/services/embeddings/text-embedding/text-embedding",
+                Map.of("model",profile.model(),"input",Map.of("texts",List.of(text)),"parameters",Map.of("dimension",profile.dimension(),"text_type","query")),key);}
+        catch(RuntimeException unavailable){calls.uncertain(receipt);throw unavailable;}
+        calls.succeeded(receipt,result);
         var vector=result.path("output").path("embeddings").path(0).path("embedding");
         requireVector(vector,profile.dimension());return vector;
     }

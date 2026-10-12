@@ -172,13 +172,30 @@ class SearchIndexApiIntegrationTest {
         var first=speechFixture(project);var second=speechFixture(project);
         for(var speech:java.util.List.of(first,second))fixtures.update("DELETE FROM retrieval_units WHERE asset_id=? AND text LIKE '第二步%'",speech.asset());
         publishFixtureIndex(owner,first,512);publishFixtureIndex(owner,second,1024);
+        var initialUsage=owner.get("/projects/"+project+"/usage/models");assertEquals(200,initialUsage.statusCode(),initialUsage.body());
+        int before=json(initialUsage).path("data").path("callCount").asInt();
         var response=owner.post("/projects/"+project+"/search","{\"query\":\"上传素材\",\"literalPhrase\":false,\"limit\":20}");
         assertEquals(200,response.statusCode(),response.body());
         var hits=json(response).path("data").path("hits");assertEquals(2,hits.size());
         for(var hit:hits){assertEquals(1,hit.path("channelRanks").path("DENSE").asInt());assertEquals(1,hit.path("channelRanks").path("BM25").asInt());}
+        var usage=json(owner.get("/projects/"+project+"/usage/models")).path("data");assertEquals(before+2,usage.path("callCount").asInt());
+        long queries=java.util.stream.StreamSupport.stream(usage.path("items").spliterator(),false).filter(row->"QUERY_EMBEDDING".equals(row.path("purpose").asText())).count();assertEquals(2,queries);
+        owner.post("/projects/"+project+"/search","{\"query\":\"上传素材\",\"literalPhrase\":true}");
+        assertEquals(before+2,json(owner.get("/projects/"+project+"/usage/models")).path("data").path("callCount").asInt());
     }
-    private void publishFixtureIndex(BrowserApi owner,Speech speech,int dimension) throws Exception {
-        String task=json(owner.post("/assets/"+speech.asset()+"/search-index","{\"dimension\":"+dimension+"}")).path("data").path("taskId").asText();
+    @Test void collectionsWithTheSameEmbeddingConfigurationShareOneQueryCall() throws Exception {
+        var owner=signedIn("query-reuse-owner");String project=json(owner.post("/projects","{\"name\":\"同配置查询复用\"}")).path("data").path("id").asText();
+        var first=speechFixture(project);var second=speechFixture(project);
+        for(var speech:java.util.List.of(first,second))fixtures.update("DELETE FROM retrieval_units WHERE asset_id=? AND text LIKE '第二步%'",speech.asset());
+        publishFixtureIndex(owner,first,512,256);publishFixtureIndex(owner,second,512,128);
+        int before=json(owner.get("/projects/"+project+"/usage/models")).path("data").path("callCount").asInt();
+        var response=owner.post("/projects/"+project+"/search","{\"query\":\"上传素材\",\"literalPhrase\":false}");assertEquals(200,response.statusCode(),response.body());
+        assertEquals(2,json(response).path("data").path("hits").size());
+        assertEquals(before+1,json(owner.get("/projects/"+project+"/usage/models")).path("data").path("callCount").asInt());
+    }
+    private void publishFixtureIndex(BrowserApi owner,Speech speech,int dimension) throws Exception {publishFixtureIndex(owner,speech,dimension,256);}
+    private void publishFixtureIndex(BrowserApi owner,Speech speech,int dimension,int average) throws Exception {
+        String task=json(owner.post("/assets/"+speech.asset()+"/search-index","{\"dimension\":"+dimension+",\"bm25AvgLength\":"+average+"}")).path("data").path("taskId").asText();
         var claim=json(internal(task,"claim",java.util.Map.of("executorId","ranking-index","claimRequestId",java.util.UUID.randomUUID()))).path("data");
         var call=new java.util.LinkedHashMap<String,Object>();call.put("attemptId",claim.path("attemptId").asText());call.put("leaseToken",claim.path("leaseToken").asText());call.put("action","LOOKUP");call.put("data",java.util.Map.of());
         var profile=json(internal(task,"provider-call",call)).path("data");var unit=profile.path("batches").get(0).path("units").get(0);
@@ -187,7 +204,7 @@ class SearchIndexApiIntegrationTest {
         call.put("action","SUCCEEDED");call.put("data",java.util.Map.of("ordinal",0,"vectors",java.util.List.of(vector),"requestId","ranking-fixture","usage",java.util.Map.of()));assertEquals(200,internal(task,"provider-call",call).statusCode());
         String collection=profile.path("collection").asText();
         qdrant("PUT","/collections/"+collection,java.util.Map.of("vectors",java.util.Map.of("dense",java.util.Map.of("size",dimension,"distance","Cosine")),"sparse_vectors",java.util.Map.of("bm25",java.util.Map.of("modifier","idf"))));
-        var point=java.util.Map.of("id",unit.path("id").asText(),"vector",java.util.Map.of("dense",vector,"bm25",java.util.Map.of("text",unit.path("text").asText(),"model","qdrant/bm25","options",SearchVectors.BM25)),"payload",java.util.Map.of("unitId",unit.path("unitId").asText(),"generationId",profile.path("generationId").asText(),"projectId",profile.path("projectId").asText(),"sourceKind","SPEECH"));
+        var point=java.util.Map.of("id",unit.path("id").asText(),"vector",java.util.Map.of("dense",vector,"bm25",java.util.Map.of("text",unit.path("text").asText(),"model","qdrant/bm25","options",new ObjectMapper().convertValue(profile.path("bm25"),java.util.Map.class))),"payload",java.util.Map.of("unitId",unit.path("unitId").asText(),"generationId",profile.path("generationId").asText(),"projectId",profile.path("projectId").asText(),"sourceKind","SPEECH"));
         qdrant("PUT","/collections/"+collection+"/points?wait=true",java.util.Map.of("points",java.util.List.of(point)));
         var complete=new java.util.LinkedHashMap<String,Object>();complete.put("attemptId",claim.path("attemptId").asText());complete.put("leaseToken",claim.path("leaseToken").asText());complete.put("producerKey","ranking-built");complete.put("resultType","INDEX_BUILT");complete.put("result",java.util.Map.of());
         var published=internal(task,"complete",complete);assertEquals(200,published.statusCode(),published.body());

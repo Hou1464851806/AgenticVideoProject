@@ -272,3 +272,12 @@ complete 结果类型为 MEDIA_PREPARED、ANALYSIS_RESULT、INDEX_VERIFIED、AGE
 `POST /assets/{id}/search-index` 可传 `{model,dimension,bm25AvgLength}`；省略配置保留最近代次配置，无历史时默认 text-embedding-v4 / 1024 / 256。支持 v4 的 64、128、256、512、768、1024、1536、2048，v3 至 1024；平均长度 1–8192。不支持的配置 400；不同配置任务正在执行时 409。同配置有效任务幂等复用。
 
 每代持久保存 collection_name；不同配置隔离 collection，成功 Dense 批次按模型／维度／单元身份和原文复用，与 BM25 配置无关。查询固定已发布代次及对应配置，跨 collection 用独立通道名次做 RRF。执行器完成 Embedding 后调用 provider-call INDEXING，再写 Qdrant；当前尝试通过内容与可查询性核对后才切换 head。
+
+## #31 分类空间与模型用量
+
+- `GET /projects/{id}/usage?offset=0`：所有者权限；四类真实对象及分片字节、未完成预留、待清理子集；全项目模型汇总、每页 100 条回执、`nextOffset`、阈值及当前预警。
+- `GET /projects/{id}/usage/models?offset=0`：独立读取模型汇总／回执，无须核对对象存储；偏移 0–1000000，-1 表示无下一页。
+- `PATCH /projects/{id}/usage/thresholds`：可选正数 `costCny`、整数 `calls`、整数 `tokens`、`audioSeconds`；空对象或 null 关闭对应预警，持久保存项目累计阈值。达到阈值提示，不阻止任务，不设置月预算。
+- `reportedUsage` 保留提供方用量，`usageBasis=REPORTED/ESTIMATED` 区分完整实际报告与输入／输出预算估算；费用始终为公开价估算，`estimatedCostCny=null` 表示价格未知，合计是已知价格部分，另列 `unpricedCallCount`。`SUBMITTING/SUBMITTED/UNCERTAIN` 单列未确认数量，不能视为未收费。
+- ASR、VLM、索引向量、Agent 来自原持久回执；查询向量先保存 SUBMITTING，再记录响应用量或 UNCERTAIN。回执不返回请求／响应正文。向量复用批次不计调用数与费用；单次查询中同模型／维度共享查询向量。
+- 分类已占用来自物理对象、未完成分片与未发布尝试文件；原文件缺失不按声明大小冒充占用。预留含工作区保守执行预算，待清理是已占用的子集。测量不可用返回失败，不冒充零值。

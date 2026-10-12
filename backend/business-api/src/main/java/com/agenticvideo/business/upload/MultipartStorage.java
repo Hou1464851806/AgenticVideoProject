@@ -124,6 +124,16 @@ public class MultipartStorage {
         try { return client.headObject(b -> b.bucket(bucket).key(key)).contentLength(); }
         catch (S3Exception failure) { if (failure.statusCode() == 404) return null; throw failure; }
     }
+    /** Includes unpublished attempts; physical listings, not database byte declarations. */
+    public java.util.Map<String,Long> objectSizes(String prefix) {
+        var sizes=new java.util.LinkedHashMap<String,Long>();String token=null;
+        do {
+            var page=client.listObjectsV2(ListObjectsV2Request.builder().bucket(bucket).prefix(prefix).continuationToken(token).maxKeys(listPageSize).build());
+            for(var object:page.contents())sizes.put(object.key(),object.size());
+            token=Boolean.TRUE.equals(page.isTruncated())?page.nextContinuationToken():null;
+        }while(token!=null);
+        return sizes;
+    }
     public void deleteObject(String key) { client.deleteObject(b -> b.bucket(bucket).key(key)); }
     public boolean cleanUpload(String key) {
         initialize();

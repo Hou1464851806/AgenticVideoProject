@@ -1,4 +1,4 @@
-# 当前项目是怎样工作的（截至 #14）
+# 当前项目是怎样工作的（截至 #14、#31）
 
 这份说明对应当前已实现代码。你提到的“ase”，这里按 **ASR（语音识别）** 解释。
 
@@ -202,3 +202,9 @@ checkpoint 解决的是“执行到哪一步”，PostgreSQL 历史保存的是�
 - 当前会话有持久历史和有限输入窗口，完整长历史治理尚未实现。
 
 阅读代码时建议依次看：`MediaExecutor → SpeechAnalysis / VisualAnalysis → EvidenceSearch → conversation.py → ConversationTurns → EditPlans`。先沿一条真实用户操作走完，再深入任务、存储与恢复细节。
+
+## 分类空间和模型成本（#31）
+
+`usage/ProjectStorage.java` 按已授权项目找到上传、素材和渲染请求，再直接核对 Silo 对象与分片。`ModelUsage.java` 汇合已有 ASR／VLM／Embedding／DeepSeek 回执；`QueryModelCalls.java` 保存同步检索 Embedding 的提交与不确定性，不保存查询原文。`ModelPricing.java` 用有日期的公开价估算，未知模型保留 null 费用；`UsagePanel.vue` 展示分类、用途、预警和分页回执。
+
+这层计量不会触发模型。工作区预留与物理已占用分开；待清理仍属于已占用。缺实际用量标 ESTIMATED，成功向量复用不另算模型调用。详细价格依据和验证范围见 [#31 验证](verification/issue-31.md)。
