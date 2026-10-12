@@ -14,11 +14,13 @@ from pathlib import Path
 import boto3
 import pika
 import requests
+import httpx
 from fastapi import FastAPI, Header, HTTPException
 from botocore.config import Config
 
 from .bailian import BailianAsr, ProviderError, SubmissionUncertain
 from .conversation import run_conversation, ConversationUnverified
+from .model_transport import receive_business
 
 TOKEN = os.environ.get("INTERNAL_WORKER_TOKEN", "")
 BUSINESS = os.environ.get("BUSINESS_URL", "http://business-api:8080")
@@ -56,11 +58,15 @@ class BusinessRejected(RuntimeError):
         super().__init__(message)
 
 
-def business(path, body, retries=3):
+def business(path, body, retries=3, check=None):
     for attempt in range(retries):
         try:
-            response = requests.post(BUSINESS + path, json=body,
-                headers={"Authorization": "Bearer " + TOKEN}, timeout=(2, 150 if path.endswith("/tool") else 5))
+            if check:
+                check()
+                response=receive_business(BUSINESS+path,body,{"Authorization":"Bearer "+TOKEN},check)
+            else:
+                response = requests.post(BUSINESS + path, json=body,
+                    headers={"Authorization": "Bearer " + TOKEN}, timeout=(2, 150 if path.endswith("/tool") else 5))
             if response.status_code in (401, 409):
                 raise LostAttempt()
             if response.status_code == 200:
@@ -71,7 +77,7 @@ def business(path, body, retries=3):
                 except (ValueError, AttributeError):
                     error = {}
                 raise BusinessRejected(error if isinstance(error, dict) else {})
-        except requests.RequestException:
+        except (requests.RequestException,httpx.HTTPError):
             pass
         if attempt + 1 < retries:
             time.sleep(.25 * 2 ** attempt)
@@ -100,7 +106,16 @@ class Execution:
         return (deadline - datetime.now(timezone.utc)).total_seconds()
 
     def post(self, action, data):
-        return business(f"/internal/v1/tasks/{self.task}/{action}", {**self.credentials, **data})
+        check=self.check if "conversationId" in self.input and action=="tool" else None
+        try:
+            return business(f"/internal/v1/tasks/{self.task}/{action}", {**self.credentials, **data},check=check)
+        except LostAttempt:
+            if action == "complete" and "conversationId" in self.input:
+                authority = self.post("heartbeat", {})
+                if authority.get("action") == "CONTINUE":
+                    self.deadline = datetime.fromisoformat(authority["leaseExpiresAt"].replace("Z", "+00:00"))
+                    raise ConversationUnverified("公开答复未通过业务校验，未发布正式结果；可关联原需求重试。") from None
+            raise
 
     def provider(self, action, data=None):
         self.check()

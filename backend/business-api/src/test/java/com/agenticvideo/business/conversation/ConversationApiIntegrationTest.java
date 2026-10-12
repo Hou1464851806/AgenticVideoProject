@@ -31,6 +31,7 @@ class ConversationApiIntegrationTest {
         properties.add("spring.datasource.username", POSTGRES::getUsername);
         properties.add("spring.datasource.password", POSTGRES::getPassword);
         properties.add("internal.worker-token", () -> "conversation-integration-worker-token");
+        properties.add("app.auth.max-attempts",()->100);
     }
     @LocalServerPort int port;
     @org.springframework.beans.factory.annotation.Autowired org.springframework.jdbc.core.JdbcTemplate fixtures;
@@ -247,6 +248,142 @@ class ConversationApiIntegrationTest {
         assertEquals(new ObjectMapper().valueToTree(response), replay.path("response"));
         request.put("data", Map.of("callNumber", 1, "request", Map.of("model", "different")));
         assertEquals(409, internal(task, "provider-call", request).statusCode());
+    }
+
+    @Test
+    void failedTurnRetryKeepsOneUserMessageAndReturnsTheCommittedResultOnReplay() throws Exception {
+        BrowserApi owner=signedIn("retry-original-owner"), outsider=signedIn("retry-original-outsider");
+        String project=json(owner.post("/projects","{\"name\":\"原需求重试\"}")).path("data").path("id").asText();
+        String session=json(owner.post("/projects/"+project+"/conversations","{\"title\":\"失败重试\"}")).path("data").path("id").asText();
+        JsonNode original=json(owner.post("/conversations/"+session+"/turns","{\"content\":\"核查当前范围\"}","original-query")).path("data");
+        String task=original.path("taskId").asText();
+        JsonNode claim=json(internal(task,"claim",Map.of("executorId","retry-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        Map<String,Object> lease=Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText());
+        var failure=new java.util.HashMap<String,Object>(lease);failure.putAll(Map.of("producerKey","failed","code","CONVERSATION_FAILED","message","对话暂时失败"));
+        assertEquals(200,internal(task,"fail",failure).statusCode());
+        String path="/conversations/"+session+"/tasks/"+task+"/retry";
+        var retry=owner.post(path,"{}","retry-once");
+        assertEquals(202,retry.statusCode(),retry.body());
+        JsonNode retried=json(retry).path("data");
+        org.junit.jupiter.api.Assertions.assertNotEquals(task,retried.path("taskId").asText());
+        assertEquals(original.path("messageId"),retried.path("messageId"));
+        assertEquals(task,retried.path("retryOfTaskId").asText());
+        assertEquals(retried,json(owner.post(path,"{}","retry-once")).path("data"));
+        assertEquals(404,outsider.post(path,"{}","outsider").statusCode());
+        assertEquals(409,owner.post(path,"{}","competing-retry").statusCode());
+        assertEquals("FAILED",json(owner.get("/tasks/"+task)).path("data").path("status").asText());
+        assertEquals(1,json(owner.get("/conversations/"+session+"/messages")).path("data").path("items").size());
+        String next=retried.path("taskId").asText();
+        JsonNode nextClaim=json(internal(next,"claim",Map.of("executorId","retry-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        assertEquals(200,internal(next,"fail",Map.of("attemptId",nextClaim.path("attemptId").asText(),"leaseToken",nextClaim.path("leaseToken").asText(),"producerKey","second-failure","code","CONVERSATION_FAILED","message","再次暂时失败")).statusCode());
+        var again=owner.post("/conversations/"+session+"/tasks/"+next+"/retry","{}","retry-twice");
+        assertEquals(202,again.statusCode(),again.body());next=json(again).path("data").path("taskId").asText();
+        nextClaim=json(internal(next,"claim",Map.of("executorId","retry-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        var publication=new java.util.HashMap<String,Object>();
+        publication.putAll(Map.of("attemptId",nextClaim.path("attemptId").asText(),"leaseToken",nextClaim.path("leaseToken").asText(),"producerKey","answer","resultType","CONVERSATION_ANSWERED","result",Map.of("content","本轮无素材，不能核查视频事实。","evidenceIds",List.of())));
+        assertEquals(200,internal(next,"complete",publication).statusCode());
+        assertEquals(2,json(owner.get("/conversations/"+session+"/messages")).path("data").path("items").size());
+        JsonNode replay=json(owner.post("/conversations/"+session+"/tasks/"+next+"/retry","{}","after-success")).path("data");
+        assertEquals(next,replay.path("taskId").asText());
+        var revisited=owner.post(path,"{}","revisit-original-success");
+        assertEquals(202,revisited.statusCode(),revisited.body());
+        assertEquals(next,json(revisited).path("data").path("taskId").asText());
+        assertEquals(2,json(owner.get("/conversations/"+session+"/messages")).path("data").path("items").size());
+        publication.putAll(lease);
+        assertEquals(409,internal(task,"complete",publication).statusCode());
+    }
+
+    @Test
+    void uncertainModelCallRequiresExplicitUnknownCostAcknowledgementBeforeFreshRetry() throws Exception {
+        BrowserApi owner=signedIn("retry-unknown-cost");
+        String project=json(owner.post("/projects","{\"name\":\"费用未知\"}")).path("data").path("id").asText();
+        String session=json(owner.post("/projects/"+project+"/conversations","{\"title\":\"未知回执\"}")).path("data").path("id").asText();
+        String task=json(owner.post("/conversations/"+session+"/turns","{\"content\":\"核查素材\"}","uncertain")).path("data").path("taskId").asText();
+        JsonNode claim=json(internal(task,"claim",Map.of("executorId","uncertain-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        var body=new java.util.HashMap<String,Object>();body.putAll(Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText()));
+        body.putAll(Map.of("action","PREPARE","data",Map.of("callNumber",1,"request",Map.of("model","deepseek-flash","messages",List.of()))));
+        assertEquals(200,internal(task,"provider-call",body).statusCode());
+        body.remove("action");body.remove("data");body.putAll(Map.of("producerKey","uncertain-failed","code","CONVERSATION_UNVERIFIED","message","模型回执不明确"));
+        assertEquals(200,internal(task,"fail",body).statusCode());
+        String path="/conversations/"+session+"/tasks/"+task+"/retry";
+        assertEquals(409,owner.post(path,"{}","new-paid-call").statusCode());
+        JsonNode state=json(owner.get("/conversations/"+session+"/snapshot")).path("data").path("latestTask").path("externalEffects");
+        assertEquals(true,state.path("unknownCost").asBoolean());assertEquals(false,state.path("stopSupported").asBoolean(true));
+        assertEquals(202,owner.post(path,"{\"acknowledgeUnknownCost\":true}","new-paid-call").statusCode());
+        assertEquals(1,json(owner.get("/conversations/"+session+"/messages")).path("data").path("items").size());
+    }
+
+    @Test
+    void stoppingAndCompletingRaceNeverReclassifiesACommittedAnswerOrPublishesAfterStop() throws Exception {
+        BrowserApi owner=signedIn("stop-completion-race");
+        String project=json(owner.post("/projects","{\"name\":\"停止竞争\"}")).path("data").path("id").asText();
+        for(int round=0;round<5;round++) {
+            String session=json(owner.post("/projects/"+project+"/conversations","{\"title\":\"竞争\"}")).path("data").path("id").asText();
+            String task=json(owner.post("/conversations/"+session+"/turns","{\"content\":\"查询\"}","race")).path("data").path("taskId").asText();
+            JsonNode claim=json(internal(task,"claim",Map.of("executorId","race-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+            Map<String,Object> publication=Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","racing-answer","resultType","CONVERSATION_ANSWERED","result",Map.of("content","无素材，不能核查。","evidenceIds",List.of()));
+            var completion=java.util.concurrent.CompletableFuture.supplyAsync(()->{
+                try{return internal(task,"complete",publication);}catch(Exception failure){throw new RuntimeException(failure);}
+            });
+            assertEquals(202,owner.post("/tasks/"+task+"/cancel","{}").statusCode());
+            var result=completion.get();
+            String status=json(owner.get("/tasks/"+task)).path("data").path("status").asText();
+            if(result.statusCode()==200) {
+                assertEquals("SUCCEEDED",status);
+                assertEquals(200,internal(task,"complete",publication).statusCode());
+                assertEquals(2,json(owner.get("/conversations/"+session+"/messages")).path("data").path("items").size());
+            } else {
+                assertEquals(409,result.statusCode(),result.body());assertEquals("CANCEL_REQUESTED",status);
+                var stopped=new java.util.HashMap<String,Object>();stopped.putAll(Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"processExited",false));
+                assertEquals(409,internal(task,"cancelled",stopped).statusCode());
+                stopped.put("processExited",true);assertEquals(200,internal(task,"cancelled",stopped).statusCode());
+                assertEquals("CANCELLED",json(owner.get("/tasks/"+task)).path("data").path("status").asText());
+                assertEquals(1,json(owner.get("/conversations/"+session+"/messages")).path("data").path("items").size());
+                assertEquals(409,internal(task,"complete",publication).statusCode());
+            }
+            assertEquals(202,owner.post("/tasks/"+task+"/cancel","{}").statusCode());
+            assertEquals(result.statusCode()==200?"SUCCEEDED":"CANCELLED",json(owner.get("/tasks/"+task)).path("data").path("status").asText());
+            assertEquals(202,owner.post("/conversations/"+session+"/turns","{\"content\":\"下一轮\"}","next").statusCode());
+        }
+    }
+
+    @Test
+    void retryReacquiresTheSamePlanAndPendingStopReleasesItsEditingSlot() throws Exception {
+        BrowserApi owner=signedIn("retry-editing-slot");
+        String project=json(owner.post("/projects","{\"name\":\"原方案占用\"}")).path("data").path("id").asText();
+        String session=json(owner.post("/projects/"+project+"/conversations","{\"title\":\"原方案重试\"}")).path("data").path("id").asText();
+        String request="{\"content\":\"生成方案\",\"context\":{\"editing\":{\"topic\":\"原方案\",\"minDurationMs\":1000,\"maxDurationMs\":2000,\"profile\":\"LANDSCAPE_720\"}}}";
+        JsonNode original=json(owner.post("/conversations/"+session+"/turns",request,"editing-failed")).path("data");
+        String task=original.path("taskId").asText();
+        JsonNode claim=json(internal(task,"claim",Map.of("executorId","editing-retry","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        assertEquals(200,internal(task,"fail",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","editing-failed","code","CONVERSATION_FAILED","message","方案执行失败")).statusCode());
+        var reply=owner.post("/conversations/"+session+"/tasks/"+task+"/retry","{}","editing-retry");
+        assertEquals(202,reply.statusCode(),reply.body());JsonNode retried=json(reply).path("data");
+        assertEquals(original.path("planId"),retried.path("planId"));
+        assertEquals(202,owner.post("/tasks/"+retried.path("taskId").asText()+"/cancel","{}").statusCode());
+        assertEquals("CANCELLED",json(owner.get("/tasks/"+retried.path("taskId").asText())).path("data").path("status").asText());
+        String next=request.replace("\"topic\":\"原方案\"","\"planId\":\""+original.path("planId").asText()+"\",\"topic\":\"原方案\"");
+        var accepted=owner.post("/conversations/"+session+"/turns",next,"next-editing");
+        assertEquals(202,accepted.statusCode(),accepted.body());
+        assertEquals(original.path("planId"),json(accepted).path("data").path("planId"));
+    }
+
+    @Test
+    void retryRechecksTheOriginalFixedAssetBeforeCreatingAnotherTask() throws Exception {
+        BrowserApi owner=signedIn("retry-fixed-object");
+        String project=json(owner.post("/projects","{\"name\":\"固定素材复核\"}")).path("data").path("id").asText();
+        var projectId=java.util.UUID.fromString(project);var asset=java.util.UUID.randomUUID();var upload=java.util.UUID.randomUUID();
+        fixtures.update("INSERT INTO upload_sessions(id,project_id,actor_user_id,idempotency_key,filename,declared_bytes,declared_sha256,part_size_bytes,expected_parts,object_key,writer_token) SELECT ?,id,owner_user_id,?,'source.mp4',1,?,1,1,?,? FROM projects WHERE id=?",upload,upload.toString(),"a".repeat(64),upload.toString(),java.util.UUID.randomUUID(),projectId);
+        fixtures.update("INSERT INTO assets(id,project_id,upload_id,object_key,filename,byte_size,sha256,validation_status) VALUES (?,?,?,?,'source.mp4',1,?,'VALID')",asset,projectId,upload,asset.toString(),"a".repeat(64));
+        String session=json(owner.post("/projects/"+project+"/conversations",new ObjectMapper().writeValueAsString(Map.of("title","固定范围","assetIds",List.of(asset))))).path("data").path("id").asText();
+        String task=json(owner.post("/conversations/"+session+"/turns","{\"content\":\"核查原素材\"}","fixed-original")).path("data").path("taskId").asText();
+        JsonNode claim=json(internal(task,"claim",Map.of("executorId","fixed-retry","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        assertEquals(200,internal(task,"fail",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","failed","code","CONVERSATION_FAILED","message","暂时失败")).statusCode());
+        fixtures.update("UPDATE assets SET validation_status='INVALID' WHERE id=?",asset);
+        var retry=owner.post("/conversations/"+session+"/tasks/"+task+"/retry","{}","fixed-retry");
+        assertEquals(404,retry.statusCode(),retry.body());
+        assertEquals(task,json(owner.get("/conversations/"+session+"/snapshot")).path("data").path("latestTask").path("taskId").asText());
+        assertEquals(1,json(owner.get("/conversations/"+session+"/messages")).path("data").path("items").size());
     }
 
     private HttpResponse<String> internal(String task, String action, Object body) throws Exception {

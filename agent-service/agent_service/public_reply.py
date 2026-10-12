@@ -102,17 +102,17 @@ def answer_prefix(arguments):
         return ""
 
 
-def streamed_response(reply, execution, public):
+async def streamed_response(reply, execution, public):
     # Legacy protocol fixtures remain useful for business size-limit verification.
     if "text/event-stream" not in reply.headers.get("Content-Type", ""):
+        await reply.aread()
         return reply.json()
     calls, message, usage = {}, {"role": "assistant", "content": ""}, {}
     identity = model = None
     finished = False
     frame = []
-    for line in reply.iter_lines(chunk_size=1, decode_unicode=False):
+    async for line in reply.aiter_lines():
         execution.check()
-        line = line.decode("utf-8")
         if line:
             if line.startswith("data:"):
                 frame.append(line[5:].lstrip())

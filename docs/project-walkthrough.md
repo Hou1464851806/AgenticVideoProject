@@ -1,4 +1,4 @@
-# 当前项目是怎样工作的（含 #14、#16、#31、#27）
+# 当前项目是怎样工作的（含 #14、#16、#17、#31、#27）
 
 这份说明对应当前已实现代码。你提到的“ase”，这里按 **ASR（语音识别）** 解释。
 
@@ -176,6 +176,14 @@ flowchart LR
 模型的推理、普通 assistant 内容和原始工具参数不会进入这个事件流。Python 只从 `answer_query` 工具的顶层公开 `content` 解码增量，按批提交；Spring 校验当前任务、尝试、租约、生产序号、内容版本和 Unicode 位置。草稿按尝试隔离，尚未正式提交时明确标注未完成；正式答复同事务写入持久消息并结束当前草稿。恢复只先取最近 10 份草稿，较早草稿通过鉴权分页读取。会话过期会关闭订阅并要求重新登录。
 
 入口：[一致快照](/Users/nonbeing/AgenticVideoProject/backend/business-api/src/main/java/com/agenticvideo/business/conversation/ProjectRecovery.java:20)、[持久事件与提交序号](/Users/nonbeing/AgenticVideoProject/backend/business-api/src/main/resources/db/migration/V40__project_public_events.sql:1)、[项目订阅](/Users/nonbeing/AgenticVideoProject/frontend/src/projectEvents.ts:10)、[公开草稿解码](/Users/nonbeing/AgenticVideoProject/agent-service/agent_service/public_reply.py:1)。
+
+### 停止与失败重试
+
+`ConversationRetries` 在会话锁内建立关联失败任务的新轮次，保留原用户消息、固定输入和旧失败；重新检查素材与方案基准，原失败链已有成功结果时直接返回。未知模型费用需要显式确认，重试接纳记录保存该选择。自动恢复仍属于原任务的新尝试。
+
+Python 的 `model_transport.py` 通过异步 HTTP 流和周期性执行校验取消本地模型或工具等待。结束须由执行器确认退出，权威任务状态会阻止迟到答复发布。DeepSeek 与查询 Embedding 同步接口没有远端查询或停止身份，因此本地停止不能保证远端计算和费用撤销；查询回执从 V43 起关联执行任务。
+
+入口：[关联重试](/Users/nonbeing/AgenticVideoProject/backend/business-api/src/main/java/com/agenticvideo/business/conversation/ConversationRetries.java)、[可取消传输](/Users/nonbeing/AgenticVideoProject/agent-service/agent_service/model_transport.py)、[停止与费用确认界面](/Users/nonbeing/AgenticVideoProject/frontend/src/ConversationPanel.vue)。
 
 ### 每轮模型输入
 

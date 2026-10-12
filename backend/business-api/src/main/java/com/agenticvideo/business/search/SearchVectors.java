@@ -54,8 +54,11 @@ public class SearchVectors {
         catch(InterruptedException stopped) {Thread.currentThread().interrupt();throw new ResponseStatusException(SERVICE_UNAVAILABLE,"检索已中断");}
     }
     public JsonNode embed(UUID project,String text,Profile profile) {
+        return embed(project,text,profile,null);
+    }
+    public JsonNode embed(UUID project,String text,Profile profile,UUID task) {
         if(key.isBlank())throw new ResponseStatusException(SERVICE_UNAVAILABLE,"语义检索模型凭据尚未配置");
-        UUID receipt=calls.begin(project,profile.model(),text.getBytes(java.nio.charset.StandardCharsets.UTF_8).length);
+        UUID receipt=calls.begin(project,profile.model(),text.getBytes(java.nio.charset.StandardCharsets.UTF_8).length,task);
         JsonNode result;
         try {result=call("POST",provider+"/services/embeddings/text-embedding/text-embedding",
                 Map.of("model",profile.model(),"input",Map.of("texts",List.of(text)),"parameters",Map.of("dimension",profile.dimension(),"text_type","query")),key);}

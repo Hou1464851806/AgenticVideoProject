@@ -98,6 +98,14 @@ public class ConversationTurns {
         });
     }
 
+    void validateRetry(Map<String,Object> session,com.fasterxml.jackson.databind.JsonNode input) {
+        var context=input.path("context").deepCopy();
+        ((com.fasterxml.jackson.databind.node.ObjectNode)context).set("assetIds",input.path("assetIds"));
+        var refs=new java.util.ArrayList<com.fasterxml.jackson.databind.JsonNode>();
+        input.path("references").forEach(refs::add);
+        validateReferences(session,new ConversationController.Turn(input.path("content").asText(),refs,context));
+    }
+
     private void validateReferences(Map<String, Object> session, ConversationController.Turn request) {
         var scope = (com.fasterxml.jackson.databind.JsonNode)decode(session.get("asset_ids_json"));
         java.util.Set<UUID> allowed = new java.util.HashSet<>();
@@ -239,7 +247,7 @@ public class ConversationTurns {
                 if(!requested.isArray()||requested.isEmpty()||requested.size()>3)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"证据类型必须为非空列表，最多三项");
                 for(var kind:requested){if(!kind.isTextual()||!java.util.Set.of("SPEECH","VISUAL","VISIBLE_TEXT").contains(kind.asText()))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"证据类型无效");kinds.add(kind.asText());}
             }else kinds.add("SPEECH");
-            var found=evidenceSearch.search((UUID)task.get("project_id"),query,query.isBlank(),20,assets,kinds);
+            var found=evidenceSearch.search((UUID)task.get("project_id"),query,query.isBlank(),20,assets,kinds,(UUID)task.get("id"));
             var hits=new java.util.ArrayList<Object>();
             for(var unit:found.rows()) {
                 for(var evidence:database.queryForList("SELECT e.id FROM unit_evidence_refs ref JOIN evidence_segments e ON e.id=ref.evidence_id WHERE ref.unit_id=? AND e.analysis_id=? AND e.project_id=? ORDER BY ref.ordinal",UUID.class,unit.get("id"),unit.get("analysis_id"),task.get("project_id"))) {

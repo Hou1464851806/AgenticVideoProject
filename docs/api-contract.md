@@ -288,3 +288,10 @@ complete 结果类型为 MEDIA_PREPARED、ANALYSIS_RESULT、INDEX_VERIFIED、AGE
 `POST /conversations/{id}/turns` 复用 `context.editing`：增加可选 `kind`（默认／SPEECH 为单素材讲话，MONTAGE 为混剪）和混剪必填 `orderedAssetIds`（2–10 个固定范围内不重复素材）。主题、硬时长、画幅、方案与基准版本字段继续沿用。顺序无效 400，事务回滚，不留下消息或方案。显式编辑条件不触发确认或导出，即使需求提及这些词。
 
 混剪内部候选仍为 `{title,clips}`；同素材区间不得重叠，跨素材可使用相同原素材时间；实际素材连续分组必须与指定顺序完全相同。每个片段须引用本轮 read_evidence_context 实际读取出处，语音与区间重叠，画面／可见文字观察点位于左闭右开片段。无音轨片段无虚构字幕。候选校验、当前尝试、幂等发布、版本、确认、预览与导出接口均沿用。
+
+## 对话停止与关联重试（#17）
+
+- `POST /tasks/{taskId}/cancel`：所有者与 CSRF；排队任务直接取消，运行中先撤销发布资格，再由执行器关闭本地 I/O、确认退出并回报终态。已经成功提交的结果保持成功。
+- `POST /conversations/{conversationId}/tasks/{taskId}/retry`：所有者、CSRF、Idempotency-Key；仅重试该会话终态失败的 Agent 任务，202 返回 turnId、messageId、taskId、retryOfTaskId，以及编辑任务的原 planId。原消息、固定输入和失败记录保留，新任务重新取得会话及方案资格。
+- 请求 `{acknowledgeUnknownCost:false}`（默认 false）；原模型或任务查询回执未知时409，明确 true 才新建任务，并持久保存该选择。仅修改幂等键不能自动重复付费。已有成功结果（包括后继重试链）直接返回；同幂等键保持原接纳身份。
+- 会话快照的 latestTask.externalEffects 显示 stopSupported=false、unknownCost 和公开说明。DeepSeek／查询 Embedding 为同步调用，没有远端任务查询或停止接口；关闭本地等待不保证停止远端计算或撤销费用。

@@ -14,6 +14,9 @@ public class EvidenceSearch {
         return search(project,query,literal,limit,assetScope,List.of("SPEECH"));
     }
     public Result search(UUID project,String query,boolean literal,int limit,List<UUID> assetScope,List<String> sourceKinds) {
+        return search(project,query,literal,limit,assetScope,sourceKinds,null);
+    }
+    public Result search(UUID project,String query,boolean literal,int limit,List<UUID> assetScope,List<String> sourceKinds,UUID task) {
         String kinds=String.join(",",sourceKinds);
         String scope=assetScope==null?null:assetScope.stream().map(UUID::toString).collect(java.util.stream.Collectors.joining(","));
         String valid="""
@@ -45,7 +48,7 @@ public class EvidenceSearch {
             if(ids.isEmpty())continue;
             var profile=vectors.profile(group.get(0));
             Object filter=SearchVectors.scope(project,ids,sourceKinds),corpus=SearchVectors.scope(project,group.stream().map(row->row.get("id").toString()).toList());
-            var vector=queryVectors.computeIfAbsent(profile.model()+":"+profile.dimension(),configuration->vectors.embed(project,query,profile));
+            var vector=queryVectors.computeIfAbsent(profile.model()+":"+profile.dimension(),configuration->vectors.embed(project,query,profile,task));
             var dense=vectors.query(vector,"dense",filter,corpus,50,profile.collection());
             var bm25=vectors.query(vectors.document(query,profile),"bm25",filter,corpus,50,profile.collection());
             for(var channel:Map.of("DENSE",dense,"BM25",bm25).entrySet())for(int i=0;i<channel.getValue().size();i++)

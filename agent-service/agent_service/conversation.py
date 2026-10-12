@@ -5,9 +5,10 @@ import sqlite3
 from pathlib import Path
 from typing import TypedDict
 
-import requests
+import httpx
 from langgraph.graph import StateGraph, START, END
-from .public_reply import PublicReply, streamed_response
+from .public_reply import PublicReply
+from .model_transport import receive_model
 from langgraph.checkpoint.sqlite import SqliteSaver
 
 
@@ -107,14 +108,12 @@ def run_conversation(execution, root):
             raise ConversationUnverified("上次 DeepSeek 调用回执不明确，已停止自动重复付费调用")
         else:
             try:
-                with requests.post(address, headers={"Authorization": "Bearer " + key}, json=payload, timeout=(5, 90), stream=True) as reply:
-                    reply.raise_for_status()
-                    raw = streamed_response(reply, execution, public)
+                raw = receive_model(address, key, payload, execution, public)
                 message = raw["choices"][0]["message"]
                 # Preserve protocol fields privately; reasoning never becomes public history.
                 message = {field: message[field] for field in ("role", "content", "tool_calls", "reasoning_content") if field in message}
                 response = {"id": raw.get("id"), "model": raw.get("model"), "message": message, "usage": raw.get("usage", {})}
-            except (requests.RequestException, ValueError, KeyError):
+            except (httpx.HTTPError, ValueError, KeyError):
                 execution.provider("UNCERTAIN", {"callNumber": number})
                 raise ConversationUnverified("DeepSeek 调用结果未确认，已停止自动重新提交") from None
             execution.provider("SUCCEEDED", {"callNumber": number, "response": response})

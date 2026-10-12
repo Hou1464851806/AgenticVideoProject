@@ -2,7 +2,7 @@
 
 本轮按 ready-for-agent 的 32 张子任务实施；#1 为汇总需求。实施起点为 `63efde7`，在当前 main 分支逐票提交。
 
-11 张 P0 任务均已实现、验证并逐票本地提交。P1 #7、#8、#11、#12、#13、#14、#16、#31、#27 已完成。继续按优先级和依赖推进其他 P1 / P2。当前功能见 [功能清单](current-features.md)，实现原理与代码入口见 [项目讲解](project-walkthrough.md)。
+11 张 P0 任务均已实现、验证并逐票本地提交。P1 #7、#8、#11、#12、#13、#14、#16、#17、#31、#27 已完成。继续按优先级和依赖推进其他 P1 / P2。当前功能见 [功能清单](current-features.md)，实现原理与代码入口见 [项目讲解](project-walkthrough.md)。
 
 已确认测试边界：公开 HTTP 接口为主，关键 PostgreSQL／对象存储／消息／媒体／模型边界使用真实集成；浏览器验证用户操作闭环。
 
@@ -23,7 +23,7 @@
 | [#14](https://github.com/Hou1464851806/AgenticVideoProject/issues/14) [T13] 只恢复失败分析阶段并重建检索索引 | P1 | #12 | 实现与验证完成，见 [记录](verification/issue-14.md) |
 | [#15](https://github.com/Hou1464851806/AgenticVideoProject/issues/15) [T14] 在独立制作会话中对话查询素材 | P0 | #10 | 实现与验证完成，见 [记录](verification/issue-15.md) |
 | [#16](https://github.com/Hou1464851806/AgenticVideoProject/issues/16) [T15] 刷新或断线后恢复对话进度与结果 | P1 | #15 | 已完成；后端 95 全通过，浏览器完整回归 68/69、剩余模型预算用例独立复验通过，双轴审查 PASS；见 [记录](verification/issue-16.md) |
-| [#17](https://github.com/Hou1464851806/AgenticVideoProject/issues/17) [T16] 停止对话任务并关联原需求重试失败 | P1 | #15 | 待实施 |
+| [#17](https://github.com/Hou1464851806/AgenticVideoProject/issues/17) [T16] 停止对话任务并关联原需求重试失败 | P1 | #15 | 已完成；后端100项全通过，浏览器完整回归71/72、剩余真实模型回执不确定用例独立复验通过，双轴审查PASS，见 [记录](verification/issue-17.md) |
 | [#18](https://github.com/Hou1464851806/AgenticVideoProject/issues/18) [T17] 纠正制作需求简报并回答关联澄清 | P1 | #15 | 待实施 |
 | [#19](https://github.com/Hou1464851806/AgenticVideoProject/issues/19) [T18] 长对话保留硬条件并分页查看完整历史 | P1 | #18 | 待实施 |
 | [#20](https://github.com/Hou1464851806/AgenticVideoProject/issues/20) [T19] 从讲话视频生成一条可核查的短视频方案 | P0 | #15 | 实现与验证完成，见 [记录](verification/issue-20.md) |

@@ -23,8 +23,10 @@ public class ConversationController {
     private final ConversationTurns turns;
     private final ProjectRecovery recovery;
     private final AssistantDrafts drafts;
+    private final ConversationRetries retries;
 
-    public ConversationController(JdbcTemplate database, ProjectAccess access, ObjectMapper json, ConversationTurns turns, ProjectRecovery recovery, AssistantDrafts drafts) {
+    public ConversationController(JdbcTemplate database, ProjectAccess access, ObjectMapper json, ConversationTurns turns, ProjectRecovery recovery, AssistantDrafts drafts,ConversationRetries retries) {
+        this.retries=retries;
         this.drafts=drafts;
         this.recovery=recovery;
         this.database = database;
@@ -91,6 +93,15 @@ public class ConversationController {
                 conversationId, access.currentUserId(account));
         if (rows.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "制作会话不存在或无权访问");
     }
+
+    @PostMapping("/conversations/{conversationId}/tasks/{taskId}/retry")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public Object retry(@PathVariable UUID conversationId,@PathVariable UUID taskId,
+            @RequestHeader("Idempotency-Key") String key,@RequestBody Retry request,Authentication account) {
+        requireOwned(conversationId,account);
+        return response(retries.retry(conversationId,taskId,key,request.acknowledgeUnknownCost()));
+    }
+    public record Retry(boolean acknowledgeUnknownCost) {}
 
     @PostMapping("/conversations/{conversationId}/turns")
     @ResponseStatus(HttpStatus.ACCEPTED)

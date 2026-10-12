@@ -80,9 +80,13 @@ test('cancelling an Agent stays responsive while an external embedding query is 
     const accepted=await post(`/conversations/${session.id}/turns`,{content:'核查转写内容'});
     expect(accepted.status()).toBe(202);task=(await accepted.json()).data.taskId;
     await Promise.race([started,new Promise((_,reject)=>setTimeout(()=>reject(new Error('Embedding query never started')),10000))]);
+    const effects=(await(await page.request.get(`/api/v1/conversations/${session.id}/snapshot`)).json()).data.latestTask.externalEffects;
+    expect(effects.unknownCost).toBe(true);
     const cancelled=await post(`/tasks/${task}/cancel`,{},1500);
     expect(cancelled.status()).toBe(202);
     expect((await cancelled.json()).data.status).toBe('CANCEL_REQUESTED');
+    // Local execution must release while the remote provider is still blocked.
+    await expect.poll(async()=>(await(await page.request.get(`/api/v1/tasks/${task}`)).json()).data.status,{timeout:15000}).toBe('CANCELLED');
     release();
     await expect.poll(async()=>(await(await page.request.get(`/api/v1/tasks/${task}`)).json()).data.status,{timeout:90000}).toBe('CANCELLED');
     const history=(await(await page.request.get(`/api/v1/conversations/${session.id}/messages`)).json()).data.items;

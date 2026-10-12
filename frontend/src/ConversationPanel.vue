@@ -11,7 +11,7 @@ type Asset = { id: string; filename: string };
 type Citation = { type: string; id: string; assetId?: string; text?: string; startMs?: number; endMs?: number; observedAtMs?:number; sourceKind?:string; planId?: string; revisionNumber?: number };
 type Message = { id: string; role: string; content: string; references: Citation[] };
 type AssistantDraft = {messageId:string;attemptId:string;taskId:string;content:string;contentVersion:number;status:string;current:boolean};
-type History = { draftsNextCursor?:string|null; draftsTruncated?:boolean; drafts?:AssistantDraft[]; items: Message[]; latestTask: { taskId: string; status: string; phase?:string; failure?: {code:string;message:string} | null } | null };
+type History = { draftsNextCursor?:string|null; draftsTruncated?:boolean; drafts?:AssistantDraft[]; items: Message[]; latestTask: { taskId: string; status: string; phase?:string; externalEffects?:{unknownCost:boolean;stopSupported:boolean;message:string}; failure?: {code:string;message:string} | null } | null };
 const sessions = ref<Session[]>([]);
 const assets = ref<Asset[]>([]);
 const scope = ref<string[]>([]);
@@ -28,6 +28,8 @@ const visibleDrafts=computed(()=>[...new Map([...assistantDrafts.value,...earlie
 const latestTask = ref<History['latestTask']>(null);
 const creating = ref(false);
 const sending = ref(false);
+const controlling=ref(false),acknowledgeUnknownCost=ref(false);
+const retryKeys=new Map<string,string>();
 const error = ref('');
 const pending = new Map<string,{ key: string; serialized: string }>();
 type Settings = {mode:string;topic:string;minSeconds:number;maxSeconds:number;profile:string;useBase:boolean;orderedAssetIds:string[]};
@@ -35,6 +37,18 @@ const editing = ref<Record<string,Settings>>({});
 const settings = computed(() => editing.value[selected.value]!);
 const session = computed(() => sessions.value.find(item => item.id === selected.value));
 const running = computed(() => ['PENDING','RUNNING','CANCEL_REQUESTED','WAITING_INPUT'].includes(latestTask.value?.status ?? ''));
+async function control(retry:boolean){
+  const task=latestTask.value,id=selected.value;if(!task||controlling.value)return;
+  controlling.value=true;error.value='';
+  try {
+    if(retry){
+      const key=retryKeys.get(task.taskId)??crypto.randomUUID();retryKeys.set(task.taskId,key);
+      await request(`/conversations/${id}/tasks/${task.taskId}/retry`,'POST',{acknowledgeUnknownCost:acknowledgeUnknownCost.value},{'Idempotency-Key':key});
+    }else await request(`/tasks/${task.taskId}/cancel`,'POST',{});
+    if(selected.value===id){acknowledgeUnknownCost.value=false;await loadHistory();}
+  }catch(failure){if(selected.value===id)error.value=failure instanceof Error?failure.message:'操作未确认，请重试';}
+  finally{controlling.value=false;}
+}
 const draft = computed({ get: () => drafts.value[selected.value] ?? '', set: (value: string) => { drafts.value[selected.value] = value; } });
 let alive = true, readingAssets = false;
 const appliedCursors=new Map<string,bigint>();
@@ -60,7 +74,7 @@ async function loadHistory(rethrow=false) {
   try {
     const history = await request<History & {cursor:string}>(`/conversations/${id}/snapshot`);
     const sequence=BigInt(history.cursor.split(':')[1]!);
-    if (alive && selected.value === id && sequence>=(appliedCursors.get(id)??0n)) { appliedCursors.set(id,sequence); messages.value = history.items; latestTask.value = history.latestTask; activity.value=phaseLabels[history.latestTask?.phase??'']??(history.latestTask?.status==='PENDING'?'正在排队':''); assistantDrafts.value=history.drafts??[]; if(!earlierDrafts.value.length)draftCursor.value=history.draftsNextCursor??null; }
+    if (alive && selected.value === id && sequence>=(appliedCursors.get(id)??0n)) { if(latestTask.value?.taskId!==history.latestTask?.taskId)acknowledgeUnknownCost.value=false; appliedCursors.set(id,sequence); messages.value = history.items; latestTask.value = history.latestTask; activity.value=phaseLabels[history.latestTask?.phase??'']??(history.latestTask?.status==='PENDING'?'正在排队':''); assistantDrafts.value=history.drafts??[]; if(!earlierDrafts.value.length)draftCursor.value=history.draftsNextCursor??null; }
   } catch (failure) { if (alive && selected.value === id) error.value = failure instanceof Error ? failure.message : '无法读取会话'; if(rethrow)throw failure; }
 }
 async function loadEarlierDrafts(){
@@ -75,7 +89,7 @@ async function choose(id: string) {
   references.value[id] ??= [];
   editing.value[id] ??= {mode:'QUERY',topic:'',minSeconds:10,maxSeconds:30,profile:'LANDSCAPE_720',useBase:false,orderedAssetIds:[]};
   emit('session',id);
-  selected.value = id; messages.value = []; latestTask.value = null; assistantDrafts.value=[]; earlierDrafts.value=[]; draftCursor.value=null; activity.value=''; error.value = '';
+  selected.value = id; acknowledgeUnknownCost.value=false; messages.value = []; latestTask.value = null; assistantDrafts.value=[]; earlierDrafts.value=[]; draftCursor.value=null; activity.value=''; error.value = '';
   localStorage.setItem(`conversation:${props.projectId}`,id);
   await loadHistory();
 }
@@ -184,7 +198,14 @@ onUnmounted(() => { alive = false; clearInterval(timer); });
         </article>
       </div>
       <p v-if="running" role="status">正在处理需求；可以继续编辑草稿，完成后再发送。</p>
+      <button v-if="running" type="button" class="secondary" :disabled="controlling || latestTask?.status==='CANCEL_REQUESTED'" @click="control(false)">{{latestTask?.status==='CANCEL_REQUESTED'?'正在停止对话':'停止当前对话'}}</button>
+      <p v-if="latestTask?.status==='CANCELLED'" role="status">对话已停止；未发布本轮结果。</p>
       <p v-else-if="latestTask?.status === 'FAILED'" role="alert">{{ latestTask.failure?.code === 'MODEL_RECORD_TOO_LARGE' ? latestTask.failure.message : '本次对话未完成，未发布正式答复。' }}</p>
+      <p v-if="latestTask?.externalEffects && ['RUNNING','CANCEL_REQUESTED','CANCELLED','FAILED'].includes(latestTask.status)">{{latestTask.externalEffects.message}}</p>
+      <template v-if="latestTask?.status==='FAILED'">
+        <label v-if="latestTask.externalEffects?.unknownCost" class="choice"><input v-model="acknowledgeUnknownCost" type="checkbox">我理解原调用费用未知，接受重试可能产生新费用</label>
+        <button type="button" class="secondary" :disabled="controlling || (latestTask.externalEffects?.unknownCost && !acknowledgeUnknownCost)" @click="control(true)">重试原需求</button>
+      </template>
       <form @submit.prevent="send">
         <label for="intent-select">需求类型</label><select id="intent-select" v-model="settings.mode"><option value="QUERY">查询素材</option><option value="GENERATE_PLAN">生成讲话方案</option><option value="MONTAGE">生成跨素材混剪</option></select>
         <fieldset v-if="['GENERATE_PLAN','MONTAGE'].includes(settings.mode)"><legend>本次明确制作条件</legend>
