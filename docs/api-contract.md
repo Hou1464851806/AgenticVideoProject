@@ -295,3 +295,11 @@ complete 结果类型为 MEDIA_PREPARED、ANALYSIS_RESULT、INDEX_VERIFIED、AGE
 - `POST /conversations/{conversationId}/tasks/{taskId}/retry`：所有者、CSRF、Idempotency-Key；仅重试该会话终态失败的 Agent 任务，202 返回 turnId、messageId、taskId、retryOfTaskId，以及编辑任务的原 planId。原消息、固定输入和失败记录保留，新任务重新取得会话及方案资格。
 - 请求 `{acknowledgeUnknownCost:false}`（默认 false）；原模型或任务查询回执未知时409，明确 true 才新建任务，并持久保存该选择。仅修改幂等键不能自动重复付费。已有成功结果（包括后继重试链）直接返回；同幂等键保持原接纳身份。
 - 会话快照的 latestTask.externalEffects 显示 stopSupported=false、unknownCost 和公开说明。DeepSeek／查询 Embedding 为同步调用，没有远端任务查询或停止接口；关闭本地等待不保证停止远端计算或撤销费用。
+
+## 已实现需求简报与关联澄清（#18）
+
+- `POST /conversations/{id}/turns` 的 context.requirements=true 进入简报整理；snapshot 返回 brief（revision、fields、history）与 questions（id、taskId、turnId、prompt、reason、fields、status、answerMessageId、可选 editing）。来源由业务保存，模型不能伪造消息身份。
+- `POST /conversations/{id}/questions/{questionId}/answers`：Idempotency-Key，content 与可选 editing；202 返回新 turnId／messageId／taskId、resumesTaskId、questionId。同键同输入复用回执；同键异输入或已结束等待为409。editing 仅用于原编辑需求，可明确新的 baseRevisionId。
+- `POST /conversations/{id}/questions/{questionId}/new-requirement`：普通 Turn 请求体与 Idempotency-Key；原等待取消，开始独立新需求并重置当前简报，历史仍保留。以上入口核验所有者及当前固定对象。
+- WAITING_INPUT 不被执行器领取，仍阻止普通 turn 接纳；问题完成重放复用同一问题。原等待的回答会将旧任务结束为 SUCCEEDED，取消／新需求则 CANCELLED，旧尝试不再有发布资格。
+- 显式应用简报：context.briefRevision 与 context.editing 同时提交。版本必须等于当前简报，主题／硬时长／画幅由简报派生，禁用素材排除，forbiddenContent 固定；数量大于一明确400。版本变化409要求重新检查，不偷偷采用新版本。

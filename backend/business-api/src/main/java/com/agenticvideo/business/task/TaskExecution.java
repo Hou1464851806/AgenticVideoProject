@@ -22,6 +22,7 @@ public class TaskExecution {
     private final com.agenticvideo.business.analysis.VisualAnalysis vision;
     private final com.agenticvideo.business.storage.StorageCapacity capacity;
     private final com.agenticvideo.business.conversation.PublicActivities activities;
+    private final com.agenticvideo.business.conversation.ConversationQuestions questions;
     private final JdbcTemplate database;
     private final TransactionTemplate transactions;
     private final ObjectMapper json;
@@ -31,10 +32,11 @@ public class TaskExecution {
     private final com.agenticvideo.business.analysis.VisualInspections inspections;
     private final com.agenticvideo.business.plan.EditPlans plans;
     private final com.agenticvideo.business.render.RenderArtifacts artifacts;
-    TaskExecution(com.agenticvideo.business.analysis.VisualInspections inspections,com.agenticvideo.business.analysis.VisualAnalysis vision,com.agenticvideo.business.search.SearchIndexes indexes,JdbcTemplate database, PlatformTransactionManager manager, ObjectMapper json,
+    TaskExecution(com.agenticvideo.business.conversation.ConversationQuestions questions,com.agenticvideo.business.analysis.VisualInspections inspections,com.agenticvideo.business.analysis.VisualAnalysis vision,com.agenticvideo.business.search.SearchIndexes indexes,JdbcTemplate database, PlatformTransactionManager manager, ObjectMapper json,
             @Value("${internal.worker-token:}") String secret, com.agenticvideo.business.analysis.SpeechAnalysis speech,
             com.agenticvideo.business.conversation.ConversationTurns conversations,
             com.agenticvideo.business.plan.EditPlans plans,com.agenticvideo.business.render.RenderArtifacts artifacts,com.agenticvideo.business.storage.StorageCapacity capacity,com.agenticvideo.business.conversation.PublicActivities activities) {
+        this.questions=questions;
         this.activities=activities;
         this.inspections=inspections;this.vision=vision;this.indexes=indexes;this.capacity=capacity;
         this.database = database; this.transactions = new TransactionTemplate(manager); this.json = json; this.secret = secret;this.speech=speech;
@@ -120,7 +122,8 @@ public class TaskExecution {
         return transactions.execute(tx -> {
             var task = locked(id);
             String state = task.get("status").toString();
-            String next = switch(state) { case "PENDING" -> "CANCELLED"; case "RUNNING" -> "CANCEL_REQUESTED"; default -> state; };
+            String next = switch(state) { case "PENDING", "WAITING_INPUT" -> "CANCELLED"; case "RUNNING" -> "CANCEL_REQUESTED"; default -> state; };
+            if("WAITING_INPUT".equals(state))questions.dismiss(id);
             database.update("UPDATE tasks SET status=? WHERE id=?", next, id);
             if("CANCELLED".equals(next))database.update("UPDATE analysis_stages SET status='CANCELLED',updated_at=now() WHERE task_id=? AND stage_key IN ('VISION','ASR','EMBEDDING','INDEX') AND status<>'SUCCEEDED'",id);
             if("CANCELLED".equals(next))inspections.finished(task,"CANCELLED");
@@ -169,7 +172,7 @@ public class TaskExecution {
                     && !("SPEECH_ANALYZED".equals(request.resultType()) && "CONTENT_ANALYZE".equals(task.get("type")))
                     && !("PREVIEW_RENDERED".equals(request.resultType()) && "PREVIEW_RENDER".equals(task.get("type")))
                     && !("EXPORT_RENDERED".equals(request.resultType()) && "EXPORT_RENDER".equals(task.get("type")))
-                    && !(java.util.Set.of("CONVERSATION_ANSWERED", "EDIT_PROPOSAL").contains(request.resultType()) && "AGENT_TURN".equals(task.get("type"))))
+                    && !(java.util.Set.of("CONVERSATION_ANSWERED", "EDIT_PROPOSAL", "CONVERSATION_WAITING").contains(request.resultType()) && "AGENT_TURN".equals(task.get("type"))))
                 throw new ResponseStatusException(CONFLICT, "任务结果类型不匹配");
             String result = request.result().toString();
             var previous = database.queryForList("SELECT *,payload_json=?::jsonb AS same_payload FROM execution_reports WHERE task_id=? AND attempt_id=? AND report_kind='COMPLETE' AND producer_key=?", result, id, request.attemptId(), request.producerKey());
@@ -204,6 +207,15 @@ public class TaskExecution {
                 return outcome;
             }
             if ("AGENT_TURN".equals(task.get("type"))) {
+                if("CONVERSATION_WAITING".equals(request.resultType())){
+                    Object outcome=questions.publish(task,input,request.result().path("question"));
+                    String receipt;try{receipt=json.writeValueAsString(outcome);}catch(java.io.IOException invalid){throw new IllegalStateException(invalid);}
+                    plans.release(id);
+                    database.update("UPDATE tasks SET status='WAITING_INPUT',public_phase=NULL,result_json=?::jsonb WHERE id=?",result,id);
+                    database.update("UPDATE task_attempts SET status='SUCCEEDED',lease_expires_at=now() WHERE id=?",request.attemptId());
+                    database.update("INSERT INTO execution_reports(task_id,attempt_id,report_kind,producer_key,payload_json,outcome_json,result_type) VALUES (?,?,'COMPLETE',?,?::jsonb,?::jsonb,?)",id,request.attemptId(),request.producerKey(),result,receipt,request.resultType());
+                    return outcome;
+                }
                 if ("CONVERSATION_ANSWERED".equals(request.resultType()) && request.result().has("planRevision"))
                     throw new ResponseStatusException(CONFLICT, "方案结果身份必须由后端成功提交分配");
                 var publication = "EDIT_PROPOSAL".equals(request.resultType()) ? plans.publish(task, input, request.result()) : request.result();

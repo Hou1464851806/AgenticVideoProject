@@ -1,4 +1,4 @@
-# 当前项目是怎样工作的（含 #14、#16、#17、#31、#27）
+# 当前项目是怎样工作的（含 #14、#16、#17、#18、#31、#27）
 
 这份说明对应当前已实现代码。你提到的“ase”，这里按 **ASR（语音识别）** 解释。
 
@@ -189,7 +189,7 @@ Python 的 `model_transport.py` 通过异步 HTTP 流和周期性执行校验取
 
 接纳任务时，Spring 固定本轮需求、素材范围、明确引用、编辑硬条件和最近 **12 条消息**，保存进 task.input_json。Python 再按最近历史裁剪，历史正文最多 **24000 字符**，随后加入系统规则和固定范围。
 
-这是字符限制，不是 Token 计数；也不是完整长会话记忆。当前没有已实现的长期摘要记忆、历史向量检索或跨会话记忆。#18 / #19 的简报与长历史能力仍待实施。
+这是字符限制，不是 Token 计数；也不是完整长会话记忆。当前没有已实现的长期摘要记忆、历史向量检索或跨会话记忆。#18 已实现独立持久化需求简报；#19 的完整长历史分页仍待实施。
 
 ### Agent 执行状态
 
@@ -233,3 +233,13 @@ ConversationPanel 将 `editing.kind=MONTAGE` 和有序 `orderedAssetIds` 随需�
 同一受控 Agent 使用 list_assets、search_evidence、read_evidence_context，读取每份素材的证据和邻近上下文后提交候选、自检与确定性校验。EditPlanValidation 按素材分别检查时间重叠，检查完整素材顺序、合法范围及本轮已读取出处；语音区间须重叠片段，画面证据的观察时刻须位于片段内。静音素材允许没有语音字幕，所有字幕仍来自已有 ASR 原文。
 
 发布仍写 plan_revisions、revision_asset_refs、revision_evidence_refs，确认和导出完全沿用原接口。MediaRenderer 已有跨素材硬切：每段缩放留边并统一帧率，原声重采样至 48kHz 双声道，无音轨段补静音，映射后的中文字幕烧入 MP4；再次渲染不调用理解或 embedding 模型。
+
+## 需求简报和等待输入（#18）
+
+`ConversationBriefs` 将各条件保存为 value、EXPLICIT／DEFAULT 和 sourceMessageId，纠正追加修订而不修改旧记录。固定任务输入带上当前简报，模型通过 `update_editing_brief` 提交新增／纠正条件；实际落库在当前尝试核验后的业务工具回执事务中，重放不会重复修订。
+
+`ask_clarification` 结束当前执行并由业务完成事务创建有身份的问题卡，任务成为 WAITING_INPUT；会话仍繁忙，执行租约和方案占用释放。普通消息无法被当成回答。`ConversationQuestions` 的回答入口关联问题、原轮次和新的恢复任务，重新验证素材及方案基准；取消或新需求会终结原等待。业务幂等回执是恢复依据，checkpoint 不能自行复活等待任务。
+
+界面明确应用简报时发送 briefRevision，`ConversationTurns` 校验最新版本并将主题、时长、禁用内容和收窄后的素材冻结到新任务。改变方案基准必须在问题卡勾选当前查看版本。方案原文字幕的明确禁用文本在 `EditPlanValidation` 检查；更广泛的语义或画面条件由 Agent 核查观察证据，能力受观察覆盖限制。
+
+代码入口：[简报](/Users/nonbeing/AgenticVideoProject/backend/business-api/src/main/java/com/agenticvideo/business/conversation/ConversationBriefs.java)、[问题生命周期](/Users/nonbeing/AgenticVideoProject/backend/business-api/src/main/java/com/agenticvideo/business/conversation/ConversationQuestions.java)、[界面](/Users/nonbeing/AgenticVideoProject/frontend/src/ConversationPanel.vue)。

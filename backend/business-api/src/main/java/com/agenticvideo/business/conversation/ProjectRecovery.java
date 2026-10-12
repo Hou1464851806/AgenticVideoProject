@@ -16,6 +16,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 /** A single database snapshot supplies both business state and its replay boundary. */
 @Service
 public class ProjectRecovery {
+    private final ConversationQuestions questions;
+    private final ConversationBriefs briefs;
     private final JdbcTemplate database;
     private final ProjectAccess access;
     private final AssistantDrafts drafts;
@@ -23,8 +25,10 @@ public class ProjectRecovery {
     private final ObjectMapper json;
     private final TransactionTemplate snapshots;
 
-    public ProjectRecovery(JdbcTemplate database, ProjectAccess access, ObjectMapper json,
+    public ProjectRecovery(ConversationQuestions questions,ConversationBriefs briefs,JdbcTemplate database, ProjectAccess access, ObjectMapper json,
             PlatformTransactionManager manager, AssistantDrafts drafts,ConversationRetries retries) {
+        this.questions=questions;
+        this.briefs=briefs;
         this.retries=retries;
         this.drafts=drafts;
         this.database = database; this.access = access; this.json = json;
@@ -56,6 +60,8 @@ public class ProjectRecovery {
                         var conversation = new LinkedHashMap<String,Object>();
                         conversation.put("id", id); conversation.put("title", row.getString("title"));
                         conversation.put("assetIds", parse(row.getString("asset_ids_json")));
+                        conversation.put("brief",briefs.snapshot(id));
+                        conversation.put("questions",questions.list(id));
                         conversation.put("items", database.query("SELECT * FROM (SELECT id,message_seq,role,content,references_json FROM conversation_messages WHERE conversation_id=? ORDER BY message_seq DESC LIMIT 100) m ORDER BY message_seq",
                                 (message, n) -> Map.of("id", message.getObject("id", UUID.class), "messageSeq", message.getLong("message_seq"), "role", message.getString("role"), "content", message.getString("content"), "references", parse(message.getString("references_json"))), id));
                         var tasks = database.queryForList("SELECT t.id AS \"taskId\",t.status,t.public_phase AS phase,t.current_attempt_id AS \"attemptId\" FROM conversation_turns r JOIN tasks t ON t.id=r.task_id WHERE r.conversation_id=? ORDER BY r.created_at DESC LIMIT 1", id);

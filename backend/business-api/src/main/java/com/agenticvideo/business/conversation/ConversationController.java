@@ -17,6 +17,7 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @RequestMapping("/api/v1")
 public class ConversationController {
+    private final ConversationQuestions questions;
     private final JdbcTemplate database;
     private final ProjectAccess access;
     private final ObjectMapper json;
@@ -25,7 +26,8 @@ public class ConversationController {
     private final AssistantDrafts drafts;
     private final ConversationRetries retries;
 
-    public ConversationController(JdbcTemplate database, ProjectAccess access, ObjectMapper json, ConversationTurns turns, ProjectRecovery recovery, AssistantDrafts drafts,ConversationRetries retries) {
+    public ConversationController(ConversationQuestions questions,JdbcTemplate database, ProjectAccess access, ObjectMapper json, ConversationTurns turns, ProjectRecovery recovery, AssistantDrafts drafts,ConversationRetries retries) {
+        this.questions=questions;
         this.retries=retries;
         this.drafts=drafts;
         this.recovery=recovery;
@@ -34,6 +36,18 @@ public class ConversationController {
         this.json = json;
         this.turns = turns;
     }
+
+    @PostMapping("/conversations/{conversationId}/questions/{questionId}/answers")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public Object answer(@PathVariable UUID conversationId,@PathVariable UUID questionId,@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody QuestionAnswer request,Authentication account){
+        requireOwned(conversationId,account);return response(questions.answer(conversationId,questionId,key,request));
+    }
+    @PostMapping("/conversations/{conversationId}/questions/{questionId}/new-requirement")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public Object startNew(@PathVariable UUID conversationId,@PathVariable UUID questionId,@RequestHeader("Idempotency-Key") String key,@Valid @RequestBody Turn request,Authentication account){
+        requireOwned(conversationId,account);return response(questions.startNew(conversationId,questionId,key,request));
+    }
+    public record QuestionAnswer(@NotBlank @Size(max=16000) String content,com.fasterxml.jackson.databind.JsonNode editing) {}
 
     @PostMapping("/projects/{projectId}/conversations")
     @ResponseStatus(HttpStatus.CREATED)

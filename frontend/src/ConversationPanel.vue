@@ -11,7 +11,10 @@ type Asset = { id: string; filename: string };
 type Citation = { type: string; id: string; assetId?: string; text?: string; startMs?: number; endMs?: number; observedAtMs?:number; sourceKind?:string; planId?: string; revisionNumber?: number };
 type Message = { id: string; role: string; content: string; references: Citation[] };
 type AssistantDraft = {messageId:string;attemptId:string;taskId:string;content:string;contentVersion:number;status:string;current:boolean};
-type History = { draftsNextCursor?:string|null; draftsTruncated?:boolean; drafts?:AssistantDraft[]; items: Message[]; latestTask: { taskId: string; status: string; phase?:string; externalEffects?:{unknownCost:boolean;stopSupported:boolean;message:string}; failure?: {code:string;message:string} | null } | null };
+type BriefCondition={value:unknown;basis:string;sourceMessageId:string};
+type Brief={revision:number;fields:Record<string,BriefCondition>;history:{revision:number;fields:Record<string,BriefCondition>;sourceMessageId:string}[]};
+type Question={id:string;taskId:string;turnId:string;prompt:string;reason:string;fields:string[];status:string;answerMessageId:string|null;editing?:Record<string,unknown>|null};
+type History = { brief?:Brief;questions?:Question[]; draftsNextCursor?:string|null; draftsTruncated?:boolean; drafts?:AssistantDraft[]; items: Message[]; latestTask: { taskId: string; status: string; phase?:string; externalEffects?:{unknownCost:boolean;stopSupported:boolean;message:string}; failure?: {code:string;message:string} | null } | null };
 const sessions = ref<Session[]>([]);
 const assets = ref<Asset[]>([]);
 const scope = ref<string[]>([]);
@@ -20,6 +23,32 @@ const selected = ref('');
 const drafts = ref<Record<string,string>>({});
 const references = ref<Record<string,string[]>>({});
 const messages = ref<Message[]>([]);
+const brief=ref<Brief|null>(null),questions=ref<Question[]>([]);
+const answers=ref<Record<string,string>>({});
+const useChangedBase=ref<Record<string,boolean>>({});
+const appliedBrief=ref<Record<string,number>>({});
+const questionKeys=new Map<string,{serialized:string;key:string}>();
+const openQuestions=computed(()=>questions.value.filter(item=>item.status==='OPEN'));
+const briefLabels:Record<string,string>={topic:'主题',count:'数量',duration:'硬时长',assetIds:'素材范围',forbiddenAssetIds:'禁用素材',forbiddenContent:'禁用内容',profile:'画幅'};
+function briefValue(name:string,value:unknown):string{
+  if(name==='duration'&&value&&typeof value==='object'&&'minMs' in value&&'maxMs' in value)return `${Number(value.minMs)/1000}–${Number(value.maxMs)/1000} 秒`;
+  if(Array.isArray(value))return value.map(item=>['assetIds','forbiddenAssetIds'].includes(name)?assets.value.find(asset=>asset.id===item)?.filename??String(item):String(item)).join('、')||'无';
+  if(name==='profile')return value==='LANDSCAPE_720'?'横屏 720p':'竖屏 720p';
+  return String(value);
+}
+async function resolveQuestion(question:Question,startNew:boolean){
+  const id=selected.value,content=startNew?draft.value:answers.value[question.id]??'';if(!content.trim()||controlling.value)return;
+  const body=startNew?{content,references:[],context:{requirements:true}}:{content,...(useChangedBase.value[question.id]&&props.editingBase&&question.editing?{editing:{...question.editing,planId:props.editingBase.planId,baseRevisionId:props.editingBase.revisionId}}:{})};
+  const serialized=JSON.stringify(body),identityKey=question.id+(startNew?':new':':answer');
+  const identity=questionKeys.get(identityKey)?.serialized===serialized?questionKeys.get(identityKey)!:{serialized,key:crypto.randomUUID()};questionKeys.set(identityKey,identity);
+  controlling.value=true;error.value='';
+  try{
+    await request(`/conversations/${id}/questions/${question.id}/${startNew?'new-requirement':'answers'}`,'POST',body,{'Idempotency-Key':identity.key});
+    if(selected.value===id){if(startNew)draft.value='';else answers.value[question.id]='';settings.value.mode='REQUIREMENTS';await loadHistory();}
+  }catch(failure){if(selected.value===id)error.value=failure instanceof Error?failure.message:'回答未确认，请重试';}
+  finally{controlling.value=false;}
+}
+
 const assistantDrafts=ref<AssistantDraft[]>([]);
 const activity=ref('');
 const phaseLabels:Record<string,string>={SEARCHING:'正在检索证据',READING_EVIDENCE:'正在核查原文',MODELING:'正在组织答复',SELF_CHECKING:'正在自检候选',VALIDATING:'正在验证方案'};
@@ -74,7 +103,7 @@ async function loadHistory(rethrow=false) {
   try {
     const history = await request<History & {cursor:string}>(`/conversations/${id}/snapshot`);
     const sequence=BigInt(history.cursor.split(':')[1]!);
-    if (alive && selected.value === id && sequence>=(appliedCursors.get(id)??0n)) { if(latestTask.value?.taskId!==history.latestTask?.taskId)acknowledgeUnknownCost.value=false; appliedCursors.set(id,sequence); messages.value = history.items; latestTask.value = history.latestTask; activity.value=phaseLabels[history.latestTask?.phase??'']??(history.latestTask?.status==='PENDING'?'正在排队':''); assistantDrafts.value=history.drafts??[]; if(!earlierDrafts.value.length)draftCursor.value=history.draftsNextCursor??null; }
+    if (alive && selected.value === id && sequence>=(appliedCursors.get(id)??0n)) { if(latestTask.value?.taskId!==history.latestTask?.taskId)acknowledgeUnknownCost.value=false; appliedCursors.set(id,sequence); messages.value = history.items; brief.value=history.brief??null;questions.value=history.questions??[];latestTask.value = history.latestTask; activity.value=phaseLabels[history.latestTask?.phase??'']??(history.latestTask?.status==='PENDING'?'正在排队':''); assistantDrafts.value=history.drafts??[]; if(!earlierDrafts.value.length)draftCursor.value=history.draftsNextCursor??null; }
   } catch (failure) { if (alive && selected.value === id) error.value = failure instanceof Error ? failure.message : '无法读取会话'; if(rethrow)throw failure; }
 }
 async function loadEarlierDrafts(){
@@ -89,7 +118,7 @@ async function choose(id: string) {
   references.value[id] ??= [];
   editing.value[id] ??= {mode:'QUERY',topic:'',minSeconds:10,maxSeconds:30,profile:'LANDSCAPE_720',useBase:false,orderedAssetIds:[]};
   emit('session',id);
-  selected.value = id; acknowledgeUnknownCost.value=false; messages.value = []; latestTask.value = null; assistantDrafts.value=[]; earlierDrafts.value=[]; draftCursor.value=null; activity.value=''; error.value = '';
+  selected.value = id;brief.value=null;questions.value=[];acknowledgeUnknownCost.value=false; messages.value = []; latestTask.value = null; assistantDrafts.value=[]; earlierDrafts.value=[]; draftCursor.value=null; activity.value=''; error.value = '';
   localStorage.setItem(`conversation:${props.projectId}`,id);
   await loadHistory();
 }
@@ -102,6 +131,17 @@ async function create() {
   } catch (failure) { error.value = failure instanceof Error ? failure.message : '无法创建制作会话'; }
   finally { creating.value = false; }
 }
+function applyBrief(mode:string){
+  if(!brief.value)return;
+  const fields=brief.value.fields;
+  if(!fields.topic||!fields.duration){error.value='请先明确简报主题与硬时长';return;}
+  if(Number(fields.count?.value??1)!==1){error.value='当前仅支持一次生成一份方案，请明确数量为一';return;}
+  const duration=fields.duration.value as {minMs:number;maxMs:number};
+  settings.value.mode=mode;settings.value.topic=String(fields.topic.value);settings.value.minSeconds=duration.minMs/1000;settings.value.maxSeconds=duration.maxMs/1000;settings.value.profile=String(fields.profile?.value??'LANDSCAPE_720');
+  const forbidden=fields.forbiddenAssetIds?.value as string[]|undefined;
+  settings.value.orderedAssetIds=(fields.assetIds?.value as string[]|undefined??session.value?.assetIds??[]).filter(id=>!forbidden?.includes(id));
+  appliedBrief.value[selected.value]=brief.value.revision;error.value='';
+}
 function moveMontage(index:number,delta:number){
   const order=settings.value.orderedAssetIds,target=index+delta;
   if(target<0||target>=order.length)return;
@@ -112,7 +152,9 @@ async function send() {
   const id = selected.value, content = draft.value;
   const condition = settings.value;
   const context: Record<string,unknown> = {};
+  if(condition.mode==='REQUIREMENTS')context.requirements=true;
   if (['GENERATE_PLAN','MONTAGE'].includes(condition.mode)) {
+    if(appliedBrief.value[id])context.briefRevision=appliedBrief.value[id];
     if (!condition.topic.trim() || condition.minSeconds <= 0 || condition.maxSeconds < condition.minSeconds || condition.maxSeconds > 3600) {
       error.value = '请明确主题和合法的硬时长范围'; return;
     }
@@ -178,6 +220,20 @@ onUnmounted(() => { alive = false; clearInterval(timer); });
     </select>
     <p v-if="error" role="alert">{{ error }}</p>
     <template v-if="session">
+      <section v-if="brief&&Object.keys(brief.fields).length" aria-label="制作需求简报">
+        <h3>制作需求简报</h3>
+        <dl><template v-for="(condition,name) in brief.fields" :key="name"><dt>{{briefLabels[name]??name}}</dt><dd>{{briefValue(name,condition.value)}} · {{condition.basis==='EXPLICIT'?'明确约束':'已说明默认值'}}<small>来源：{{messages.find(item=>item.id===condition.sourceMessageId)?.content??condition.sourceMessageId}}</small></dd></template></dl>
+        <p>选择“整理制作需求”，用新消息纠正指定条件；未提及条件保留。</p>
+        <button type="button" :disabled="running" @click="applyBrief('GENERATE_PLAN')">应用简报生成讲话方案</button><button type="button" :disabled="running" @click="applyBrief('MONTAGE')">应用简报生成混剪</button>
+        <p v-if="appliedBrief[selected]">已应用简报 V{{appliedBrief[selected]}}；发送时会固定该版本条件。简报发生变化后请重新应用。</p>
+        <details><summary>查看简报修订历史</summary><article v-for="revision in brief.history" :key="revision.revision"><strong>简报 V{{revision.revision}}</strong><p v-for="(condition,name) in revision.fields" :key="name">{{briefLabels[name]??name}}：{{briefValue(name,condition.value)}}</p></article></details>
+      </section>
+      <article v-for="question in openQuestions" :key="question.id" aria-label="待回答的澄清问题">
+        <h3>{{question.prompt}}</h3><p>{{question.reason}}</p><p>等待明确回答；执行与方案编辑占用已释放。普通新消息不会自动作为回答。</p>
+        <label v-if="question.editing" class="choice"><input v-model="useChangedBase[question.id]" type="checkbox" :disabled="!editingBase||editingBase.planId!==question.editing.planId">以当前查看版本恢复方案修改</label>
+        <form @submit.prevent="resolveQuestion(question,false)"><label :for="`answer-${question.id}`">澄清回答</label><textarea :id="`answer-${question.id}`" v-model="answers[question.id]" maxlength="8000" required></textarea><button type="submit" :disabled="controlling||!answers[question.id]?.trim()">提交澄清回答</button></form>
+        <button type="button" class="secondary" :disabled="controlling||!draft.trim()" @click="resolveQuestion(question,true)">开始新需求</button><p>在下方对话输入中填写新需求，再点击此按钮放弃原等待。</p>
+      </article>
       <p class="scope">本会话固定包含 {{ session.assetIds.length }} 个素材，查询无需创建剪辑方案。</p>
       <p v-if="running && activity" role="status">{{ activity }}</p>
       <article v-for="reply in visibleDrafts" :key="reply.messageId" aria-label="助手未完成草稿">
@@ -197,7 +253,7 @@ onUnmounted(() => { alive = false; clearInterval(timer); });
           </div>
         </article>
       </div>
-      <p v-if="running" role="status">正在处理需求；可以继续编辑草稿，完成后再发送。</p>
+      <p v-if="running" role="status">{{latestTask?.status==='WAITING_INPUT'?'正在等待关联澄清回答；也可停止或明确开始新需求。':'正在处理需求；可以继续编辑草稿，完成后再发送。'}}</p>
       <button v-if="running" type="button" class="secondary" :disabled="controlling || latestTask?.status==='CANCEL_REQUESTED'" @click="control(false)">{{latestTask?.status==='CANCEL_REQUESTED'?'正在停止对话':'停止当前对话'}}</button>
       <p v-if="latestTask?.status==='CANCELLED'" role="status">对话已停止；未发布本轮结果。</p>
       <p v-else-if="latestTask?.status === 'FAILED'" role="alert">{{ latestTask.failure?.code === 'MODEL_RECORD_TOO_LARGE' ? latestTask.failure.message : '本次对话未完成，未发布正式答复。' }}</p>
@@ -207,7 +263,7 @@ onUnmounted(() => { alive = false; clearInterval(timer); });
         <button type="button" class="secondary" :disabled="controlling || (latestTask.externalEffects?.unknownCost && !acknowledgeUnknownCost)" @click="control(true)">重试原需求</button>
       </template>
       <form @submit.prevent="send">
-        <label for="intent-select">需求类型</label><select id="intent-select" v-model="settings.mode"><option value="QUERY">查询素材</option><option value="GENERATE_PLAN">生成讲话方案</option><option value="MONTAGE">生成跨素材混剪</option></select>
+        <label for="intent-select">需求类型</label><select id="intent-select" v-model="settings.mode"><option value="QUERY">查询素材</option><option value="REQUIREMENTS">整理制作需求</option><option value="GENERATE_PLAN">生成讲话方案</option><option value="MONTAGE">生成跨素材混剪</option></select>
         <fieldset v-if="['GENERATE_PLAN','MONTAGE'].includes(settings.mode)"><legend>本次明确制作条件</legend>
           <label for="plan-topic">方案主题</label><input id="plan-topic" v-model="settings.topic" required maxlength="120">
           <label for="minimum-duration">最短时长（秒）</label><input id="minimum-duration" v-model.number="settings.minSeconds" type="number" min="0.001" max="3600" step="0.001" required>
@@ -235,6 +291,7 @@ onUnmounted(() => { alive = false; clearInterval(timer); });
 </template>
 
 <style scoped>
+dd small { display:block;overflow-wrap:anywhere;color:#69766e; }
 fieldset { border: 1px solid #dce5de; border-radius: 8px; margin-top: 12px; padding: 10px; }
 legend,.scope { font-size: 12px; color: #69766e; }
 .choice { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 13px; overflow-wrap: anywhere; }

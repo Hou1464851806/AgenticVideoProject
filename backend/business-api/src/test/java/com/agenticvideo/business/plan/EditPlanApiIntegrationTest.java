@@ -70,6 +70,21 @@ class EditPlanApiIntegrationTest {
     }
 
     @Test
+    void explicitForbiddenTextPreventsPublishingOtherwiseValidSpeech() throws Exception {
+        BrowserApi owner=signedIn("forbidden-caption-owner");
+        String project=json(owner.post("/projects","{\"name\":\"禁用原文\"}")).path("data").path("id").asText();
+        var speech=speechFixture(project);
+        String session=json(owner.post("/projects/"+project+"/conversations",new ObjectMapper().writeValueAsString(java.util.Map.of("title","禁用条件","assetIds",java.util.List.of(speech.asset()))))).path("data").path("id").asText();
+        var accepted=acceptPlan(owner,session,java.util.Map.of("topic","上传步骤","minDurationMs",8000,"maxDurationMs",12000,"profile","LANDSCAPE_720","forbiddenContent",java.util.List.of("上传")),"forbidden-plan");
+        String task=accepted.path("taskId").asText();
+        var claim=json(internal(task,"claim",java.util.Map.of("executorId","plan-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        var request=new java.util.HashMap<String,Object>();request.put("attemptId",claim.path("attemptId").asText());request.put("leaseToken",claim.path("leaseToken").asText());
+        request.put("producerKey","read-forbidden");request.put("name","read_evidence_context");request.put("arguments",java.util.Map.of("evidenceId",speech.first()));assertEquals(200,internal(task,"tool",request).statusCode());
+        request.remove("name");request.remove("arguments");request.put("producerKey","check-forbidden");request.put("proposal",java.util.Map.of("title","上传步骤","clips",java.util.List.of(java.util.Map.of("assetId",speech.asset(),"sourceInMs",2000,"sourceOutMs",10000,"evidenceIds",java.util.List.of(speech.first(),speech.second()),"reason","保留完整步骤"))));
+        var checked=internal(task,"validate-edit",request);assertEquals(200,checked.statusCode(),checked.body());assertEquals(false,json(checked).path("data").path("valid").asBoolean(),checked.body());
+    }
+
+    @Test
     void successfulProposalPublishesOneImmutableVersionWithMappedOriginalSubtitles() throws Exception {
         BrowserApi owner = signedIn("revision-owner");
         String project = json(owner.post("/projects", "{\"name\":\"完整讲话\"}")).path("data").path("id").asText();

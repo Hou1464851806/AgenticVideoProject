@@ -25,9 +25,14 @@ public class EditPlans {
     public JsonNode allocate(UUID project, UUID task, JsonNode editing, JsonNode scope) {
         if (!editing.isObject()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "制作条件必须是对象");
         editing.fieldNames().forEachRemaining(field -> {
-            if (!Set.of("topic", "minDurationMs", "maxDurationMs", "profile", "planId", "baseRevisionId", "kind", "orderedAssetIds").contains(field))
+            if (!Set.of("topic", "minDurationMs", "maxDurationMs", "profile", "planId", "baseRevisionId", "kind", "orderedAssetIds", "forbiddenContent").contains(field))
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "制作条件字段不受支持");
         });
+        if(editing.has("forbiddenContent")){
+            var forbidden=editing.path("forbiddenContent");
+            if(!forbidden.isArray()||forbidden.size()>100)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"禁用内容须为最多100项明确文本");
+            for(var text:forbidden)if(!text.isTextual()||text.asText().isBlank()||text.asText().length()>256)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"禁用内容必须为明确文本");
+        }
         String topic = editing.path("topic").asText().strip();
         long minimum = editing.path("minDurationMs").asLong(-1), maximum = editing.path("maxDurationMs").asLong(-1);
         if (!editing.path("topic").isTextual() || topic.isBlank() || topic.length() > 120

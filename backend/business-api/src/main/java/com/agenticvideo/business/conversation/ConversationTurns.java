@@ -13,6 +13,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ConversationTurns {
+    private final ConversationBriefs briefs;
     private final com.agenticvideo.business.search.EvidenceSearch evidenceSearch;
     private final long requestMaxBytes;
     private final long responseMaxBytes;
@@ -23,11 +24,12 @@ public class ConversationTurns {
     private final com.agenticvideo.business.analysis.SpeechTimings timings;
     private final com.agenticvideo.business.render.ProductionCommands production;
 
-    public ConversationTurns(com.agenticvideo.business.search.EvidenceSearch evidenceSearch,JdbcTemplate database, ObjectMapper json, PlatformTransactionManager manager,
+    public ConversationTurns(ConversationBriefs briefs,com.agenticvideo.business.search.EvidenceSearch evidenceSearch,JdbcTemplate database, ObjectMapper json, PlatformTransactionManager manager,
             com.agenticvideo.business.plan.EditPlans plans, com.agenticvideo.business.analysis.SpeechTimings timings, com.agenticvideo.business.render.ProductionCommands production,
             @org.springframework.beans.factory.annotation.Value("${conversation.model-record.request-max-bytes:16777216}") long requestMaxBytes,
             @org.springframework.beans.factory.annotation.Value("${conversation.model-record.response-max-bytes:4194304}") long responseMaxBytes) {
         if (requestMaxBytes < 1 || responseMaxBytes < 1) throw new IllegalArgumentException("模型记录字节上限必须为正数");
+        this.briefs=briefs;
         this.evidenceSearch=evidenceSearch;
         this.requestMaxBytes = requestMaxBytes;
         this.responseMaxBytes = responseMaxBytes;
@@ -39,11 +41,12 @@ public class ConversationTurns {
         this.production = production;
     }
 
-    public Object accept(UUID sessionId, String key, ConversationController.Turn request) {
+    public Object accept(UUID sessionId,String key,ConversationController.Turn request){return accept(sessionId,key,request,false);}
+    Object accept(UUID sessionId, String key, ConversationController.Turn request,boolean startsNewRequirement) {
         if (key.isBlank() || key.length() > 120) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "发送幂等键不符合要求");
         boolean replayExists=database.queryForObject("SELECT count(*) FROM conversation_turns WHERE conversation_id=? AND request_key=?",Integer.class,sessionId,key)>0;
         boolean editingIntent=request.context()!=null&&request.context().has("editing");
-        var preparation=replayExists||editingIntent?null:production.prepare(sessionId,request.content());
+        var preparation=replayExists||editingIntent||(request.context()!=null&&request.context().path("requirements").asBoolean(false))?null:production.prepare(sessionId,request.content());
         return transactions.execute(tx -> {
             var session = database.queryForMap("SELECT * FROM conversations WHERE id=? FOR UPDATE", sessionId);
             String payload = encode(Map.of("content", request.content(),
@@ -57,12 +60,14 @@ public class ConversationTurns {
             }
             if (database.queryForObject("SELECT count(*) FROM conversation_turns r JOIN tasks t ON t.id=r.task_id WHERE r.conversation_id=? AND t.status IN ('PENDING','RUNNING','CANCEL_REQUESTED','WAITING_INPUT')", Integer.class, sessionId) > 0)
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "制作会话正在处理需求；可继续编辑草稿，完成或停止后再发送");
-            validateReferences(session, request);
+            var effectiveContext=request.context()!=null&&request.context().has("briefRevision")?briefs.apply(sessionId,request.context(),(com.fasterxml.jackson.databind.JsonNode)decode(session.get("asset_ids_json"))):request.context();
+            var effectiveRequest=new ConversationController.Turn(request.content(),request.references(),effectiveContext);
+            validateReferences(session, effectiveRequest);
             UUID turn = UUID.randomUUID(), message = UUID.randomUUID(), task = UUID.randomUUID(), event = UUID.randomUUID();
             long sequence = database.queryForObject("SELECT coalesce(max(message_seq),0)+1 FROM conversation_messages WHERE conversation_id=?", Long.class, sessionId);
             database.update("INSERT INTO conversation_messages(id,conversation_id,message_seq,role,content,references_json) VALUES (?,?,?,'USER',?,?::jsonb)",
                     message, sessionId, sequence, request.content(), encode(request.references() == null ? List.of() : request.references()));
-            var command=editingIntent?null:production.route(session,message,request.content(),preparation);
+            var command=editingIntent||(request.context()!=null&&request.context().path("requirements").asBoolean(false))?null:production.route(session,message,request.content(),preparation);
             if(command!=null){
                 database.update("INSERT INTO tasks(id,project_id,type,status,input_json) VALUES (?,?,'PRODUCTION_COMMAND','SUCCEEDED',?::jsonb)",task,session.get("project_id"),encode(Map.of("messageId",message,"conversationId",sessionId)));
                 database.update("INSERT INTO conversation_turns(id,conversation_id,message_id,task_id,request_key,request_json) VALUES (?,?,?,?,?,?::jsonb)",turn,sessionId,message,task,key,payload);
@@ -70,15 +75,20 @@ public class ConversationTurns {
                 return identities(turn,message,task);
             }
             var fixedInput = new java.util.LinkedHashMap<String,Object>(Map.of("conversationId", sessionId, "turnId", turn, "messageId", message,
-                    "content", request.content(), "assetIds", request.context() != null && request.context().has("assetIds")
-                            ? request.context().path("assetIds") : decode(session.get("asset_ids_json")),
+                    "content", request.content(), "assetIds", effectiveContext != null && effectiveContext.has("assetIds")
+                            ? effectiveContext.path("assetIds") : decode(session.get("asset_ids_json")),
                     "history", database.queryForList("SELECT role,content FROM (SELECT role,content,message_seq FROM conversation_messages WHERE conversation_id=? ORDER BY message_seq DESC LIMIT 12) h ORDER BY message_seq", sessionId),
                     "references", request.references() == null ? List.of() : request.references(),
-                    "context", request.context() == null ? Map.of() : request.context()));
-            if (request.context() != null && request.context().has("editing"))
-                fixedInput.put("editing", plans.allocate((UUID)session.get("project_id"), task, request.context().path("editing"), json.valueToTree(fixedInput.get("assetIds"))));
+                    "context", effectiveContext == null ? Map.of() : effectiveContext));
+            if(startsNewRequirement){
+                fixedInput.put("startsNewRequirement",true);
+            }
+            if(effectiveContext!=null&&(effectiveContext.path("requirements").asBoolean(false)||effectiveContext.has("briefRevision")))fixedInput.put("brief",startsNewRequirement?Map.of("fields",Map.of()):briefs.snapshot(sessionId));
+            if (effectiveContext != null && effectiveContext.has("editing"))
+                fixedInput.put("editing", plans.allocate((UUID)session.get("project_id"), task, effectiveContext.path("editing"), json.valueToTree(fixedInput.get("assetIds"))));
             String input = encode(fixedInput);
             database.update("INSERT INTO tasks(id,project_id,type,input_json) VALUES (?,?,'AGENT_TURN',?::jsonb)", task, session.get("project_id"), input);
+            if(startsNewRequirement)briefs.start(sessionId,task,message);
             database.update("INSERT INTO conversation_turns(id,conversation_id,message_id,task_id,request_key,request_json) VALUES (?,?,?,?,?,?::jsonb)", turn, sessionId, message, task, key, payload);
             database.update("INSERT INTO outbox_events(id,task_id,type,payload_json) VALUES (?,?,'AGENT_TURN',jsonb_build_object('schemaVersion','1.0','eventId',?::text,'taskId',?::text,'taskType','AGENT_TURN','projectId',?::text,'occurredAt',now()))", event, task, event, task, session.get("project_id"));
             return identities(turn, message, task);
@@ -113,8 +123,9 @@ public class ConversationTurns {
         if (request.context() != null) {
             if (!request.context().isObject()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "查询上下文必须是对象");
             request.context().fieldNames().forEachRemaining(field -> {
-                if (!java.util.Set.of("assetIds", "editing").contains(field)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "查询上下文字段不受支持");
+                if (!java.util.Set.of("assetIds", "editing", "requirements", "briefRevision").contains(field)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "查询上下文字段不受支持");
             });
+            if(request.context().has("requirements")&&!request.context().path("requirements").isBoolean())throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"需求简报标志必须为布尔值");
             if (request.context().has("assetIds")) {
                 var selected = request.context().path("assetIds");
                 if (!selected.isArray() || selected.size() > 100) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "素材范围不符合要求");
@@ -198,6 +209,7 @@ public class ConversationTurns {
         String name = request.name();
         var arguments = request.arguments();
         var fields = switch (name) {
+            case "update_editing_brief" -> java.util.Set.of("fields");
             case "list_assets" -> java.util.Set.<String>of();
             case "search_evidence" -> java.util.Set.of("query","sourceKinds");
             case "read_evidence_context" -> java.util.Set.of("evidenceId");
@@ -226,7 +238,8 @@ public class ConversationTurns {
         String name=request.name();var arguments=request.arguments();
         String scope = input.path("assetIds").toString();
         Object result;
-        if ("list_assets".equals(name)) {
+        if("update_editing_brief".equals(name)){briefs.validate(input,arguments.path("fields"));result=arguments.path("fields");}
+        else if ("list_assets".equals(name)) {
             var assets = database.queryForList("""
                     SELECT a.id AS "assetId",a.filename,a.duration_ms AS "durationMs",s.status AS "speechStatus"
                     FROM assets a LEFT JOIN asset_analysis_heads h ON h.asset_id=a.id
@@ -290,6 +303,7 @@ public class ConversationTurns {
         if(!Boolean.TRUE.equals(receipt.get("same_request")))throw new ResponseStatusException(HttpStatus.CONFLICT,"工具幂等键内容不同");
         if("SUCCEEDED".equals(receipt.get("status")))return decode(receipt.get("result_json"));
         if(!request.attemptId().equals(receipt.get("attempt_id")))throw new ResponseStatusException(HttpStatus.CONFLICT,"工具调用尝试已经失效");
+        if("update_editing_brief".equals(request.name()))result=briefs.append(task,input,json.valueToTree(result));
         var value=json.valueToTree(result);String scope=input.path("assetIds").toString();
         for(var key:List.of("hits","observations"))for(var observation:value.path(key)) {
             var current=database.queryForList("""

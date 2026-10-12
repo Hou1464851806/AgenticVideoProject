@@ -91,6 +91,7 @@ public class EditPlanValidation {
                     observedEnd=selectedWords.get(selectedWords.size()-1).path("endMs").asLong();
                 }
                 if (caption.isBlank() || caption.length() > 2000 || caption.chars().anyMatch(value -> value < 32 && value != 10)) reject("原文字幕不符合渲染文本限制");
+                for(var forbidden:input.path("editing").path("forbiddenContent"))if(caption.contains(forbidden.asText()))reject("选段原文包含明确禁用内容");
                 cues.add(Map.of("startMs", duration+observedStart-start, "endMs", duration+observedEnd-start,
                         "text", caption, "evidenceId", observation.get("id")));
                 usedEvidence.add((UUID)observation.get("id"));

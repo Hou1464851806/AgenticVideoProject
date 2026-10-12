@@ -37,6 +37,149 @@ class ConversationApiIntegrationTest {
     @org.springframework.beans.factory.annotation.Autowired org.springframework.jdbc.core.JdbcTemplate fixtures;
 
     @Test
+    void editingBriefCorrectionsKeepConditionSourcesAndDeclaredDefaults() throws Exception {
+        BrowserApi owner=signedIn("brief-corrections"),outsider=signedIn("brief-outsider");
+        String project=json(owner.post("/projects","{\"name\":\"制作需求简报\"}")).path("data").path("id").asText();
+        String session=json(owner.post("/projects/"+project+"/conversations","{\"title\":\"教程需求\"}")).path("data").path("id").asText();
+        var accepted=owner.post("/conversations/"+session+"/turns","{\"content\":\"制作一条教程，7至11秒，不展示姓名\",\"context\":{\"requirements\":true}}","brief-first");
+        assertEquals(202,accepted.statusCode(),accepted.body());JsonNode first=json(accepted).path("data");
+        String task=first.path("taskId").asText();
+        var claimResponse=internal(task,"claim",Map.of("executorId","brief-test","claimRequestId",java.util.UUID.randomUUID()));
+        assertEquals(200,claimResponse.statusCode(),claimResponse.body());JsonNode claim=json(claimResponse).path("data");
+        Map<String,Object> fields=Map.of("topic",Map.of("value","教程","basis","EXPLICIT"),"count",Map.of("value",1,"basis","DEFAULT"),"duration",Map.of("value",Map.of("minMs",7000,"maxMs",11000),"basis","EXPLICIT"),"forbiddenContent",Map.of("value",List.of("姓名"),"basis","EXPLICIT"));
+        var call=Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","brief-update","name","update_editing_brief","arguments",Map.of("fields",fields));
+        var update=internal(task,"tool",call);assertEquals(200,update.statusCode(),update.body());
+        assertEquals(json(update).path("data"),json(internal(task,"tool",call)).path("data"));
+        JsonNode brief=json(owner.get("/conversations/"+session+"/snapshot")).path("data").path("brief");
+        assertEquals("教程",brief.path("fields").path("topic").path("value").asText());
+        assertEquals(first.path("messageId").asText(),brief.path("fields").path("topic").path("sourceMessageId").asText());
+        assertEquals("DEFAULT",brief.path("fields").path("count").path("basis").asText());
+        assertEquals(404,outsider.get("/conversations/"+session+"/snapshot").statusCode());
+        assertEquals(200,internal(task,"complete",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","brief-done","resultType","CONVERSATION_ANSWERED","result",Map.of("content","需求简报已记录；默认数量为一条。","evidenceIds",List.of()))).statusCode());
+        JsonNode correction=json(owner.post("/conversations/"+session+"/turns","{\"content\":\"时长改为8至10秒，还不能展示电话\",\"context\":{\"requirements\":true}}","brief-correction")).path("data");
+        task=correction.path("taskId").asText();claim=json(internal(task,"claim",Map.of("executorId","brief-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        var corrected=internal(task,"tool",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","brief-corrected","name","update_editing_brief","arguments",Map.of("fields",Map.of("duration",Map.of("value",Map.of("minMs",8000,"maxMs",10000),"basis","EXPLICIT"),"forbiddenContent",Map.of("value",List.of("姓名","电话"),"basis","EXPLICIT")))));
+        assertEquals(200,corrected.statusCode(),corrected.body());
+        brief=json(owner.get("/conversations/"+session+"/snapshot")).path("data").path("brief");
+        assertEquals(8000,brief.path("fields").path("duration").path("value").path("minMs").asInt());
+        assertEquals(correction.path("messageId").asText(),brief.path("fields").path("duration").path("sourceMessageId").asText());
+        assertEquals(first.path("messageId").asText(),brief.path("fields").path("topic").path("sourceMessageId").asText());
+        assertEquals(2,brief.path("history").size());
+        assertEquals(7000,brief.path("history").get(0).path("fields").path("duration").path("value").path("minMs").asInt());
+        assertEquals(200,internal(task,"complete",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","correction-done","resultType","CONVERSATION_ANSWERED","result",Map.of("content","已纠正简报。","evidenceIds",List.of()))).statusCode());
+        var fromBrief=owner.post("/conversations/"+session+"/turns","{\"content\":\"按已检查简报生成方案\",\"context\":{\"briefRevision\":2,\"editing\":{\"topic\":\"旧表单主题\",\"minDurationMs\":1000,\"maxDurationMs\":2000,\"profile\":\"LANDSCAPE_720\"}}}","apply-corrected-brief");
+        assertEquals(202,fromBrief.statusCode(),fromBrief.body());
+        String produced=json(fromBrief).path("data").path("taskId").asText();
+        JsonNode fixed=json(internal(produced,"claim",Map.of("executorId","brief-production","claimRequestId",java.util.UUID.randomUUID()))).path("data").path("input");
+        assertEquals("教程",fixed.path("editing").path("topic").asText());assertEquals(8000,fixed.path("editing").path("minDurationMs").asInt());assertEquals(10000,fixed.path("editing").path("maxDurationMs").asInt());
+        assertEquals(List.of("姓名","电话"),new ObjectMapper().convertValue(fixed.path("editing").path("forbiddenContent"),List.class));
+        assertEquals(2,fixed.path("brief").path("revision").asInt());
+    }
+
+    @Test
+    void clarificationWaitIsDurableAndOnlyItsExplicitAnswerResumesALinkedTask() throws Exception {
+        BrowserApi owner=signedIn("clarification-owner"),outsider=signedIn("clarification-outsider");
+        String project=json(owner.post("/projects","{\"name\":\"关联澄清\"}")).path("data").path("id").asText();
+        String session=json(owner.post("/projects/"+project+"/conversations","{\"title\":\"等待时长\"}")).path("data").path("id").asText();
+        JsonNode original=json(owner.post("/conversations/"+session+"/turns","{\"content\":\"制作教程，请先确认时长\",\"context\":{\"requirements\":true}}","waiting-original")).path("data");
+        String task=original.path("taskId").asText();JsonNode claim=json(internal(task,"claim",Map.of("executorId","waiting-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        var result=Map.of("question",Map.of("prompt","希望制作多少秒的视频？","fields",List.of("duration"),"reason","关键时长未说明"));
+        var publication=Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","ask-duration","resultType","CONVERSATION_WAITING","result",result);
+        var waiting=internal(task,"complete",publication);assertEquals(200,waiting.statusCode(),waiting.body());
+        JsonNode receipt=json(waiting).path("data");String question=receipt.path("questionId").asText();org.junit.jupiter.api.Assertions.assertFalse(question.isBlank());
+        assertEquals(receipt,json(internal(task,"complete",publication)).path("data"));
+        assertEquals("WAITING_INPUT",json(owner.get("/tasks/"+task)).path("data").path("status").asText());
+        assertEquals(false,json(internal(task,"claim",Map.of("executorId","restart-test","claimRequestId",java.util.UUID.randomUUID()))).path("data").path("claimed").asBoolean());
+        assertEquals(409,owner.post("/conversations/"+session+"/turns","{\"content\":\"8至10秒\"}","unlinked-answer").statusCode());
+        JsonNode snapshot=json(owner.get("/conversations/"+session+"/snapshot")).path("data");
+        assertEquals(1,snapshot.path("questions").size());assertEquals(question,snapshot.path("questions").get(0).path("id").asText());
+        String path="/conversations/"+session+"/questions/"+question+"/answers";
+        assertEquals(404,outsider.post(path,"{\"content\":\"8至10秒\"}","answer").statusCode());
+        var answered=owner.post(path,"{\"content\":\"8至10秒\"}","answer");assertEquals(202,answered.statusCode(),answered.body());JsonNode next=json(answered).path("data");
+        org.junit.jupiter.api.Assertions.assertNotEquals(task,next.path("taskId").asText());assertEquals(task,next.path("resumesTaskId").asText());
+        assertEquals(next,json(owner.post(path,"{\"content\":\"8至10秒\"}","answer")).path("data"));
+        assertEquals(409,owner.post(path,"{\"content\":\"9至11秒\"}","different-answer").statusCode());
+        assertEquals(409,internal(task,"heartbeat",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText())).statusCode());
+        snapshot=json(owner.get("/conversations/"+session+"/snapshot")).path("data");assertEquals("ANSWERED",snapshot.path("questions").get(0).path("status").asText());
+        assertEquals(2,snapshot.path("items").size());assertEquals("8至10秒",snapshot.path("items").get(1).path("content").asText());
+        JsonNode resumed=json(internal(next.path("taskId").asText(),"claim",Map.of("executorId","resumed-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        assertEquals(question,resumed.path("input").path("clarification").path("questionId").asText());
+        assertEquals("8至10秒",resumed.path("input").path("clarification").path("answer").asText());
+    }
+
+    @Test
+    void cancellingAWaitingQuestionReleasesTheConversationAndCannotReviveIt() throws Exception {
+        BrowserApi owner=signedIn("waiting-cancel");String project=json(owner.post("/projects","{\"name\":\"停止澄清\"}")).path("data").path("id").asText();
+        String session=json(owner.post("/projects/"+project+"/conversations","{\"title\":\"等待教程\"}")).path("data").path("id").asText();
+        JsonNode original=json(owner.post("/conversations/"+session+"/turns","{\"content\":\"准备教程方案，先问清楚条件\",\"context\":{\"requirements\":true,\"editing\":{\"topic\":\"教程\",\"minDurationMs\":1000,\"maxDurationMs\":2000,\"profile\":\"LANDSCAPE_720\"}}}","waiting-plan")).path("data");
+        String task=original.path("taskId").asText();JsonNode claim=json(internal(task,"claim",Map.of("executorId","wait-plan-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        var waiting=internal(task,"complete",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","ask-plan","resultType","CONVERSATION_WAITING","result",Map.of("question",Map.of("prompt","是否允许展示姓名？","reason","禁用内容未说明","fields",List.of("forbiddenContent")))));
+        assertEquals(200,waiting.statusCode(),waiting.body());String question=json(waiting).path("data").path("questionId").asText();
+        String other=json(owner.post("/projects/"+project+"/conversations","{\"title\":\"另一会话编辑\"}")).path("data").path("id").asText();
+        var reusedPlan=owner.post("/conversations/"+other+"/turns",new ObjectMapper().writeValueAsString(Map.of("content","继续修改这份方案","context",Map.of("editing",Map.of("topic","教程","minDurationMs",1000,"maxDurationMs",2000,"profile","LANDSCAPE_720","planId",original.path("planId").asText())))),"plan-slot-free");
+        assertEquals(202,reusedPlan.statusCode(),reusedPlan.body());
+        assertEquals(202,owner.post("/tasks/"+task+"/cancel","{}").statusCode());
+        assertEquals("CANCELLED",json(owner.get("/tasks/"+task)).path("data").path("status").asText());
+        JsonNode snapshot=json(owner.get("/conversations/"+session+"/snapshot")).path("data");assertEquals("CANCELLED",snapshot.path("questions").get(0).path("status").asText());
+        assertEquals(409,owner.post("/conversations/"+session+"/questions/"+question+"/answers","{\"content\":\"禁止姓名\"}","late-answer").statusCode());
+        assertEquals(202,owner.post("/conversations/"+session+"/turns","{\"content\":\"开始另一个素材查询\"}","after-wait-cancel").statusCode());
+    }
+
+    @Test
+    void explicitlyStartingANewRequirementClosesTheQuestionAndIsIdempotent() throws Exception {
+        BrowserApi owner=signedIn("waiting-new-requirement");String project=json(owner.post("/projects","{\"name\":\"明确另起需求\"}")).path("data").path("id").asText();
+        String session=json(owner.post("/projects/"+project+"/conversations","{\"title\":\"新需求入口\"}")).path("data").path("id").asText();
+        JsonNode original=json(owner.post("/conversations/"+session+"/turns","{\"content\":\"制作视频\",\"context\":{\"requirements\":true}}","old-demand")).path("data");
+        String task=original.path("taskId").asText();JsonNode claim=json(internal(task,"claim",Map.of("executorId","new-demand-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        var waiting=internal(task,"complete",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","ask-topic","resultType","CONVERSATION_WAITING","result",Map.of("question",Map.of("prompt","希望制作什么主题？","reason","主题缺失","fields",List.of("topic")))));
+        String question=json(waiting).path("data").path("questionId").asText();String path="/conversations/"+session+"/questions/"+question+"/new-requirement";
+        String body="{\"content\":\"放弃上轮，开始整理旅行视频需求\",\"context\":{\"requirements\":true}}";
+        var accepted=owner.post(path,body,"explicit-new");assertEquals(202,accepted.statusCode(),accepted.body());JsonNode fresh=json(accepted).path("data");
+        assertEquals(fresh,json(owner.post(path,body,"explicit-new")).path("data"));
+        assertEquals("CANCELLED",json(owner.get("/tasks/"+task)).path("data").path("status").asText());
+        assertEquals(409,owner.post("/conversations/"+session+"/questions/"+question+"/answers","{\"content\":\"教程\"}","old-answer").statusCode());
+        JsonNode history=json(owner.get("/conversations/"+session+"/snapshot")).path("data");assertEquals(2,history.path("items").size());assertEquals("CANCELLED",history.path("questions").get(0).path("status").asText());
+        JsonNode next=json(internal(fresh.path("taskId").asText(),"claim",Map.of("executorId","fresh-requirement","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        assertEquals(true,next.path("input").path("startsNewRequirement").asBoolean());
+        assertEquals("放弃上轮，开始整理旅行视频需求",next.path("input").path("content").asText());
+    }
+
+    @Test
+    void answeringAQuestionRechecksTheOriginalFixedAssetAndLeavesInvalidAnswersUnaccepted() throws Exception {
+        BrowserApi owner=signedIn("question-fixed-asset");String project=json(owner.post("/projects","{\"name\":\"恢复素材复核\"}")).path("data").path("id").asText();
+        var projectId=java.util.UUID.fromString(project);var asset=java.util.UUID.randomUUID();var upload=java.util.UUID.randomUUID();
+        fixtures.update("INSERT INTO upload_sessions(id,project_id,actor_user_id,idempotency_key,filename,declared_bytes,declared_sha256,part_size_bytes,expected_parts,object_key,writer_token) SELECT ?,id,owner_user_id,?,'question-source.mp4',1,?,1,1,?,? FROM projects WHERE id=?",upload,upload.toString(),"a".repeat(64),upload.toString(),java.util.UUID.randomUUID(),projectId);
+        fixtures.update("INSERT INTO assets(id,project_id,upload_id,object_key,filename,byte_size,sha256,validation_status) VALUES (?,?,?,?,'question-source.mp4',1,?,'VALID')",asset,projectId,upload,asset.toString(),"a".repeat(64));
+        String session=json(owner.post("/projects/"+project+"/conversations",new ObjectMapper().writeValueAsString(Map.of("title","素材恢复","assetIds",List.of(asset))))).path("data").path("id").asText();
+        String task=json(owner.post("/conversations/"+session+"/turns","{\"content\":\"制作教程，时长先问我\",\"context\":{\"requirements\":true}}","asset-question")).path("data").path("taskId").asText();
+        JsonNode claim=json(internal(task,"claim",Map.of("executorId","question-asset-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        String question=json(internal(task,"complete",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","ask-asset-duration","resultType","CONVERSATION_WAITING","result",Map.of("question",Map.of("prompt","制作多少秒？","reason","时长缺失","fields",List.of("duration")))))).path("data").path("questionId").asText();
+        fixtures.update("UPDATE assets SET validation_status='INVALID' WHERE id=?",asset);
+        var answer=owner.post("/conversations/"+session+"/questions/"+question+"/answers","{\"content\":\"8至10秒\"}","invalid-asset-answer");assertEquals(404,answer.statusCode(),answer.body());
+        JsonNode snapshot=json(owner.get("/conversations/"+session+"/snapshot")).path("data");assertEquals("WAITING_INPUT",snapshot.path("latestTask").path("status").asText());assertEquals("OPEN",snapshot.path("questions").get(0).path("status").asText());assertEquals(1,snapshot.path("items").size());
+    }
+
+    @Test
+    void changingThePlanBaseWhileWaitingNeedsAnExplicitBaseAndCreatesALinkedExecution() throws Exception {
+        BrowserApi owner=signedIn("question-plan-base");String project=json(owner.post("/projects","{\"name\":\"基准变更恢复\"}")).path("data").path("id").asText();
+        String session=json(owner.post("/projects/"+project+"/conversations","{\"title\":\"编辑澄清\"}")).path("data").path("id").asText();
+        JsonNode original=json(owner.post("/conversations/"+session+"/turns","{\"content\":\"制作教程，先确认主题\",\"context\":{\"requirements\":true,\"editing\":{\"topic\":\"教程\",\"minDurationMs\":1000,\"maxDurationMs\":2000,\"profile\":\"LANDSCAPE_720\"}}}","base-question")).path("data");
+        String task=original.path("taskId").asText();JsonNode claim=json(internal(task,"claim",Map.of("executorId","base-question-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        String question=json(internal(task,"complete",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","ask-new-base","resultType","CONVERSATION_WAITING","result",Map.of("question",Map.of("prompt","主题如何调整？","reason","主题条件冲突","fields",List.of("topic")))))).path("data").path("questionId").asText();
+        var revision=java.util.UUID.randomUUID();var plan=java.util.UUID.fromString(original.path("planId").asText());
+        fixtures.update("INSERT INTO plan_revisions(id,project_id,plan_id,revision_number,source_task_id,content_json) VALUES (?,?,?,1,?,'{\"schemaVersion\":\"1.0\",\"outputs\":[]}'::jsonb)",revision,java.util.UUID.fromString(project),plan,java.util.UUID.fromString(task));
+        fixtures.update("UPDATE edit_plans SET next_revision_number=2 WHERE id=?",plan);
+        String path="/conversations/"+session+"/questions/"+question+"/answers";
+        assertEquals(409,owner.post(path,"{\"content\":\"改为上传主题\"}","missing-new-base").statusCode());
+        assertEquals("WAITING_INPUT",json(owner.get("/tasks/"+task)).path("data").path("status").asText());
+        var answer=owner.post(path,new ObjectMapper().writeValueAsString(Map.of("content","改为上传主题","editing",Map.of("topic","上传教程","minDurationMs",1000,"maxDurationMs",2000,"profile","LANDSCAPE_720","planId",plan,"baseRevisionId",revision))),"explicit-base-answer");assertEquals(202,answer.statusCode(),answer.body());
+        JsonNode next=json(answer).path("data");assertEquals(task,next.path("resumesTaskId").asText());
+        JsonNode resumed=json(internal(next.path("taskId").asText(),"claim",Map.of("executorId","new-base-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        assertEquals(revision.toString(),resumed.path("input").path("editing").path("baseRevisionId").asText());assertEquals("上传教程",resumed.path("input").path("editing").path("topic").asText());
+        assertEquals(409,internal(task,"heartbeat",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText())).statusCode());
+    }
+
+    @Test
     void multipleSessionsKeepIndependentHistoryAndPrivateOwnershipWithoutAPlan() throws Exception {
         BrowserApi owner = signedIn("conversation-owner");
         BrowserApi outsider = signedIn("conversation-outsider");
