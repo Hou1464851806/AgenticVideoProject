@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import { request } from './api';
 import ProjectWorkspace from './ProjectWorkspace.vue';
 
@@ -48,7 +48,10 @@ async function logout() {
   }
 }
 
+function expired(){if(!user.value)return;user.value=null;notice.value='登录已到期，请重新登录';}
+onUnmounted(()=>window.removeEventListener('auth-required',expired));
 onMounted(async () => {
+  window.addEventListener('auth-required',expired);
   try {
     const result = await request<{ user: User }>('/auth/me');
     user.value = result.user;

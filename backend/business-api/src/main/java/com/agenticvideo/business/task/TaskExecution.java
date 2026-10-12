@@ -21,6 +21,7 @@ public class TaskExecution {
     private final com.agenticvideo.business.search.SearchIndexes indexes;
     private final com.agenticvideo.business.analysis.VisualAnalysis vision;
     private final com.agenticvideo.business.storage.StorageCapacity capacity;
+    private final com.agenticvideo.business.conversation.PublicActivities activities;
     private final JdbcTemplate database;
     private final TransactionTemplate transactions;
     private final ObjectMapper json;
@@ -33,7 +34,8 @@ public class TaskExecution {
     TaskExecution(com.agenticvideo.business.analysis.VisualInspections inspections,com.agenticvideo.business.analysis.VisualAnalysis vision,com.agenticvideo.business.search.SearchIndexes indexes,JdbcTemplate database, PlatformTransactionManager manager, ObjectMapper json,
             @Value("${internal.worker-token:}") String secret, com.agenticvideo.business.analysis.SpeechAnalysis speech,
             com.agenticvideo.business.conversation.ConversationTurns conversations,
-            com.agenticvideo.business.plan.EditPlans plans,com.agenticvideo.business.render.RenderArtifacts artifacts,com.agenticvideo.business.storage.StorageCapacity capacity) {
+            com.agenticvideo.business.plan.EditPlans plans,com.agenticvideo.business.render.RenderArtifacts artifacts,com.agenticvideo.business.storage.StorageCapacity capacity,com.agenticvideo.business.conversation.PublicActivities activities) {
+        this.activities=activities;
         this.inspections=inspections;this.vision=vision;this.indexes=indexes;this.capacity=capacity;
         this.database = database; this.transactions = new TransactionTemplate(manager); this.json = json; this.secret = secret;this.speech=speech;
         this.conversations = conversations;
@@ -63,7 +65,7 @@ public class TaskExecution {
             UUID attemptId = UUID.randomUUID();
             int number = database.queryForObject("SELECT coalesce(max(attempt_number),0)+1 FROM task_attempts WHERE task_id=?", Integer.class, id);
             database.update("INSERT INTO task_attempts (id,task_id,attempt_number,executor_id,claim_request_id,lease_token_hash,lease_expires_at) VALUES (?,?,?,?,?,?,now()+interval '60 seconds')", attemptId, id, number, request.executorId(), request.claimRequestId(), hash(token(attemptId)));
-            database.update("UPDATE tasks SET status='RUNNING',current_attempt_id=? WHERE id=?", attemptId, id);
+            database.update("UPDATE tasks SET status='RUNNING',current_attempt_id=?,public_phase=NULL WHERE id=?", attemptId, id);
             if(java.util.Set.of("VISION_PREPARE","VISION_ANALYZE").contains(task.get("type")))database.update("UPDATE analysis_stages SET status='RUNNING',error_json=NULL WHERE task_id=? AND stage_key='VISION'",id);
             if("CONTENT_ANALYZE".equals(task.get("type"))) database.update("UPDATE analysis_stages SET status='RUNNING',error_json=NULL,updated_at=now() WHERE task_id=? AND stage_key='ASR'",id);
             task.put("status", "RUNNING");
@@ -206,6 +208,7 @@ public class TaskExecution {
                     throw new ResponseStatusException(CONFLICT, "方案结果身份必须由后端成功提交分配");
                 var publication = "EDIT_PROPOSAL".equals(request.resultType()) ? plans.publish(task, input, request.result()) : request.result();
                 Object published = conversations.publish(task, input, publication);
+                database.update("UPDATE assistant_drafts SET status='COMPLETE',content=?,content_version=content_version+1 WHERE task_id=? AND attempt_id=?", publication.path("content").asText(), id, request.attemptId());
                 plans.release(id);
                 var outcome = new java.util.LinkedHashMap<String,Object>((Map<String,Object>)published);
                 if (publication.has("planRevision")) {
@@ -373,6 +376,14 @@ public class TaskExecution {
                     "leaseToken", token(id), "leaseExpiresAt", ((java.sql.Timestamp) attempt.get("lease_expires_at")).toInstant().toString(),
                     "input", input);
         } catch (java.io.IOException invalid) { throw new IllegalStateException("Invalid persisted task input", invalid); }
+    }
+    public Object event(UUID id,TaskController.PublicEvent request) {
+        return transactions.execute(tx -> {
+            var task=locked(id);
+            requireAttempt(task,request.attemptId(),request.leaseToken(),true);
+            if(!"AGENT_TURN".equals(task.get("type")) || !"RUNNING".equals(task.get("status")))throw new ResponseStatusException(CONFLICT,"任务没有公开活动发布资格");
+            return activities.record(task,request);
+        });
     }
     public Object provider(UUID id,TaskController.ProviderCall request) {
         return transactions.execute(tx -> {

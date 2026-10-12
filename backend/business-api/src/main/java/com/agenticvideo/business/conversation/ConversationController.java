@@ -21,8 +21,12 @@ public class ConversationController {
     private final ProjectAccess access;
     private final ObjectMapper json;
     private final ConversationTurns turns;
+    private final ProjectRecovery recovery;
+    private final AssistantDrafts drafts;
 
-    public ConversationController(JdbcTemplate database, ProjectAccess access, ObjectMapper json, ConversationTurns turns) {
+    public ConversationController(JdbcTemplate database, ProjectAccess access, ObjectMapper json, ConversationTurns turns, ProjectRecovery recovery, AssistantDrafts drafts) {
+        this.drafts=drafts;
+        this.recovery=recovery;
         this.database = database;
         this.access = access;
         this.json = json;
@@ -50,6 +54,17 @@ public class ConversationController {
         access.requireOwned(projectId, account);
         return response(Map.of("items", database.query("SELECT id,title,asset_ids_json FROM conversations WHERE project_id=? ORDER BY created_at,id",
                 (row, index) -> Map.of("id", row.getObject("id", UUID.class), "title", row.getString("title"), "assetIds", parse(row.getString("asset_ids_json"))), projectId)));
+    }
+
+    @GetMapping("/conversations/{conversationId}/drafts")
+    public Object drafts(@PathVariable UUID conversationId,@RequestParam(required=false) UUID before,Authentication account) {
+        requireOwned(conversationId,account);return response(drafts.page(conversationId,before));
+    }
+
+    @GetMapping("/conversations/{conversationId}/snapshot")
+    public Object snapshot(@PathVariable UUID conversationId, Authentication account) {
+        requireOwned(conversationId,account);
+        return response(recovery.conversation(conversationId,account));
     }
 
     @GetMapping("/conversations/{conversationId}/messages")

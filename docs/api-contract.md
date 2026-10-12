@@ -132,6 +132,7 @@ SearchHit 基线：assetId、retrievalUnitId、evidenceIds、sourceKind、text�
 | --- | --- |
 | POST /api/v1/projects/{projectId}/conversations | title、可选 planId；创建制作会话，后端分配 graph 关联 |
 | GET /api/v1/projects/{projectId}/conversations | 会话分页与活动摘要 |
+| GET /api/v1/conversations/{conversationId}/drafts?before={messageId} | 每页 10 份未完成草稿与 nextCursor，所有者鉴权；恢复窗口之外显式读取 |
 | GET /api/v1/conversations/{conversationId}/snapshot | 分页历史、活动轮次／问题、需求简报、查看偏好、项目事件 cursor；一致快照 |
 | GET /api/v1/conversations/{conversationId}/messages | beforeMessageSeq、limit；加载更早历史，不替代首次恢复快照 |
 | PATCH /api/v1/conversations/{conversationId}/view | planId、revisionId、outputId、expectedRowVersion；仅查看偏好，不改变任务输入 |

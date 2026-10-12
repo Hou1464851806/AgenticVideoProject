@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { request } from './api';
+import { useProjectEvents } from './projectEvents';
 import type { Playback } from './AssetLibrary.vue';
 import type { PlanBase, PlanSelection } from './PlanPanel.vue';
 const props = defineProps<{ projectId: string; editingBase?: PlanBase | null }>();
@@ -9,7 +10,8 @@ type Session = { id: string; title: string; assetIds: string[] };
 type Asset = { id: string; filename: string };
 type Citation = { type: string; id: string; assetId?: string; text?: string; startMs?: number; endMs?: number; observedAtMs?:number; sourceKind?:string; planId?: string; revisionNumber?: number };
 type Message = { id: string; role: string; content: string; references: Citation[] };
-type History = { items: Message[]; latestTask: { taskId: string; status: string; failure?: {code:string;message:string} | null } | null };
+type AssistantDraft = {messageId:string;attemptId:string;taskId:string;content:string;contentVersion:number;status:string;current:boolean};
+type History = { draftsNextCursor?:string|null; draftsTruncated?:boolean; drafts?:AssistantDraft[]; items: Message[]; latestTask: { taskId: string; status: string; phase?:string; failure?: {code:string;message:string} | null } | null };
 const sessions = ref<Session[]>([]);
 const assets = ref<Asset[]>([]);
 const scope = ref<string[]>([]);
@@ -18,6 +20,11 @@ const selected = ref('');
 const drafts = ref<Record<string,string>>({});
 const references = ref<Record<string,string[]>>({});
 const messages = ref<Message[]>([]);
+const assistantDrafts=ref<AssistantDraft[]>([]);
+const activity=ref('');
+const phaseLabels:Record<string,string>={SEARCHING:'正在检索证据',READING_EVIDENCE:'正在核查原文',MODELING:'正在组织答复',SELF_CHECKING:'正在自检候选',VALIDATING:'正在验证方案'};
+const earlierDrafts=ref<AssistantDraft[]>([]),draftCursor=ref<string|null>(null);
+const visibleDrafts=computed(()=>[...new Map([...assistantDrafts.value,...earlierDrafts.value].map(item=>[item.messageId,item])).values()]);
 const latestTask = ref<History['latestTask']>(null);
 const creating = ref(false);
 const sending = ref(false);
@@ -29,7 +36,8 @@ const settings = computed(() => editing.value[selected.value]!);
 const session = computed(() => sessions.value.find(item => item.id === selected.value));
 const running = computed(() => ['PENDING','RUNNING','CANCEL_REQUESTED','WAITING_INPUT'].includes(latestTask.value?.status ?? ''));
 const draft = computed({ get: () => drafts.value[selected.value] ?? '', set: (value: string) => { drafts.value[selected.value] = value; } });
-let alive = true, reading = false, readingAssets = false;
+let alive = true, readingAssets = false;
+const appliedCursors=new Map<string,bigint>();
 let timer: ReturnType<typeof setInterval> | undefined;
 
 async function loadAssets() {
@@ -46,21 +54,29 @@ async function loadAssets() {
   finally { readingAssets = false; }
 }
 
-async function loadHistory() {
+async function loadHistory(rethrow=false) {
   const id = selected.value;
-  if (!id || reading) return;
-  reading = true;
+  if (!id) return;
   try {
-    const history = await request<History>(`/conversations/${id}/messages`);
-    if (alive && selected.value === id) { messages.value = history.items; latestTask.value = history.latestTask; }
-  } catch (failure) { if (alive && selected.value === id) error.value = failure instanceof Error ? failure.message : '无法读取会话'; }
-  finally { reading = false; }
+    const history = await request<History & {cursor:string}>(`/conversations/${id}/snapshot`);
+    const sequence=BigInt(history.cursor.split(':')[1]!);
+    if (alive && selected.value === id && sequence>=(appliedCursors.get(id)??0n)) { appliedCursors.set(id,sequence); messages.value = history.items; latestTask.value = history.latestTask; activity.value=phaseLabels[history.latestTask?.phase??'']??(history.latestTask?.status==='PENDING'?'正在排队':''); assistantDrafts.value=history.drafts??[]; if(!earlierDrafts.value.length)draftCursor.value=history.draftsNextCursor??null; }
+  } catch (failure) { if (alive && selected.value === id) error.value = failure instanceof Error ? failure.message : '无法读取会话'; if(rethrow)throw failure; }
+}
+async function loadEarlierDrafts(){
+  const id=selected.value,cursor=draftCursor.value;if(!cursor)return;
+  try{
+    const page=await request<{items:AssistantDraft[];nextCursor:string|null}>(`/conversations/${id}/drafts?before=${encodeURIComponent(cursor)}`);
+    if(selected.value!==id)return;
+    earlierDrafts.value.push(...page.items);draftCursor.value=page.nextCursor;
+  }catch(failure){error.value=failure instanceof Error?failure.message:'无法读取未完成草稿';}
 }
 async function choose(id: string) {
   references.value[id] ??= [];
   editing.value[id] ??= {mode:'QUERY',topic:'',minSeconds:10,maxSeconds:30,profile:'LANDSCAPE_720',useBase:false,orderedAssetIds:[]};
   emit('session',id);
-  selected.value = id; messages.value = []; latestTask.value = null; error.value = '';
+  selected.value = id; messages.value = []; latestTask.value = null; assistantDrafts.value=[]; earlierDrafts.value=[]; draftCursor.value=null; activity.value=''; error.value = '';
+  localStorage.setItem(`conversation:${props.projectId}`,id);
   await loadHistory();
 }
 async function create() {
@@ -109,6 +125,13 @@ async function inspect(citation: Citation) {
   try { emit('play', { ...await request<Playback>(`/assets/${citation.assetId}/playback-access`, 'POST', {}), startMs: citation.observedAtMs ?? citation.startMs ?? 0 }); }
   catch (failure) { error.value = failure instanceof Error ? failure.message : '无法核查原视频'; }
 }
+useProjectEvents(async event=>{
+  if(!alive)return;
+  if(event===null || event.conversationId===selected.value){
+    if(event?.payload.phase)activity.value=phaseLabels[String(event.payload.phase)]??'';
+    await loadHistory(true);
+  }
+});
 onMounted(async () => {
   try {
     const [available, existing] = await Promise.all([
@@ -117,8 +140,9 @@ onMounted(async () => {
     ]);
     if (!alive) return;
     assets.value = available.items; scope.value = available.items.map(asset => asset.id); sessions.value = existing.items;
-    if (existing.items.length) await choose(existing.items[existing.items.length-1]!.id);
-    timer = setInterval(() => { void loadHistory(); void loadAssets(); }, 1000);
+    const saved=localStorage.getItem(`conversation:${props.projectId}`);
+    if (existing.items.length) await choose(existing.items.find(item=>item.id===saved)?.id??existing.items[existing.items.length-1]!.id);
+    timer = setInterval(() => { void loadAssets(); }, 5000);
   } catch (failure) { if (alive) error.value = failure instanceof Error ? failure.message : '无法打开对话'; }
 });
 onUnmounted(() => { alive = false; clearInterval(timer); });
@@ -141,6 +165,12 @@ onUnmounted(() => { alive = false; clearInterval(timer); });
     <p v-if="error" role="alert">{{ error }}</p>
     <template v-if="session">
       <p class="scope">本会话固定包含 {{ session.assetIds.length }} 个素材，查询无需创建剪辑方案。</p>
+      <p v-if="running && activity" role="status">{{ activity }}</p>
+      <article v-for="reply in visibleDrafts" :key="reply.messageId" aria-label="助手未完成草稿">
+        <p>{{ reply.current && running ? '正在回复，尚未发布正式答复' : '未完成草稿，未发布正式答复' }}</p>
+        <div class="message-content">{{ reply.content }}</div>
+      </article>
+      <button v-if="draftCursor" type="button" class="secondary" @click="loadEarlierDrafts">查看更早的未完成草稿</button>
       <div class="messages" aria-live="polite">
         <article v-for="message in messages" :key="message.id" :aria-label="message.role === 'USER' ? '用户需求' : '助手答复'">
           <strong>{{ message.role === 'USER' ? '你' : '助手' }}</strong><p class="message-content">{{ message.content }}</p>

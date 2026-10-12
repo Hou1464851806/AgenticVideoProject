@@ -56,6 +56,10 @@ public class TaskController {
             @NotNull com.fasterxml.jackson.databind.JsonNode arguments) {}
     @PostMapping("/internal/v1/tasks/{id}/provider-call")
     Map<String,Object> provider(@PathVariable UUID id,@Valid @RequestBody ProviderCall request) { return envelope(tasks.provider(id,request)); }
+    @PostMapping("/internal/v1/tasks/{id}/events")
+    Map<String,Object> events(@PathVariable UUID id,@Valid @RequestBody PublicEvent request) { return envelope(tasks.event(id,request)); }
+    public record PublicEvent(@NotNull UUID attemptId,@NotBlank String leaseToken,
+            @jakarta.validation.constraints.Min(1) long producerSeq,@NotBlank String type,@NotNull com.fasterxml.jackson.databind.JsonNode payload) {}
     public record ProviderCall(@NotNull UUID attemptId,@NotBlank String leaseToken,@NotBlank String action,@NotNull com.fasterxml.jackson.databind.JsonNode data) {}
     @PostMapping("/internal/v1/tasks/{id}/validate-edit")
     Map<String,Object> validateEdit(@PathVariable UUID id,@Valid @RequestBody Candidate request) { return envelope(tasks.validateEdit(id,request)); }

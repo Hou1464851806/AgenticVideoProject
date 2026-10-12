@@ -47,6 +47,9 @@ public class AuthenticationSecurity {
                 .csrf(csrf -> csrf.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                         .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler()))
                 .authorizeHttpRequests(auth -> auth
+                        // Initial SSE requests are authenticated; the stream rechecks its session.
+                        // Completing a committed async response must not issue a second challenge.
+                        .dispatcherTypeMatchers(jakarta.servlet.DispatcherType.ASYNC).permitAll()
                         .requestMatchers("/api/v1/auth/csrf", "/api/v1/auth/register", "/api/v1/auth/login", "/", "/index.html", "/assets/**").permitAll()
                         .anyRequest().authenticated())
                 .logout(logout -> logout.disable())

@@ -1,4 +1,4 @@
-# 当前项目是怎样工作的（截至 #14、#31、#27）
+# 当前项目是怎样工作的（含 #14、#16、#31、#27）
 
 这份说明对应当前已实现代码。你提到的“ase”，这里按 **ASR（语音识别）** 解释。
 
@@ -34,6 +34,7 @@ flowchart TD
 - 校验和播放原视频；自动识别有音轨视频的语音，按原文或主题检索，查看上下文并跳转原素材。
 - 手动分析画面，查询场景描述和可见文字，查看佐证帧；预算内加密复查或覆盖补查，明确接受后扩大投入。
 - 创建相互独立的制作会话，让 Agent 查询本会话固定素材范围。
+- 用一致快照与项目事件流恢复对话阶段、消息和按尝试隔离的公开草稿；断线、刷新或关闭页面不会取消后台计算。
 - 从一份讲话素材生成一条有硬时长条件的短视频方案；查看历史方案，核查源片段。
 - 手动生成 360p 预览；明确确认某个方案版本，正式导出 720p／1080p MP4，播放、下载和管理成功成片。
 
@@ -167,6 +168,14 @@ flowchart LR
 ### 公开会话历史
 
 用户消息、已发布助手消息和引用保存在 PostgreSQL，每个制作会话独立。界面能读取持久历史。
+
+### 刷新与断线恢复
+
+工作区只维持一条项目 SSE 连接。`ProjectRecovery` 在 PostgreSQL REPEATABLE READ 事务内一起读取业务状态和项目游标；`append_public_event` 在业务事务提交阶段锁定项目计数器，确保游标顺序与提交顺序一致。客户端先应用快照，再订阅该游标之后的日志；处理对象成功后才推进本地游标，并忽略重复序号。断线或游标过期重新读取快照，页面关闭只释放订阅，后台任务继续执行。
+
+模型的推理、普通 assistant 内容和原始工具参数不会进入这个事件流。Python 只从 `answer_query` 工具的顶层公开 `content` 解码增量，按批提交；Spring 校验当前任务、尝试、租约、生产序号、内容版本和 Unicode 位置。草稿按尝试隔离，尚未正式提交时明确标注未完成；正式答复同事务写入持久消息并结束当前草稿。恢复只先取最近 10 份草稿，较早草稿通过鉴权分页读取。会话过期会关闭订阅并要求重新登录。
+
+入口：[一致快照](/Users/nonbeing/AgenticVideoProject/backend/business-api/src/main/java/com/agenticvideo/business/conversation/ProjectRecovery.java:20)、[持久事件与提交序号](/Users/nonbeing/AgenticVideoProject/backend/business-api/src/main/resources/db/migration/V40__project_public_events.sql:1)、[项目订阅](/Users/nonbeing/AgenticVideoProject/frontend/src/projectEvents.ts:10)、[公开草稿解码](/Users/nonbeing/AgenticVideoProject/agent-service/agent_service/public_reply.py:1)。
 
 ### 每轮模型输入
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { provideProjectEvents } from './projectEvents';
 import { request } from './api';
 import UploadPanel from './UploadPanel.vue';
 import UsagePanel from './UsagePanel.vue';
@@ -21,6 +22,7 @@ type Project = { id: string; name: string; rowVersion: number };
 type ProjectPage = { items: Project[]; nextCursor: string | null };
 const projects = ref<Project[]>([]);
 const selected = ref<Project | null>(null);
+const eventStatus=provideProjectEvents(computed(()=>selected.value?.id));
 const nextCursor = ref<string | null>(null);
 const name = ref('');
 const busy = ref(false);
@@ -98,6 +100,7 @@ onUnmounted(() => window.removeEventListener('popstate', restoreSelection));
 </script>
 
 <template>
+  <p v-if="eventStatus" role="status">{{ eventStatus }}</p>
   <section class="projects">
     <p v-if="error" role="alert" class="error">{{ error }}</p>
     <template v-if="!selected">

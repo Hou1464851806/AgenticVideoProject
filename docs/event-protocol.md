@@ -1,6 +1,6 @@
 # 任务通知与公开事件协议
 
-状态：Q58 已确认基线下的协议规格 v1，尚未联调。RabbitMQ 执行通知、内部 Agent 活动回报和浏览器 SSE 是三类消息，分别处理；不把供应商流或 LangGraph 原始事件直接转发前端。
+状态：Q58 已确认基线下的协议规格 v1；#16 已实现对话快照、项目 SSE、公开活动及草稿，验证记录见 verification/issue-16.md。目录中上传、分析、问题和产物专用事件仍为相应功能的协议目标；当前任务状态及正式消息已自动持久发布。RabbitMQ 执行通知、内部 Agent 活动回报和浏览器 SSE 是三类消息，分别处理；不把供应商流或 LangGraph 原始事件直接转发前端。
 
 ## RabbitMQ 执行通知
 
@@ -93,3 +93,13 @@ cursor 绑定项目和提交序号但不是授权；eventSeq 用十进制字符�
 用两个并发事务交错提交验证项目游标顺序；模拟快照后断线、重放重复、草稿增量乱序、旧尝试迟到、通知丢失但日志存在、日志过期和代理超时。验证不同项目不能订阅／恢复他人 cursor，取消／等待不由连接关闭触发，回复和版本结果在刷新后都能恢复。
 
 机制依据沿用 [SSE 标准](https://html.spec.whatwg.org/multipage/server-sent-events.html)、[Spring async requests](https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-ann-async.html)、[PostgreSQL 序列](https://www.postgresql.org/docs/18/functions-sequence.html)、[RabbitMQ confirms](https://www.rabbitmq.com/docs/confirms)。上述快照和日志语义是本系统设计，并非这些组件自动提供。
+
+## #16 实际入口与保留策略
+
+项目快照 `/api/v1/projects/{projectId}/snapshot` 和单会话快照 `/api/v1/conversations/{conversationId}/snapshot` 均使用 REPEATABLE READ，返回相同项目游标语义。单次恢复最多 100 会话、每会话最新 100 条消息；完整历史仍由 messages 入口读取，分页与简报由 #19／#18 继续交付。当前尝试及旧尝试草稿分别返回，不能拼接；每会话恢复最近 10 份未完成草稿，draftsTruncated 与 draftsNextCursor 标明截断，GET `/api/v1/conversations/{id}/drafts?before={messageId}` 每页 10 份，界面可明确加载更早草稿。
+
+内部 events 接口只接受 activity.updated（固定 phase 枚举）及 assistant.delta（messageId、baseContentVersion、offset、appendText）；producerSeq 与内容持久幂等。单批至多 2048 码点，累计至多 8000 码点；completion 更新当前草稿并发布完整正式消息。消息／任务的 deferred constraint trigger 在业务锁完成后分配项目序号，避免在事务中途持有事件计数器再等待其他业务锁。
+
+默认公开日志和终止／旧尝试草稿保留 7 天，清理每分钟运行；PUBLIC_EVENT_RETENTION_SECONDS、ASSISTANT_DRAFT_RETENTION_SECONDS、PUBLIC_EVENT_CLEANUP_MS 可配置。生产调度启用时自动启用回收；独立业务运行可设置 PUBLIC_EVENT_CLEANUP_ENABLED=true。读取事件与保留范围在同一快照中，回收不能造成悄然跳过事件。流限制 128 个连接、共享 4 个轮询线程，每 500ms 读取持久日志，15s 注释心跳，5 分钟连接超时后客户端重连。关闭连接从不取消任务。
+
+供应商流协议依据 [DeepSeek Chat Completions](https://api-docs.deepseek.com/api/create-chat-completion/)：工具参数分片汇总，最终 usage 回执持久保存；浏览器收到的是业务白名单事件。

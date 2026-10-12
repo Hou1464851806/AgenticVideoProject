@@ -7,6 +7,7 @@ from typing import TypedDict
 
 import requests
 from langgraph.graph import StateGraph, START, END
+from .public_reply import PublicReply, streamed_response
 from langgraph.checkpoint.sqlite import SqliteSaver
 
 
@@ -86,9 +87,11 @@ def run_conversation(execution, root):
     model = os.environ.get("DEEPSEEK_MODEL", "deepseek-flash")
     address = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/") + "/chat/completions"
     editing = execution.input.get("editing")
+    public = PublicReply(execution)
 
     def model_node(state):
         execution.check()
+        public.phase("MODELING")
         number = state["calls"] + 1
         if number > 6:
             return {"answer": {"content": "本轮查询预算已用尽，尚未形成可确认的答复。请缩小查询范围后再试。", "evidenceIds": []}, "pending": []}
@@ -96,7 +99,7 @@ def run_conversation(execution, root):
         if state.get("review_response"):
             available = [tool for tool in EDIT_TOOLS if tool["function"]["name"] in {"propose_edit_plan", "answer_query"}]
         payload = {"model": model, "messages": state["messages"], "tools": available, "tool_choice": "required",
-                   "thinking": {"type": "disabled"}, "max_tokens": 2048, "stream": False}
+                   "thinking": {"type": "disabled"}, "max_tokens": 2048, "stream": True, "stream_options": {"include_usage": True}}
         grant = execution.provider("PREPARE", {"callNumber": number, "request": payload})
         if grant["status"] == "SUCCEEDED":
             response = grant["response"]
@@ -104,9 +107,9 @@ def run_conversation(execution, root):
             raise ConversationUnverified("上次 DeepSeek 调用回执不明确，已停止自动重复付费调用")
         else:
             try:
-                with requests.post(address, headers={"Authorization": "Bearer " + key}, json=payload, timeout=(5, 90)) as reply:
+                with requests.post(address, headers={"Authorization": "Bearer " + key}, json=payload, timeout=(5, 90), stream=True) as reply:
                     reply.raise_for_status()
-                    raw = reply.json()
+                    raw = streamed_response(reply, execution, public)
                 message = raw["choices"][0]["message"]
                 # Preserve protocol fields privately; reasoning never becomes public history.
                 message = {field: message[field] for field in ("role", "content", "tool_calls", "reasoning_content") if field in message}
@@ -151,6 +154,7 @@ def run_conversation(execution, root):
             elif name == "search_evidence" and (not isinstance(arguments.get("query"), str) or len(arguments["query"]) > 256):
                 result = {"error": "search_evidence 需要 query 文本参数，最多 256 字符；请修正后重试"}
             else:
+                public.phase("SEARCHING" if name == "search_evidence" else "READING_EVIDENCE")
                 result = execution.post("tool", {"producerKey": f"tool-{state['calls']}-{index}", "name": name, "arguments": arguments})
             messages.append({"role": "tool", "tool_call_id": call["id"], "content": json.dumps(result, ensure_ascii=False)})
         return {"messages": messages, "tools_used": used, "answer": answer, "pending": [],
@@ -158,12 +162,14 @@ def run_conversation(execution, root):
 
     def self_check(state):
         execution.check()
+        public.phase("SELF_CHECKING")
         prompt = "内部自检阶段：核查主题、完整观点、必要上下文、每段来源、用户指定的素材顺序与硬时长。保持原素材时间轴；若需修正则修正。核查后再次通过propose_edit_plan提出完整候选，不发布版本。当前候选：" + json.dumps(state["candidate"], ensure_ascii=False)
         reviewing = {**state, "messages": state["messages"] + [{"role": "user", "content": prompt}], "reviewing": True, "review_response": True}
         return {**model_node(reviewing), "candidate": {}, "reviewing": True, "self_checked": False}
 
     def validate_candidate(state):
         execution.check()
+        public.phase("VALIDATING")
         number = state.get("candidate_checks", 0) + 1
         if number > 3:
             return {"answer": {"content": "本轮有限修正已用尽，未得到满足硬条件的方案。请调整主题或时长后再试。", "evidenceIds": []}}
@@ -217,4 +223,5 @@ def run_conversation(execution, root):
                 "calls": 0, "tools_used": 0, "pending": [], "answer": {}, "candidate": {},
                 "reviewing": False, "self_checked": False, "candidate_checks": 0}, config)
         execution.check()
+        public.update(outcome["answer"].get("content", ""), force=True)
         execution.post("complete", {"producerKey": "conversation-answered", "resultType": "EDIT_PROPOSAL" if "proposal" in outcome["answer"] else "CONVERSATION_ANSWERED", "result": outcome["answer"]})

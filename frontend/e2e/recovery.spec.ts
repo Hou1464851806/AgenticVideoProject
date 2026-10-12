@@ -34,7 +34,7 @@ test('worker interruption after claim and ACK recovers with a new attempt and on
       { timeout: 20000, intervals: [20] }).toBe('RUNNING');
     execFileSync(docker, ['compose', 'kill', '-s', 'SIGKILL', 'media-worker'], { timeout: 10000 });
     expect((await (await page.request.get(`/api/v1/tasks/${taskId}`)).json()).data.status).toBe('RUNNING');
-    execFileSync(docker, ['compose', 'up', '-d', 'media-worker'], { timeout: 30000 });
+    execFileSync(docker, ['compose', 'up', '-d', '--no-deps', 'media-worker'], { timeout: 30000 });
     await expect(page.getByRole('button', { name: '播放 recovery.mp4', exact: true })).toHaveCount(1, { timeout: 100000 });
     const recovered = (await (await page.request.get(`/api/v1/tasks/${taskId}`)).json()).data;
     expect(recovered.status).toBe('SUCCEEDED');
@@ -42,7 +42,7 @@ test('worker interruption after claim and ACK recovers with a new attempt and on
     expect(execFileSync(docker, ['compose', 'exec', '-T', 'media-worker', 'sh', '-c',
       'find /work -mindepth 1 -maxdepth 1 -type d | wc -l'], { timeout: 5000 }).toString().trim()).toBe('0');
   } finally {
-    execFileSync(docker, ['compose', 'up', '-d', 'media-worker'], { timeout: 30000 });
+    execFileSync(docker, ['compose', 'up', '-d', '--no-deps', 'media-worker'], { timeout: 30000 });
     rmSync(directory, { recursive: true, force: true });
   }
 });

@@ -14,6 +14,7 @@ export async function request<T>(path: string, method = 'GET', data?: unknown, e
     method, headers, credentials: 'same-origin', body: data === undefined ? undefined : JSON.stringify(data),
   });
   const result = await response.json();
+  if(response.status===401)window.dispatchEvent(new Event('auth-required'));
   if (!response.ok) throw new ApiFailure(result.error?.message ?? '请求失败，请稍后重试', result.error?.retryable === true);
   return result.data;
 }

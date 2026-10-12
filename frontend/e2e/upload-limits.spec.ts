@@ -41,10 +41,10 @@ test('the real media worker rechecks shared space before downloading and probing
     await page.getByLabel('选择视频',{exact:true}).setInputFiles('e2e/fixtures/short-video.mp4');
     const reply=await completion;expect(reply.status()).toBe(202);
     const upload=(await reply.json()).data;
+    const username=(await page.locator('text=/已登录：/').textContent())!.replace('已登录：','').trim();
     recreate({...process.env,CAPACITY_MIN_FREE_BYTES:'9223372036854775807'});
     execFileSync(docker,['compose','start','media-worker'],{timeout:60000,stdio:'pipe'});
     // Observe via a new login after the API restart.
-    const username=(await page.locator('text=/已登录：/').textContent())!.replace('已登录：','').trim();
     expect((await post(page,'/auth/login',{username,password:'project-browser-password'})).status()).toBe(200);
     await expect.poll(async()=>(await(await page.request.get(`/api/v1/uploads/${upload.uploadId}`)).json()).data.validationStatus,{timeout:30000}).toBe('INVALID');
     const state=(await(await page.request.get(`/api/v1/uploads/${upload.uploadId}`)).json()).data;
