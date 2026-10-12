@@ -55,7 +55,7 @@ class TaskRecovery {
                     }
                     if("CANCEL_REQUESTED".equals(task.get("status"))) {
                         database.update("UPDATE tasks SET status='CANCELLED' WHERE id=?",task.get("id"));
-                        database.update("UPDATE analysis_stages SET status='CANCELLED',updated_at=now() WHERE task_id=? AND stage_key='VISION'",task.get("id"));
+                        database.update("UPDATE analysis_stages SET status='CANCELLED',updated_at=now() WHERE task_id=? AND stage_key IN ('VISION','ASR','EMBEDDING','INDEX') AND status<>'SUCCEEDED'",task.get("id"));
                         inspections.finished(task,"CANCELLED");database.update("UPDATE task_attempts SET status='CANCELLED' WHERE id=?",attempt);
                         database.update("UPDATE edit_plans SET editing_task_id=NULL,editing_attempt_id=NULL WHERE editing_task_id=?",task.get("id"));
                         return;
@@ -66,7 +66,7 @@ class TaskRecovery {
                         database.update("UPDATE tasks SET status='FAILED',result_json=?::jsonb WHERE id=?",error,task.get("id"));inspections.finished(task,"FAILED");
                         database.update("UPDATE edit_plans SET editing_task_id=NULL,editing_attempt_id=NULL WHERE editing_task_id=?",task.get("id"));
                         if("MEDIA_PREPARE".equals(task.get("type"))) database.update("UPDATE assets SET validation_status='INVALID',error_json=?::jsonb WHERE id=(SELECT (input_json->>'assetId')::uuid FROM tasks WHERE id=?) AND validation_status='VALIDATING'",error,task.get("id"));
-                        else database.update("UPDATE analysis_stages SET status='FAILED',error_json=?::jsonb WHERE task_id=? AND stage_key IN ('ASR','INDEX','VISION')",error,task.get("id"));
+                        else database.update("UPDATE analysis_stages SET status='FAILED',error_json=?::jsonb WHERE task_id=? AND stage_key IN ('ASR','INDEX','VISION','EMBEDDING') AND status<>'SUCCEEDED'",error,task.get("id"));
                         return;
                     }
                     database.update("UPDATE tasks SET status='PENDING',current_attempt_id=NULL WHERE id=?",task.get("id"));

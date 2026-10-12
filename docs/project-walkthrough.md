@@ -1,6 +1,6 @@
-# 当前项目是怎样工作的（截至 #13）
+# 当前项目是怎样工作的（截至 #14）
 
-这份说明对应当前已实现代码。#14 尚未开始。你提到的“ase”，这里按 **ASR（语音识别）** 解释。
+这份说明对应当前已实现代码。你提到的“ase”，这里按 **ASR（语音识别）** 解释。
 
 ## 1. 先用一句话理解整个项目
 
@@ -109,7 +109,7 @@ Python 给 VLM 单张图片及固定 JSON 提示，分别得到 `description` �
 
 `evidence_segments` 保存原始观察与出处；`retrieval_units` 保存检索单元并关联原证据；`embedding_batches` 保存实际向量及调用回执；Qdrant 保存派生检索索引。
 
-索引先写入新代次，业务 API 核对数量、身份、向量和可查询性，再切换 `search_index_heads`。构建期间保留旧有效代次；成功向量批次可复用。目前模型、维度和 BM25 配置仍固定，完整的阶段恢复与不兼容配置切换属于尚未实现的 #14。
+索引先写入新代次，业务 API 核对数量、身份、向量和可查询性，再切换 `search_index_heads`。构建期间保留旧有效代次；成功向量批次可复用。素材状态页分别展示媒体、语音、视觉、Embedding 与索引状态，可以只恢复失败阶段。索引配置可选择 text-embedding-v4 / v3、受支持维度与 BM25 平均长度；不同模型、维度和配置使用独立 collection。只改 BM25 配置复用成功向量；主题查询按各 collection 的独立通道排名融合。取消或迟到尝试不能切换有效映射。临时媒体验证故障保留原文件并支持恢复，确定无效或已进入清理的文件需重新上传。
 
 入口：[融合检索](/Users/nonbeing/AgenticVideoProject/backend/business-api/src/main/java/com/agenticvideo/business/search/EvidenceSearch.java:16)、[向量与 BM25 适配](/Users/nonbeing/AgenticVideoProject/backend/business-api/src/main/java/com/agenticvideo/business/search/SearchVectors.java:21)、[索引恢复和发布](/Users/nonbeing/AgenticVideoProject/backend/business-api/src/main/java/com/agenticvideo/business/search/SearchIndexes.java:34)。
 
@@ -197,7 +197,7 @@ checkpoint 解决的是“执行到哪一步”，PostgreSQL 历史保存的是�
 - 基础视觉分析是稀疏单帧观察；连续动作、镜头关系和未采到的画面还不能完整覆盖。
 - 文字检索效果受到 ASR / VLM 识别准确性及检索单元质量影响；排名需要回看验证。
 - #13 补查由用户结果卡启动，尚未成为 Agent 的自主工具。
-- #14 的完整失败阶段恢复、独立 Embedding 状态及不兼容模型配置切换尚未实现。
+- 已完成分阶段恢复及不兼容索引配置隔离；回执未知的付费调用仍须核查，程序不会盲目重提。
 - 当前方案是一份讲话素材、一条短视频；多条成片、定向修改和跨素材混剪仍是后续票。
 - 当前会话有持久历史和有限输入窗口，完整长历史治理尚未实现。
 

@@ -120,7 +120,7 @@ public class TaskExecution {
             String state = task.get("status").toString();
             String next = switch(state) { case "PENDING" -> "CANCELLED"; case "RUNNING" -> "CANCEL_REQUESTED"; default -> state; };
             database.update("UPDATE tasks SET status=? WHERE id=?", next, id);
-            if("CANCELLED".equals(next))database.update("UPDATE analysis_stages SET status='CANCELLED',updated_at=now() WHERE task_id=? AND stage_key='VISION'",id);
+            if("CANCELLED".equals(next))database.update("UPDATE analysis_stages SET status='CANCELLED',updated_at=now() WHERE task_id=? AND stage_key IN ('VISION','ASR','EMBEDDING','INDEX') AND status<>'SUCCEEDED'",id);
             if("CANCELLED".equals(next))inspections.finished(task,"CANCELLED");
             if (java.util.Set.of("CANCELLED", "FAILED", "SUCCEEDED").contains(next)) plans.release(id);
             return Map.of("taskId", id, "status", next);
@@ -135,7 +135,7 @@ public class TaskExecution {
             if (!"CANCEL_REQUESTED".equals(task.get("status"))) throw new ResponseStatusException(CONFLICT, "任务没有有效取消请求");
             database.update("UPDATE task_attempts SET status='CANCELLED' WHERE id=?", request.attemptId());
             database.update("UPDATE tasks SET status='CANCELLED' WHERE id=?", id);
-            database.update("UPDATE analysis_stages SET status='CANCELLED',updated_at=now() WHERE task_id=? AND stage_key='VISION'",id);
+            database.update("UPDATE analysis_stages SET status='CANCELLED',updated_at=now() WHERE task_id=? AND stage_key IN ('VISION','ASR','EMBEDDING','INDEX') AND status<>'SUCCEEDED'",id);
             plans.release(id);inspections.finished(task,"CANCELLED");
             return Map.of("status", "CANCELLED");
         });
@@ -317,7 +317,9 @@ public class TaskExecution {
             if("INDEX_BUILD".equals(task.get("type"))) {
                 database.update("UPDATE task_attempts SET status='FAILED' WHERE id=?",request.attemptId());
                 database.update("UPDATE tasks SET status='FAILED',result_json=?::jsonb WHERE id=?",payload,id);
-                database.update("UPDATE analysis_stages SET status='FAILED',error_json=?::jsonb,updated_at=now() WHERE task_id=? AND stage_key='INDEX'",payload,id);
+                boolean embedded=database.queryForObject("SELECT count(*) FROM embedding_batches b JOIN search_index_generations g ON g.id=b.generation_id WHERE g.task_id=? AND b.status<>'SUCCEEDED'",Integer.class,id)==0;
+                database.update("UPDATE analysis_stages SET status=?,error_json=?::jsonb,updated_at=now() WHERE task_id=? AND stage_key=?", "FAILED",payload,id,embedded?"INDEX":"EMBEDDING");
+                database.update("UPDATE search_index_generations SET status='FAILED' WHERE task_id=?",id);
                 database.update("INSERT INTO execution_reports(task_id,attempt_id,report_kind,producer_key,payload_json,outcome_json) VALUES (?,?,'FAIL',?,?::jsonb,'{\"status\":\"FAILED\"}'::jsonb)",id,request.attemptId(),request.producerKey(),payload);
                 return Map.of("status","FAILED");
             }

@@ -25,7 +25,7 @@ public class EvidenceSearch {
                 """;
         var matches=database.queryForList("SELECT u.*,a.filename,a.sha256 "+valid+" AND position(? in u.text)>0 ORDER BY a.id,u.start_ms,u.id LIMIT ?",project,kinds,scope,scope,query,literal?limit:50);
         var generations=database.queryForList("""
-                SELECT g.id,g.asset_id FROM search_index_heads sh JOIN search_index_generations g ON g.id=sh.generation_id
+                SELECT g.* FROM search_index_heads sh JOIN search_index_generations g ON g.id=sh.generation_id
                 JOIN assets a ON a.id=g.asset_id AND a.project_id=g.project_id
                 JOIN asset_analysis_heads h ON h.asset_id=a.id AND h.analysis_id=g.analysis_id
                 JOIN asset_analysis_revisions r ON r.id=h.analysis_id AND r.source_sha256=a.sha256
@@ -34,24 +34,31 @@ public class EvidenceSearch {
         boolean available=!generations.isEmpty();
         var rankings=new LinkedHashMap<String,List<String>>();
         if(literal||!available){rankings.put("LITERAL",matches.stream().map(row->row.get("id").toString()).toList());return new Result(matches,List.of("LITERAL"),available,rankings,List.of());}
-        var projectIds=generations.stream().map(row->row.get("id").toString()).toList();
         var scopedIds=generations.stream().filter(row->assetScope==null||assetScope.contains(row.get("asset_id"))).map(row->row.get("id").toString()).toList();
         if(scopedIds.isEmpty())return new Result(matches,List.of("LITERAL"),false,Map.of(),List.of());
-        Object filter=SearchVectors.scope(project,scopedIds,sourceKinds),corpus=SearchVectors.scope(project,projectIds);
-        var dense=vectors.query(vectors.embed(query),"dense",filter,corpus,50);
-        var bm25=vectors.query(vectors.document(query),"bm25",filter,corpus,50);
-        for(var channel:Map.of("DENSE",dense,"BM25",bm25).entrySet()) {
-            var ids=new ArrayList<String>();for(var point:channel.getValue())ids.add(point.path("payload").path("unitId").asText());
-            rankings.put(channel.getKey(),ids);
+        var groups=generations.stream().collect(java.util.stream.Collectors.groupingBy(row->row.get("collection_name").toString()));
+        var channelRanks=new LinkedHashMap<String,Map<String,Integer>>();
+        channelRanks.put("DENSE",new HashMap<>());channelRanks.put("BM25",new HashMap<>());
+        for(var group:groups.values()) {
+            var ids=group.stream().filter(row->scopedIds.contains(row.get("id").toString())).map(row->row.get("id").toString()).toList();
+            if(ids.isEmpty())continue;
+            var profile=vectors.profile(group.get(0));
+            Object filter=SearchVectors.scope(project,ids,sourceKinds),corpus=SearchVectors.scope(project,group.stream().map(row->row.get("id").toString()).toList());
+            var dense=vectors.query(vectors.embed(query,profile),"dense",filter,corpus,50,profile.collection());
+            var bm25=vectors.query(vectors.document(query,profile),"bm25",filter,corpus,50,profile.collection());
+            for(var channel:Map.of("DENSE",dense,"BM25",bm25).entrySet())for(int i=0;i<channel.getValue().size();i++)
+                channelRanks.get(channel.getKey()).merge(channel.getValue().get(i).path("payload").path("unitId").asText(),i+1,Math::min);
         }
-        rankings.put("LITERAL",matches.stream().map(row->row.get("id").toString()).toList());
+        var literalRanks=new HashMap<String,Integer>();for(int i=0;i<matches.size();i++)literalRanks.put(matches.get(i).get("id").toString(),i+1);
+        channelRanks.put("LITERAL",literalRanks);
+        for(var channel:channelRanks.entrySet())rankings.put(channel.getKey(),channel.getValue().keySet().stream().sorted(Comparator.<String>comparingInt(channel.getValue()::get).thenComparing(id->id)).toList());
         var scores=new HashMap<String,Double>();
-        for(var ids:rankings.values())for(int i=0;i<ids.size();i++)scores.merge(ids.get(i),1.0/(60+i+1),Double::sum);
+        for(var ranks:channelRanks.values())for(var rank:ranks.entrySet())scores.merge(rank.getKey(),1.0/(60+rank.getValue()),Double::sum);
         var ordered=scores.keySet().stream().sorted(Comparator.<String>comparingDouble(scores::get).reversed().thenComparing(id->id)).limit(limit).toList();
         var rows=new ArrayList<Map<String,Object>>();
         for(var id:ordered) {
             var found=database.queryForList("SELECT u.*,a.filename,a.sha256 "+valid+" AND u.id=?",project,kinds,scope,scope,UUID.fromString(id));
-            if(!found.isEmpty()){var row=new LinkedHashMap<>(found.get(0));row.put("rrfScore",scores.get(id));row.put("channelRanks",rankings.entrySet().stream().filter(channel->channel.getValue().contains(id)).collect(java.util.stream.Collectors.toMap(Map.Entry::getKey,channel->channel.getValue().indexOf(id)+1)));rows.add(row);}
+            if(!found.isEmpty()){var row=new LinkedHashMap<>(found.get(0));row.put("rrfScore",scores.get(id));row.put("channelRanks",channelRanks.entrySet().stream().filter(channel->channel.getValue().containsKey(id)).collect(java.util.stream.Collectors.toMap(Map.Entry::getKey,channel->channel.getValue().get(id))));rows.add(row);}
         }
         rankings.put("RRF",ordered);
         return new Result(rows,List.of("DENSE","BM25","LITERAL"),true,rankings,scopedIds);

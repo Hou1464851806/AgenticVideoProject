@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
 import { request } from './api';
+import AnalysisStatus from './AnalysisStatus.vue';
 import type { Playback } from './AssetLibrary.vue';
 const props = defineProps<{ playback: Playback }>();
 type Stream = { codec_type: string; codec_name: string; width?: number; height?: number; avg_frame_rate?: string; r_frame_rate?: string };
@@ -8,10 +9,8 @@ const information = ref<{ mediaInfo: { streams: Stream[] }; timeMapping: { hasAu
 const error = ref('');
 const stream = computed(() => information.value?.mediaInfo.streams.find(value => value.codec_type === 'video'));
 const codec = computed(() => stream.value?.codec_name === 'h264' ? 'H.264' : stream.value?.codec_name.toUpperCase());
-const stageNames: Record<string,string> = { MEDIA:'媒体',ASR:'语音',VISION:'画面',INDEX:'索引' };
-const stageStates: Record<string,string> = { SUCCEEDED:'已就绪',NOT_APPLICABLE:'不适用',NOT_STARTED:'尚未开始',PENDING:'等待执行',RUNNING:'正在分析',FAILED:'失败',UNVERIFIED:'未验证',CANCELLED:'已取消' };
 type Observation = { id: string; text: string; startMs: number; endMs: number };
-const evidence = ref<{ observations: Observation[]; summary: { text?: string } } | null>(null);
+const evidence = ref<{ observations: Observation[]; units: unknown[]; summary: { text?: string } } | null>(null);
 async function refreshInformation(id: string) {
   try {
     const [details,observations] = await Promise.all([
@@ -98,9 +97,7 @@ function enforceClipEnd() {
       <dt v-if="stream.r_frame_rate !== stream.avg_frame_rate">帧率</dt><dd v-if="stream.r_frame_rate !== stream.avg_frame_rate">可变帧率</dd>
     </dl>
     <p v-if="error" role="alert">{{ error }}</p>
-    <p v-if="information?.analysis?.stages.ASR === 'NOT_APPLICABLE'">无音轨，不能进行语音分析</p>
-    <p v-for="(name,key) in stageNames" :key="key">{{ name }}：{{ stageStates[information?.analysis?.stages[key] ?? 'PENDING'] ?? '状态待核对' }}</p>
-    <p v-for="(failure,key) in information?.analysis?.errors" :key="`error-${key}`" role="alert">{{ failure.message }}</p>
+    <AnalysisStatus :asset-id="playback.assetId" />
     <video ref="video" :src="source" controls preload="metadata" aria-label="视频播放器"
       @error="refreshAccess" @loadedmetadata="loaded" @loadeddata="refreshed = false" @timeupdate="enforceClipEnd"></video>
     <form @submit.prevent="seek"><label for="seek-seconds">定位秒数</label><input id="seek-seconds" v-model="seconds" type="number" min="0" step="0.1"><button type="submit">定位播放</button></form>

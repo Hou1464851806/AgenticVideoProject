@@ -25,7 +25,7 @@ public class SpeechAnalysis {
                 analysisId,projectId,assetId,media.path("sha256").asText(),"speech-v1",derived.isObject()?derived.toString():null);
         database.update("INSERT INTO asset_analysis_heads (asset_id,analysis_id) VALUES (?,?)",assetId,analysisId);
         for(var stage:Map.of("MEDIA","SUCCEEDED","ASR",audio?"PENDING":"NOT_APPLICABLE","UNITS",audio?"PENDING":"NOT_APPLICABLE",
-                "INDEX",audio?"NOT_STARTED":"NOT_APPLICABLE","VISION","NOT_STARTED").entrySet())
+                "INDEX",audio?"NOT_STARTED":"NOT_APPLICABLE","EMBEDDING",audio?"NOT_STARTED":"NOT_APPLICABLE","VISION","NOT_STARTED").entrySet())
             database.update("INSERT INTO analysis_stages (asset_id,analysis_id,stage_key,status) VALUES (?,?,?,?)",assetId,analysisId,stage.getKey(),stage.getValue());
         if(audio && derived.isObject()) {
             UUID task=UUID.randomUUID(),event=UUID.randomUUID();
@@ -40,7 +40,7 @@ public class SpeechAnalysis {
     }
     public Object provider(UUID taskId,UUID attempt,JsonNode input,String action,JsonNode data) {
         UUID analysis=UUID.fromString(input.path("analysisId").asText());
-        var rows=database.queryForList("SELECT * FROM model_calls WHERE analysis_id=? FOR UPDATE",analysis);
+        var rows=database.queryForList("SELECT * FROM model_calls WHERE analysis_id=? ORDER BY retry_number DESC LIMIT 1 FOR UPDATE",analysis);
         if(rows.isEmpty()) {
             if(!"LOOKUP".equals(action)) throw conflict("模型调用尚未登记");
             database.update("INSERT INTO model_calls (id,analysis_id,task_id,owner_attempt_id,model,parameters_json,status) VALUES (?,?,?,?,?,?::jsonb,'READY')",
@@ -125,7 +125,18 @@ public class SpeechAnalysis {
             result.put(row.get("stage_key").toString(),row.get("status"));
             if(row.get("error_json")!=null)errors.put(row.get("stage_key").toString(),parse(row.get("error_json")));
         }
-        return Map.of("stages",result,"errors",errors);
+        if(result.isEmpty()) {
+            var source=database.queryForMap("SELECT validation_status,error_json FROM assets WHERE id=?",asset);
+            var media=database.queryForList("SELECT id,status FROM tasks WHERE type='MEDIA_PREPARE' AND input_json->>'assetId'=? ORDER BY created_at DESC LIMIT 1",asset.toString());
+            String validation=source.get("validation_status").toString();
+            String state="INVALID".equals(validation)?"FAILED":"VALID".equals(validation)?"SUCCEEDED":media.isEmpty()?"PENDING":media.get(0).get("status").toString();
+            result.put("MEDIA",state);
+            for(String stage:List.of("ASR","VISION","EMBEDDING","INDEX"))result.put(stage,"NOT_STARTED");
+            if(source.get("error_json")!=null)errors.put("MEDIA",parse(source.get("error_json")));
+            boolean retryable="CANCELLED".equals(state)||"FAILED".equals(state)&&source.get("error_json")!=null&&Set.of("MEDIA_EXECUTION_FAILED","EXECUTION_RECOVERY_EXHAUSTED").contains(parse(source.get("error_json")).path("code").asText());
+            return Map.of("stages",result,"errors",errors,"mediaRetryable",retryable);
+        }
+        return Map.of("stages",result,"errors",errors,"mediaRetryable",false);
     }
     public Object evidence(UUID asset) {
         var observations=new ArrayList<Object>();

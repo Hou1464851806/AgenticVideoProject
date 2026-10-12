@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue';
 import { request } from './api';
+import AnalysisStatus from './AnalysisStatus.vue';
+const selectedStatus = ref<string | null>(null);
 export type Playback = { assetId: string; filename: string; url: string; durationMs: number; expiresAt: string; startMs?: number; endMs?: number };
 const props = defineProps<{ projectId: string }>();
 const emit = defineEmits<{ play: [value: Playback] }>();
-const items = ref<Array<{ id: string; filename: string }>>([]);
+const items = ref<Array<{ id: string; filename: string; validationStatus: string }>>([]);
 const error = ref('');
 let timer: ReturnType<typeof setInterval> | undefined;
 async function refresh() {
-  try { items.value = (await request<{ items: typeof items.value }>(`/projects/${props.projectId}/assets`)).items; }
+  try { items.value = (await request<{ items: typeof items.value }>(`/projects/${props.projectId}/assets?includePending=true`)).items; }
   catch (failure) { error.value = failure instanceof Error ? failure.message : '无法查询素材'; }
 }
 async function play(id: string) {
@@ -24,8 +26,9 @@ onUnmounted(() => clearInterval(timer));
 </script>
 <template>
   <section v-if="items.length" class="library">
-    <h3>可用素材</h3>
-    <div v-for="asset in items" :key="asset.id"><button @click="play(asset.id)">播放 {{ asset.filename }}</button><button @click="analyzeVision(asset.id)">分析画面 {{asset.filename}}</button></div>
+    <h3>素材状态与操作</h3>
+    <div v-for="asset in items" :key="asset.id"><button v-if="asset.validationStatus === 'VALID'" @click="play(asset.id)">播放 {{ asset.filename }}</button><button v-if="asset.validationStatus === 'VALID'" @click="analyzeVision(asset.id)">分析画面 {{asset.filename}}</button><button @click="selectedStatus=asset.id">查看分析状态 {{asset.filename}}</button></div>
+    <div v-if="selectedStatus"><button @click="selectedStatus=null">关闭分析状态</button><AnalysisStatus :asset-id="selectedStatus" /></div>
   </section>
   <p v-if="error" role="alert">{{ error }}</p>
 </template>

@@ -91,7 +91,7 @@ services:
       STORAGE_ACCESS_KEY: agentic-storage
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
-      QDRANT_URL: http://qdrant:6333
+      QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
       DASHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/api/v1}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}
@@ -127,7 +127,7 @@ services:
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
       INTERNAL_WORKER_TOKEN: ${INTERNAL_WORKER_TOKEN}
       TASKS_DISPATCH_ENABLED: 'true'
-      QDRANT_URL: http://qdrant:6333
+      QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
       DASHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/api/v1}
       MODEL_RECORD_REQUEST_MAX_BYTES: ${MODEL_RECORD_REQUEST_MAX_BYTES:-16777216}

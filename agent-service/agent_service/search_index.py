@@ -10,7 +10,7 @@ def build_index(execution):
     profile = record("LOOKUP")
     endpoint = os.environ.get("DASHSCOPE_BASE_URL", "https://dashscope.aliyuncs.com/api/v1")
     key = os.environ.get("DASHSCOPE_API_KEY", "")
-    if not key:
+    if not key and any(batch["status"] != "SUCCEEDED" for batch in profile["batches"]):
         raise RuntimeError("Embedding credentials unavailable")
     for batch in profile["batches"]:
         execution.check()
@@ -32,8 +32,9 @@ def build_index(execution):
         record("SUCCEEDED", {"ordinal": batch["ordinal"], "vectors": [item["embedding"] for item in embeddings],
                              "requestId": result.get("request_id", ""), "usage": result.get("usage", {})})
     profile = record("LOOKUP")
+    record("INDEXING")
     base = os.environ.get("QDRANT_URL", "http://qdrant:6333")
-    collection = "evidence_qwen_v4_1024_bm25_v1"
+    collection = profile["collection"]
     path = base + "/collections/" + collection
     response = requests.get(path, timeout=(3, 10))
     if response.status_code == 404:

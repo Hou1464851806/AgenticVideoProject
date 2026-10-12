@@ -19,10 +19,12 @@ class SearchIndexController {
         requireOwned(asset,account);
         return Map.of("data",indexes.status(asset),"requestId",UUID.randomUUID());
     }
+    record Configuration(String model,Integer dimension,Integer bm25AvgLength) {}
     @PostMapping("/api/v1/assets/{asset}/search-index")
-    ResponseEntity<?> rebuild(@PathVariable UUID asset,Authentication account) {
+    ResponseEntity<?> rebuild(@PathVariable UUID asset,@RequestBody(required=false) Configuration config,Authentication account) {
         requireOwned(asset,account);
-        return ResponseEntity.accepted().body(Map.of("data",transactions.execute(tx->indexes.enqueue(asset)),"requestId",UUID.randomUUID()));
+        var profile=config==null||config.model()==null&&config.dimension()==null&&config.bm25AvgLength()==null?null:SearchVectors.profile(config.model(),config.dimension(),config.bm25AvgLength());
+        return ResponseEntity.accepted().body(Map.of("data",transactions.execute(tx->profile==null?indexes.enqueue(asset):indexes.enqueue(asset,profile)),"requestId",UUID.randomUUID()));
     }
     private void requireOwned(UUID asset,Authentication account) {
         var rows=database.queryForList("SELECT project_id FROM assets WHERE id=?",asset);

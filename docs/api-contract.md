@@ -262,3 +262,13 @@ complete 结果类型为 MEDIA_PREPARED、ANALYSIS_RESULT、INDEX_VERIFIED、AGE
 - `POST /visual-inspections/{id}/expansion-proposal`：当前轮次结束后生成并复用拟扩大素材／范围／新增预算／费用说明；PROPOSED 不启动执行。
 - `POST /visual-inspections/{id}/expansion-decision`：`choice: APPROVE | DECLINE`，所有者明确选择；接受才产生 childInspectionId。重复相同选择幂等，不同选择 409；尚无方案返回 409，拒绝保留父轮结果。
 - 首轮 4 帧 / 4 调用 / 8 步 / 180 秒 / 4 MiB；明确接受的子轮 8 帧 / 8 调用 / 16 步 / 300 秒 / 8 MiB。预算与截止时间跨尝试保存，过期心跳 STOP，取消／版本／尝试失效不能发布。
+
+## #14 分阶段恢复与可配置索引
+
+`GET /assets/{id}` 的 analysis.stages 分别返回 MEDIA、ASR、VISION、EMBEDDING、INDEX，附 errors；尚未通过媒体验证时也提供阶段状态及 mediaRetryable。临时执行失败／取消可恢复，确定无效或进入清理不可恢复。
+
+`POST /assets/{id}/analysis-stages/{stage}/retry` 校验所有者和当前阶段，仅 FAILED／UNVERIFIED／CANCELLED 可恢复；已接纳的 PENDING／RUNNING 返回同一 taskId。MEDIA 重用停止的原任务及固定原文件身份，检查容量及清理记录；ASR 恢复原提供方任务，明确 FAILED 终态由用户显式重试创建新回执行，UNKNOWN／UNCERTAIN 不重复付费；VISION、EMBEDDING、INDEX 复用已完成观察或向量。不重置成功阶段。
+
+`POST /assets/{id}/search-index` 可传 `{model,dimension,bm25AvgLength}`；省略配置保留最近代次配置，无历史时默认 text-embedding-v4 / 1024 / 256。支持 v4 的 64、128、256、512、768、1024、1536、2048，v3 至 1024；平均长度 1–8192。不支持的配置 400；不同配置任务正在执行时 409。同配置有效任务幂等复用。
+
+每代持久保存 collection_name；不同配置隔离 collection，成功 Dense 批次按模型／维度／单元身份和原文复用，与 BM25 配置无关。查询固定已发布代次及对应配置，跨 collection 用独立通道名次做 RRF。执行器完成 Embedding 后调用 provider-call INDEXING，再写 Qdrant；当前尝试通过内容与可查询性核对后才切换 head。
