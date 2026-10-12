@@ -2,7 +2,7 @@
 
 本轮按 ready-for-agent 的 32 张子任务实施；#1 为汇总需求。实施起点为 `63efde7`，在当前 main 分支逐票提交。
 
-11 张 P0 任务均已实现、验证并逐票本地提交。P1 #7、#8、#11、#12、#13、#14、#31 已完成。按用户最新要求，接下来实施 #27；其他 P1 / P2 尚待后续阶段。当前功能见 [功能清单](current-features.md)，实现原理与代码入口见 [项目讲解](project-walkthrough.md)。
+11 张 P0 任务均已实现、验证并逐票本地提交。P1 #7、#8、#11、#12、#13、#14、#31、#27 已完成。本次要求的 #14 → #31 → #27 已依次完成；其他 P1 / P2 尚待后续阶段。当前功能见 [功能清单](current-features.md)，实现原理与代码入口见 [项目讲解](project-walkthrough.md)。
 
 已确认测试边界：公开 HTTP 接口为主，关键 PostgreSQL／对象存储／消息／媒体／模型边界使用真实集成；浏览器验证用户操作闭环。
 
@@ -33,7 +33,7 @@
 | [#24](https://github.com/Hou1464851806/AgenticVideoProject/issues/24) [T23] 手动生成带原声与字幕的低清效果预览 | P0 | #20 | 实现与验证完成，见 [记录](verification/issue-24.md) |
 | [#25](https://github.com/Hou1464851806/AgenticVideoProject/issues/25) [T24] 确认具体版本后明确导出并下载一条成片 | P0 | #24 | 实现与验证完成，见 [记录](verification/issue-25.md) |
 | [#26](https://github.com/Hou1464851806/AgenticVideoProject/issues/26) [T25] 批量导出选定成片并展示部分完成 | P1 | #21, #25 | 待实施 |
-| [#27](https://github.com/Hou1464851806/AgenticVideoProject/issues/27) [T26] 按需求跨素材编排并导出基础混剪 | P1 | #25 | 待实施 |
+| [#27](https://github.com/Hou1464851806/AgenticVideoProject/issues/27) [T26] 按需求跨素材编排并导出基础混剪 | P1 | #25 | 已完成；后端 86 / 浏览器 66 全通过，双轴审查 PASS；见 [验证记录](verification/issue-27.md) |
 | [#28](https://github.com/Hou1464851806/AgenticVideoProject/issues/28) [T27] 隐藏、恢复和安全删除素材 | P1 | #20 | 待实施 |
 | [#29](https://github.com/Hou1464851806/AgenticVideoProject/issues/29) [T28] 清理过期预览并按需重新生成 | P1 | #24 | 待实施 |
 | [#30](https://github.com/Hou1464851806/AgenticVideoProject/issues/30) [T29] 回收派生媒体后仍能核查历史证据 | P1 | #12, #20 | 待实施 |

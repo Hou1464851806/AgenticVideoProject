@@ -22,10 +22,10 @@ public class EditPlans {
         this.validation = validation;
     }
 
-    public JsonNode allocate(UUID project, UUID task, JsonNode editing) {
+    public JsonNode allocate(UUID project, UUID task, JsonNode editing, JsonNode scope) {
         if (!editing.isObject()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "制作条件必须是对象");
         editing.fieldNames().forEachRemaining(field -> {
-            if (!Set.of("topic", "minDurationMs", "maxDurationMs", "profile", "planId", "baseRevisionId").contains(field))
+            if (!Set.of("topic", "minDurationMs", "maxDurationMs", "profile", "planId", "baseRevisionId", "kind", "orderedAssetIds").contains(field))
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "制作条件字段不受支持");
         });
         String topic = editing.path("topic").asText().strip();
@@ -36,6 +36,16 @@ public class EditPlans {
                 || minimum < 1 || maximum < minimum || maximum > 3600000
                 || !Set.of("LANDSCAPE_720", "PORTRAIT_720").contains(editing.path("profile").asText()))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "请明确主题、合法的硬时长范围与支持的画幅");
+        if (editing.has("kind") && !Set.of("SPEECH", "MONTAGE").contains(editing.path("kind").asText()))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "制作类型不受支持");
+        if ("MONTAGE".equals(editing.path("kind").asText())) {
+            var order=editing.path("orderedAssetIds");var authorized=new java.util.HashSet<String>();
+            for(var asset:scope)authorized.add(asset.asText());
+            var seen=new java.util.HashSet<String>();
+            if(!order.isArray()||order.size()<2||order.size()>10)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"混剪须明确 2 至 10 个素材的顺序");
+            for(var asset:order)if(!asset.isTextual()||!authorized.contains(asset.asText())||!seen.add(asset.asText()))
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"混剪顺序只能包含固定范围内不重复的素材");
+        } else if(editing.has("orderedAssetIds"))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"素材顺序仅用于混剪制作");
         UUID plan;
         if (!editing.has("planId")) {
             if (editing.hasNonNull("baseRevisionId")) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "新方案不能引用已有基准版本");
@@ -130,7 +140,16 @@ public class EditPlans {
 
     public Object candidateWindow(JsonNode input, Map<String,Object> target, java.util.List<Map<String,Object>> observations) {
         long sourceDuration = database.queryForObject("SELECT duration_ms FROM assets WHERE id=?", Long.class, target.get("asset_id"));
-        long minimum = input.path("editing").path("minDurationMs").asLong(), maximum = input.path("editing").path("maxDurationMs").asLong();
+        if (!"SPEECH".equals(target.get("source_kind"))) {
+            if (!"MONTAGE".equals(input.path("editing").path("kind").asText()))
+                return Map.of("available", false, "reason", "讲话方案须核查语音原句；画面帧只提供观察时刻");
+            long point=((Number)target.get("start_ms")).longValue();
+            long start=Math.max(0,point-1000),end=Math.min(sourceDuration,point+1000);
+            return Map.of("available",end>point,"assetId",target.get("asset_id"),"sourceInMs",start,"sourceOutMs",end,
+                    "durationMs",end-start,"evidenceIds",java.util.List.of(target.get("id")),"purpose","CANDIDATE",
+                    "note","原视频候选范围包含该观察时刻；帧证据不证明整个区间的画面内容，需用户回看核查。可在素材合法范围内调整时长，总时长由全部混剪片段共同满足。");
+        }
+        long minimum = "MONTAGE".equals(input.path("editing").path("kind").asText()) ? 1 : input.path("editing").path("minDurationMs").asLong(), maximum = input.path("editing").path("maxDurationMs").asLong();
         long sentenceStart = ((Number)target.get("start_ms")).longValue(), sentenceEnd = ((Number)target.get("end_ms")).longValue();
         if (minimum > sourceDuration || sentenceEnd-sentenceStart > maximum)
             return Map.of("available", false, "reason", "该原句完整范围与素材时长无法满足本次硬时长，请比较其他候选或解释限制");

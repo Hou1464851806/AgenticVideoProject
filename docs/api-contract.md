@@ -281,3 +281,9 @@ complete 结果类型为 MEDIA_PREPARED、ANALYSIS_RESULT、INDEX_VERIFIED、AGE
 - `reportedUsage` 保留提供方用量，`usageBasis=REPORTED/ESTIMATED` 区分完整实际报告与输入／输出预算估算；费用始终为公开价估算，`estimatedCostCny=null` 表示价格未知，合计是已知价格部分，另列 `unpricedCallCount`。`SUBMITTING/SUBMITTED/UNCERTAIN` 单列未确认数量，不能视为未收费。
 - ASR、VLM、索引向量、Agent 来自原持久回执；查询向量先保存 SUBMITTING，再记录响应用量或 UNCERTAIN。回执不返回请求／响应正文。向量复用批次不计调用数与费用；单次查询中同模型／维度共享查询向量。
 - 分类已占用来自物理对象、未完成分片与未发布尝试文件；原文件缺失不按声明大小冒充占用。预留含工作区保守执行预算，待清理是已占用的子集。测量不可用返回失败，不冒充零值。
+
+## #27 跨素材基础混剪
+
+`POST /conversations/{id}/turns` 复用 `context.editing`：增加可选 `kind`（默认／SPEECH 为单素材讲话，MONTAGE 为混剪）和混剪必填 `orderedAssetIds`（2–10 个固定范围内不重复素材）。主题、硬时长、画幅、方案与基准版本字段继续沿用。顺序无效 400，事务回滚，不留下消息或方案。显式编辑条件不触发确认或导出，即使需求提及这些词。
+
+混剪内部候选仍为 `{title,clips}`；同素材区间不得重叠，跨素材可使用相同原素材时间；实际素材连续分组必须与指定顺序完全相同。每个片段须引用本轮 read_evidence_context 实际读取出处，语音与区间重叠，画面／可见文字观察点位于左闭右开片段。无音轨片段无虚构字幕。候选校验、当前尝试、幂等发布、版本、确认、预览与导出接口均沿用。

@@ -1,4 +1,4 @@
-# 当前项目是怎样工作的（截至 #14、#31）
+# 当前项目是怎样工作的（截至 #14、#31、#27）
 
 这份说明对应当前已实现代码。你提到的“ase”，这里按 **ASR（语音识别）** 解释。
 
@@ -198,7 +198,7 @@ checkpoint 解决的是“执行到哪一步”，PostgreSQL 历史保存的是�
 - 文字检索效果受到 ASR / VLM 识别准确性及检索单元质量影响；排名需要回看验证。
 - #13 补查由用户结果卡启动，尚未成为 Agent 的自主工具。
 - 已完成分阶段恢复及不兼容索引配置隔离；回执未知的付费调用仍须核查，程序不会盲目重提。
-- 当前方案是一份讲话素材、一条短视频；多条成片、定向修改和跨素材混剪仍是后续票。
+- 当前可生成单素材讲话方案，或按指定素材顺序生成一条跨素材混剪；多条成片与定向修改仍是后续票。
 - 当前会话有持久历史和有限输入窗口，完整长历史治理尚未实现。
 
 阅读代码时建议依次看：`MediaExecutor → SpeechAnalysis / VisualAnalysis → EvidenceSearch → conversation.py → ConversationTurns → EditPlans`。先沿一条真实用户操作走完，再深入任务、存储与恢复细节。
@@ -208,3 +208,11 @@ checkpoint 解决的是“执行到哪一步”，PostgreSQL 历史保存的是�
 `usage/ProjectStorage.java` 按已授权项目找到上传、素材和渲染请求，再直接核对 Silo 对象与分片。`ModelUsage.java` 汇合已有 ASR／VLM／Embedding／DeepSeek 回执；`QueryModelCalls.java` 保存同步检索 Embedding 的提交与不确定性，不保存查询原文。`ModelPricing.java` 用有日期的公开价估算，未知模型保留 null 费用；`UsagePanel.vue` 展示分类、用途、预警和分页回执。
 
 这层计量不会触发模型。工作区预留与物理已占用分开；待清理仍属于已占用。缺实际用量标 ESTIMATED，成功向量复用不另算模型调用。详细价格依据和验证范围见 [#31 验证](verification/issue-31.md)。
+
+## #27：同一编辑流程的跨素材混剪
+
+ConversationPanel 将 `editing.kind=MONTAGE` 和有序 `orderedAssetIds` 随需求提交。ConversationTurns 对显式编辑条件优先进入编辑流程，需求中的“不导出”不会被生产命令分流截获。EditPlans 在固定会话范围内接纳不重复的至少两份素材，仍分配原有方案身份与编辑权。
+
+同一受控 Agent 使用 list_assets、search_evidence、read_evidence_context，读取每份素材的证据和邻近上下文后提交候选、自检与确定性校验。EditPlanValidation 按素材分别检查时间重叠，检查完整素材顺序、合法范围及本轮已读取出处；语音区间须重叠片段，画面证据的观察时刻须位于片段内。静音素材允许没有语音字幕，所有字幕仍来自已有 ASR 原文。
+
+发布仍写 plan_revisions、revision_asset_refs、revision_evidence_refs，确认和导出完全沿用原接口。MediaRenderer 已有跨素材硬切：每段缩放留边并统一帧率，原声重采样至 48kHz 双声道，无音轨段补静音，映射后的中文字幕烧入 MP4；再次渲染不调用理解或 embedding 模型。

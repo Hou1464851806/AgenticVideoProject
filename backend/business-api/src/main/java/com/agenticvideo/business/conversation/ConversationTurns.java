@@ -42,7 +42,8 @@ public class ConversationTurns {
     public Object accept(UUID sessionId, String key, ConversationController.Turn request) {
         if (key.isBlank() || key.length() > 120) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "发送幂等键不符合要求");
         boolean replayExists=database.queryForObject("SELECT count(*) FROM conversation_turns WHERE conversation_id=? AND request_key=?",Integer.class,sessionId,key)>0;
-        var preparation=replayExists?null:production.prepare(sessionId,request.content());
+        boolean editingIntent=request.context()!=null&&request.context().has("editing");
+        var preparation=replayExists||editingIntent?null:production.prepare(sessionId,request.content());
         return transactions.execute(tx -> {
             var session = database.queryForMap("SELECT * FROM conversations WHERE id=? FOR UPDATE", sessionId);
             String payload = encode(Map.of("content", request.content(),
@@ -61,7 +62,7 @@ public class ConversationTurns {
             long sequence = database.queryForObject("SELECT coalesce(max(message_seq),0)+1 FROM conversation_messages WHERE conversation_id=?", Long.class, sessionId);
             database.update("INSERT INTO conversation_messages(id,conversation_id,message_seq,role,content,references_json) VALUES (?,?,?,'USER',?,?::jsonb)",
                     message, sessionId, sequence, request.content(), encode(request.references() == null ? List.of() : request.references()));
-            var command=production.route(session,message,request.content(),preparation);
+            var command=editingIntent?null:production.route(session,message,request.content(),preparation);
             if(command!=null){
                 database.update("INSERT INTO tasks(id,project_id,type,status,input_json) VALUES (?,?,'PRODUCTION_COMMAND','SUCCEEDED',?::jsonb)",task,session.get("project_id"),encode(Map.of("messageId",message,"conversationId",sessionId)));
                 database.update("INSERT INTO conversation_turns(id,conversation_id,message_id,task_id,request_key,request_json) VALUES (?,?,?,?,?,?::jsonb)",turn,sessionId,message,task,key,payload);
@@ -75,7 +76,7 @@ public class ConversationTurns {
                     "references", request.references() == null ? List.of() : request.references(),
                     "context", request.context() == null ? Map.of() : request.context()));
             if (request.context() != null && request.context().has("editing"))
-                fixedInput.put("editing", plans.allocate((UUID)session.get("project_id"), task, request.context().path("editing")));
+                fixedInput.put("editing", plans.allocate((UUID)session.get("project_id"), task, request.context().path("editing"), json.valueToTree(fixedInput.get("assetIds"))));
             String input = encode(fixedInput);
             database.update("INSERT INTO tasks(id,project_id,type,input_json) VALUES (?,?,'AGENT_TURN',?::jsonb)", task, session.get("project_id"), input);
             database.update("INSERT INTO conversation_turns(id,conversation_id,message_id,task_id,request_key,request_json) VALUES (?,?,?,?,?,?::jsonb)", turn, sessionId, message, task, key, payload);

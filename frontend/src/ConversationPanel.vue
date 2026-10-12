@@ -23,7 +23,7 @@ const creating = ref(false);
 const sending = ref(false);
 const error = ref('');
 const pending = new Map<string,{ key: string; serialized: string }>();
-type Settings = {mode:string;topic:string;minSeconds:number;maxSeconds:number;profile:string;useBase:boolean};
+type Settings = {mode:string;topic:string;minSeconds:number;maxSeconds:number;profile:string;useBase:boolean;orderedAssetIds:string[]};
 const editing = ref<Record<string,Settings>>({});
 const settings = computed(() => editing.value[selected.value]!);
 const session = computed(() => sessions.value.find(item => item.id === selected.value));
@@ -58,7 +58,7 @@ async function loadHistory() {
 }
 async function choose(id: string) {
   references.value[id] ??= [];
-  editing.value[id] ??= {mode:'QUERY',topic:'',minSeconds:10,maxSeconds:30,profile:'LANDSCAPE_720',useBase:false};
+  editing.value[id] ??= {mode:'QUERY',topic:'',minSeconds:10,maxSeconds:30,profile:'LANDSCAPE_720',useBase:false,orderedAssetIds:[]};
   emit('session',id);
   selected.value = id; messages.value = []; latestTask.value = null; error.value = '';
   await loadHistory();
@@ -72,17 +72,23 @@ async function create() {
   } catch (failure) { error.value = failure instanceof Error ? failure.message : '无法创建制作会话'; }
   finally { creating.value = false; }
 }
+function moveMontage(index:number,delta:number){
+  const order=settings.value.orderedAssetIds,target=index+delta;
+  if(target<0||target>=order.length)return;
+  const [asset]=order.splice(index,1);order.splice(target,0,asset!);
+}
 async function send() {
   if (!selected.value || sending.value || running.value || !draft.value.trim()) return;
   const id = selected.value, content = draft.value;
   const condition = settings.value;
   const context: Record<string,unknown> = {};
-  if (condition.mode === 'GENERATE_PLAN') {
+  if (['GENERATE_PLAN','MONTAGE'].includes(condition.mode)) {
     if (!condition.topic.trim() || condition.minSeconds <= 0 || condition.maxSeconds < condition.minSeconds || condition.maxSeconds > 3600) {
       error.value = '请明确主题和合法的硬时长范围'; return;
     }
     if (condition.useBase && !props.editingBase) { error.value = '请先查看要继续生成的方案版本'; return; }
-    context.editing = {topic:condition.topic,minDurationMs:Math.round(condition.minSeconds*1000),maxDurationMs:Math.round(condition.maxSeconds*1000),profile:condition.profile,
+    if(condition.mode==='MONTAGE'&&condition.orderedAssetIds.length<2){error.value='请按顺序选择至少两份素材';return;}
+    context.editing = {...(condition.mode==='MONTAGE'?{kind:'MONTAGE',orderedAssetIds:condition.orderedAssetIds}:{}),topic:condition.topic,minDurationMs:Math.round(condition.minSeconds*1000),maxDurationMs:Math.round(condition.maxSeconds*1000),profile:condition.profile,
       ...(condition.useBase && props.editingBase ? {planId:props.editingBase.planId,baseRevisionId:props.editingBase.revisionId} : {})};
   }
   const body = { content, references: (references.value[id] ?? []).map(assetId => ({ type: 'ASSET', id: assetId })), context };
@@ -150,12 +156,20 @@ onUnmounted(() => { alive = false; clearInterval(timer); });
       <p v-if="running" role="status">正在处理需求；可以继续编辑草稿，完成后再发送。</p>
       <p v-else-if="latestTask?.status === 'FAILED'" role="alert">{{ latestTask.failure?.code === 'MODEL_RECORD_TOO_LARGE' ? latestTask.failure.message : '本次对话未完成，未发布正式答复。' }}</p>
       <form @submit.prevent="send">
-        <label for="intent-select">需求类型</label><select id="intent-select" v-model="settings.mode"><option value="QUERY">查询素材</option><option value="GENERATE_PLAN">生成讲话方案</option></select>
-        <fieldset v-if="settings.mode === 'GENERATE_PLAN'"><legend>本次明确制作条件</legend>
+        <label for="intent-select">需求类型</label><select id="intent-select" v-model="settings.mode"><option value="QUERY">查询素材</option><option value="GENERATE_PLAN">生成讲话方案</option><option value="MONTAGE">生成跨素材混剪</option></select>
+        <fieldset v-if="['GENERATE_PLAN','MONTAGE'].includes(settings.mode)"><legend>本次明确制作条件</legend>
           <label for="plan-topic">方案主题</label><input id="plan-topic" v-model="settings.topic" required maxlength="120">
           <label for="minimum-duration">最短时长（秒）</label><input id="minimum-duration" v-model.number="settings.minSeconds" type="number" min="0.001" max="3600" step="0.001" required>
           <label for="maximum-duration">最长时长（秒）</label><input id="maximum-duration" v-model.number="settings.maxSeconds" type="number" :min="settings.minSeconds" max="3600" step="0.001" required>
           <label for="output-profile">输出画幅</label><select id="output-profile" v-model="settings.profile"><option value="LANDSCAPE_720">横屏 720p</option><option value="PORTRAIT_720">竖屏 720p</option></select>
+          <fieldset v-if="settings.mode==='MONTAGE'"><legend>混剪素材顺序</legend>
+            <label v-for="asset in assets.filter(item=>session?.assetIds.includes(item.id))" :key="asset.id" class="choice"><input v-model="settings.orderedAssetIds" type="checkbox" :value="asset.id" :aria-label="`混剪素材 ${asset.filename}`">{{asset.filename}}</label>
+            <ol><li v-for="(id,index) in settings.orderedAssetIds" :key="id">{{assets.find(item=>item.id===id)?.filename??id}}
+              <button type="button" class="secondary" :disabled="index===0" :aria-label="`上移混剪素材 ${assets.find(item=>item.id===id)?.filename??id}`" @click="moveMontage(index,-1)">上移</button>
+              <button type="button" class="secondary" :disabled="index===settings.orderedAssetIds.length-1" :aria-label="`下移混剪素材 ${assets.find(item=>item.id===id)?.filename??id}`" @click="moveMontage(index,1)">下移</button>
+            </li></ol>
+            <p>选择至少两份素材；Agent 按此顺序选段，只使用已核查证据。无音轨片段保留静音。</p>
+          </fieldset>
           <label class="choice"><input v-model="settings.useBase" type="checkbox" :disabled="!editingBase">基于正在查看的方案重新生成</label>
           <p>未勾选时创建独立方案。硬时长无法满足时会解释，内部候选不会成为版本。</p>
         </fieldset>

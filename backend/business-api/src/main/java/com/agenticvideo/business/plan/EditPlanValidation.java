@@ -23,7 +23,10 @@ public class EditPlanValidation {
         Set<UUID> scope = new HashSet<>(), usedAssets = new HashSet<>(), usedEvidence = new HashSet<>();
         for (var asset : input.path("assetIds")) scope.add(identifier(asset));
         var ordered = new ArrayList<Object>(); var cues = new ArrayList<Object>();
-        var sourceRanges = new ArrayList<long[]>();
+        boolean montage="MONTAGE".equals(input.path("editing").path("kind").asText());
+        var requiredOrder=new ArrayList<UUID>();for(var asset:input.path("editing").path("orderedAssetIds"))requiredOrder.add(identifier(asset));
+        var actualOrder=new ArrayList<UUID>();
+        var sourceRanges = new HashMap<UUID,List<long[]>>();
         long duration = 0;
         for (var clip : clips) {
             fields(clip, Set.of("assetId", "sourceInMs", "sourceOutMs", "evidenceIds", "reason"));
@@ -31,12 +34,13 @@ public class EditPlanValidation {
             var assets = database.queryForList("SELECT duration_ms,time_mapping_json FROM assets WHERE id=? AND project_id=? AND validation_status='VALID'", asset, task.get("project_id"));
             if (!scope.contains(asset) || assets.isEmpty()) reject("片段素材不在接纳时固定的有效项目范围内");
             usedAssets.add(asset);
-            if (usedAssets.size() != 1) reject("当前初始讲话方案只支持从一份讲话素材选段");
+            if (!montage && usedAssets.size() != 1) reject("当前初始讲话方案只支持从一份讲话素材选段");
+            if(actualOrder.isEmpty()||!actualOrder.get(actualOrder.size()-1).equals(asset))actualOrder.add(asset);
             long start = milliseconds(clip.path("sourceInMs")), end = milliseconds(clip.path("sourceOutMs"));
             long sourceDuration = ((Number)assets.get(0).get("duration_ms")).longValue();
             if (start < 0 || end <= start || end > sourceDuration) reject("片段须满足 0 ≤ 起点 < 终点 ≤ 素材时长");
-            for (var range : sourceRanges) if (start < range[1] && end > range[0]) reject("不能重复使用重叠的原文区间凑时长");
-            sourceRanges.add(new long[]{start,end});
+            for (var range : sourceRanges.computeIfAbsent(asset, ignored -> new ArrayList<>())) if (start < range[1] && end > range[0]) reject("不能重复使用重叠的原文区间凑时长");
+            sourceRanges.get(asset).add(new long[]{start,end});
             JsonNode ids = clip.path("evidenceIds");
             if (!ids.isArray() || ids.isEmpty() || ids.size() > 50) reject("每个讲话片段必须包含实际核查的语音出处");
             var clipEvidence = new LinkedHashSet<UUID>();
@@ -50,11 +54,12 @@ public class EditPlanValidation {
                             AND o->>'evidenceId'=?)
                         """, Boolean.class, task.get("id"), evidence.toString());
                 if (!Boolean.TRUE.equals(read)) reject("选段依据须先通过本轮上下文工具核查");
-                var rows = database.queryForList("SELECT asset_id,start_ms,end_ms FROM evidence_segments WHERE id=? AND project_id=? AND source_kind='SPEECH'", evidence, task.get("project_id"));
-                if (rows.isEmpty() || !asset.equals(rows.get(0).get("asset_id"))
-                        || ((Number)rows.get(0).get("start_ms")).longValue() >= end
-                        || ((Number)rows.get(0).get("end_ms")).longValue() <= start)
-                    reject("语音依据须与对应片段的原素材区间重叠");
+                var rows = database.queryForList("SELECT asset_id,source_kind,start_ms,end_ms FROM evidence_segments WHERE id=? AND project_id=?", evidence, task.get("project_id"));
+                if(rows.isEmpty()||!asset.equals(rows.get(0).get("asset_id")))reject("依据须属于对应片段素材");
+                var observation=rows.get(0);boolean speech="SPEECH".equals(observation.get("source_kind"));
+                long observedStart=((Number)observation.get("start_ms")).longValue(),observedEnd=((Number)observation.get("end_ms")).longValue();
+                if(speech ? observedStart>=end||observedEnd<=start : !montage||observedStart<start||observedStart>=end)
+                    reject("语音依据须重叠片段；混剪画面依据的观察时刻须位于片段内");
                 usedEvidence.add(evidence);
             }
             // Derive all captions from stored observations, never from model-generated text.
@@ -64,7 +69,8 @@ public class EditPlanValidation {
                     WHERE e.asset_id=? AND e.project_id=? AND e.source_kind='SPEECH'
                     AND e.start_ms<? AND e.end_ms>? ORDER BY e.start_ms,e.ordinal,e.id
                     """, asset, task.get("project_id"), end, start);
-            if (observations.isEmpty() || observations.size() > 100) reject("片段语音证据为空或超过字幕上限");
+            boolean hasAudio=parseMapping(assets.get(0).get("time_mapping_json")).path("hasAudio").asBoolean();
+            if (observations.isEmpty() && (!montage || hasAudio) || observations.size() > 100) reject("片段语音证据为空或超过字幕上限");
             for (var observation : observations) {
                 long observedStart = ((Number)observation.get("start_ms")).longValue();
                 long observedEnd = ((Number)observation.get("end_ms")).longValue();
@@ -94,6 +100,7 @@ public class EditPlanValidation {
                     "reason", text(clip.path("reason"), 1000)));
             duration += end-start; // source ranges and clip count make this sum bounded.
         }
+        if(montage && !actualOrder.equals(requiredOrder))reject("片段素材须完整遵循用户指定顺序，不能遗漏或交错素材");
         JsonNode editing = input.path("editing");
         if (duration < editing.path("minDurationMs").asLong() || duration > editing.path("maxDurationMs").asLong()) reject("选段总时长不满足用户硬时长范围");
         boolean portrait = "PORTRAIT_720".equals(editing.path("profile").asText());
@@ -103,6 +110,10 @@ public class EditPlanValidation {
         var output = Map.of("outputId", UUID.randomUUID(), "title", title, "durationMs", duration,
                 "render", render, "clips", ordered, "subtitles", Map.of("enabled", true, "cues", cues));
         return new Validated(Map.of("schemaVersion", "1.0", "outputs", List.of(output)), usedAssets, usedEvidence);
+    }
+    private JsonNode parseMapping(Object value) {
+        try { return new com.fasterxml.jackson.databind.ObjectMapper().readTree(value.toString()); }
+        catch(java.io.IOException invalid){throw new IllegalStateException(invalid);}
     }
     private void fields(JsonNode object, Set<String> allowed) {
         if (!object.isObject()) reject("提议结构必须是对象");

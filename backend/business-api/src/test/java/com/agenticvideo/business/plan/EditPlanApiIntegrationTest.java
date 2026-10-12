@@ -301,6 +301,81 @@ class EditPlanApiIntegrationTest {
         var response=internal(task,"complete",request);assertEquals(200,response.statusCode(),response.body());return json(response).path("data");
     }
 
+    @Test
+    void montageUsesReadEvidenceAcrossSourcesInExplicitOrderAndMapsOriginalCaptions() throws Exception {
+        BrowserApi owner=signedIn("montage-owner"), outsider=signedIn("montage-outsider");
+        String project=json(owner.post("/projects","{\"name\":\"跨素材混剪\"}")).path("data").path("id").asText();
+        var first=speechFixture(project);var second=speechFixture(project);
+        String session=json(owner.post("/projects/"+project+"/conversations",new ObjectMapper().writeValueAsString(java.util.Map.of("title","指定顺序","assetIds",java.util.List.of(first.asset(),second.asset()))))).path("data").path("id").asText();
+        var editing=java.util.Map.of("topic","上传步骤","minDurationMs",6000,"maxDurationMs",6000,"profile","PORTRAIT_720","kind","MONTAGE","orderedAssetIds",java.util.List.of(second.asset(),first.asset()));
+        String body=new ObjectMapper().writeValueAsString(java.util.Map.of("content","先第二素材再第一素材，保留原句。只生成方案，不导出","context",java.util.Map.of("editing",editing)));
+        var accepted=owner.post("/conversations/"+session+"/turns",body,"montage-one");assertEquals(202,accepted.statusCode(),accepted.body());
+        String task=json(accepted).path("data").path("taskId").asText(),plan=json(accepted).path("data").path("planId").asText();
+        org.junit.jupiter.api.Assertions.assertFalse(plan.isBlank(),accepted.body());
+        var claim=json(internal(task,"claim",java.util.Map.of("executorId","montage-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        var credentials=new java.util.HashMap<String,Object>();credentials.put("attemptId",claim.path("attemptId").asText());credentials.put("leaseToken",claim.path("leaseToken").asText());
+        for(var source:java.util.List.of(first,second)){
+            var read=new java.util.HashMap<String,Object>(credentials);read.put("producerKey","read-"+source.asset());read.put("name","read_evidence_context");read.put("arguments",java.util.Map.of("evidenceId",source.first()));
+            var response=internal(task,"tool",read);assertEquals(200,response.statusCode(),response.body());
+        }
+        var a=java.util.Map.of("assetId",first.asset(),"sourceInMs",2000,"sourceOutMs",5000,"evidenceIds",java.util.List.of(first.first()),"reason","完整上传原句");
+        var b=java.util.Map.of("assetId",second.asset(),"sourceInMs",2000,"sourceOutMs",5000,"evidenceIds",java.util.List.of(second.first()),"reason","按用户指定先播放第二素材");
+        var candidate=new java.util.HashMap<String,Object>(credentials);candidate.put("producerKey","wrong-order");candidate.put("proposal",java.util.Map.of("title","错误顺序","clips",java.util.List.of(a,b)));
+        assertEquals(false,json(internal(task,"validate-edit",candidate)).path("data").path("valid").asBoolean());
+        var proposal=java.util.Map.of("title","按指定顺序混剪","clips",java.util.List.of(b,a));candidate.put("producerKey","correct-order");candidate.put("proposal",proposal);
+        var checked=internal(task,"validate-edit",candidate);assertEquals(true,json(checked).path("data").path("valid").asBoolean(),checked.body());
+        var completion=new java.util.HashMap<String,Object>(credentials);completion.put("producerKey","montage-publish");completion.put("resultType","EDIT_PROPOSAL");completion.put("result",java.util.Map.of("content","已依据两份原文编排。","proposal",proposal));
+        var completed=internal(task,"complete",completion);assertEquals(200,completed.statusCode(),completed.body());
+        String revision=json(completed).path("data").path("revisionId").asText();var output=json(owner.get("/revisions/"+revision)).path("data").path("content").path("outputs").get(0);
+        assertEquals(6000,output.path("durationMs").asLong());assertEquals(second.asset().toString(),output.path("clips").get(0).path("assetId").asText());
+        assertEquals(first.asset().toString(),output.path("clips").get(1).path("assetId").asText());assertEquals(2,output.path("subtitles").path("cues").size());
+        assertEquals(0,output.path("subtitles").path("cues").get(0).path("startMs").asLong());assertEquals(3000,output.path("subtitles").path("cues").get(1).path("startMs").asLong());
+        assertEquals("第一步，上传素材。",output.path("subtitles").path("cues").get(1).path("text").asText());
+        assertEquals(1,json(owner.get("/plans/"+plan+"/revisions")).path("data").path("items").size());assertEquals(404,outsider.get("/revisions/"+revision).statusCode());
+        assertEquals(json(completed).path("data"),json(internal(task,"complete",completion)).path("data"));
+    }
+
+    @Test
+    void montageCanUseReadFrameEvidenceForSilentMediaWithoutInventingCaptions() throws Exception {
+        BrowserApi owner=signedIn("silent-montage-owner");
+        String project=json(owner.post("/projects","{\"name\":\"语音与静音混剪\"}")).path("data").path("id").asText();
+        var speech=speechFixture(project);var silent=speechFixture(project);var visual=java.util.UUID.randomUUID();var frame=java.util.UUID.randomUUID();var call=java.util.UUID.randomUUID();
+        var analysis=fixtures.queryForObject("SELECT analysis_id FROM asset_analysis_heads WHERE asset_id=?",java.util.UUID.class,silent.asset());
+        fixtures.update("DELETE FROM evidence_segments WHERE asset_id=?",silent.asset());
+        fixtures.update("UPDATE assets SET duration_ms=4000,time_mapping_json='{\"hasAudio\":false}',media_info_json='{\"streams\":[{\"codec_type\":\"video\"}]}' WHERE id=?",silent.asset());
+        fixtures.update("INSERT INTO vision_frames(id,analysis_id,ordinal,observed_at_ms,source_pts,object_key,sha256,size_bytes) VALUES (?,?,0,1000,'1000',?,'"+"c".repeat(64)+"',1)",frame,analysis,frame.toString());
+        fixtures.update("INSERT INTO vision_model_calls(id,analysis_id,task_id,frame_sha256,model,parameters_json,status) SELECT ?,?,task_id,'"+"c".repeat(64)+"','fixture','{}','SUCCEEDED' FROM model_calls WHERE analysis_id=?",call,analysis,analysis);
+        fixtures.update("INSERT INTO evidence_segments(id,project_id,asset_id,analysis_id,source_kind,ordinal,text,start_ms,end_ms,observation_json,frame_id,vision_call_id) VALUES (?,?,?,?,'VISUAL',0,'红色矩形',1000,1000,'{}',?,?)",visual,java.util.UUID.fromString(project),silent.asset(),analysis,frame,call);
+        String session=json(owner.post("/projects/"+project+"/conversations",new ObjectMapper().writeValueAsString(java.util.Map.of("title","静音第二段","assetIds",java.util.List.of(speech.asset(),silent.asset()))))).path("data").path("id").asText();
+        String body=new ObjectMapper().writeValueAsString(java.util.Map.of("content","上传原句后接静音画面","context",java.util.Map.of("editing",java.util.Map.of("kind","MONTAGE","orderedAssetIds",java.util.List.of(speech.asset(),silent.asset()),"topic","上传与红色画面","minDurationMs",5000,"maxDurationMs",5000,"profile","LANDSCAPE_720"))));
+        var accepted=owner.post("/conversations/"+session+"/turns",body,"silent-montage");assertEquals(202,accepted.statusCode(),accepted.body());String task=json(accepted).path("data").path("taskId").asText();
+        var claim=json(internal(task,"claim",java.util.Map.of("executorId","silent-montage","claimRequestId",java.util.UUID.randomUUID()))).path("data");var credentials=new java.util.HashMap<String,Object>();credentials.put("attemptId",claim.path("attemptId").asText());credentials.put("leaseToken",claim.path("leaseToken").asText());
+        for(var id:java.util.List.of(speech.first(),visual)){
+            var read=new java.util.HashMap<String,Object>(credentials);read.put("producerKey","read-"+id);read.put("name","read_evidence_context");read.put("arguments",java.util.Map.of("evidenceId",id));var response=internal(task,"tool",read);assertEquals(200,response.statusCode(),response.body());
+            if(id.equals(visual)){assertEquals(1000,json(response).path("data").path("observations").get(0).path("observedAtMs").asLong());assertEquals(false,json(response).path("data").path("observations").get(0).has("startMs"));}
+        }
+        var proposal=java.util.Map.of("title","原声后接静音","clips",java.util.List.of(java.util.Map.of("assetId",speech.asset(),"sourceInMs",2000,"sourceOutMs",5000,"evidenceIds",java.util.List.of(speech.first()),"reason","完整原句"),java.util.Map.of("assetId",silent.asset(),"sourceInMs",0,"sourceOutMs",2000,"evidenceIds",java.util.List.of(visual),"reason","包含已核查帧的原视频片段；不推断未观察画面")));
+        var invalidVisual=java.util.Map.of("assetId",silent.asset(),"sourceInMs",2000,"sourceOutMs",4000,"evidenceIds",java.util.List.of(visual),"reason","不包含观察时刻");
+        var candidate=new java.util.HashMap<String,Object>(credentials);candidate.put("producerKey","outside-frame");candidate.put("proposal",java.util.Map.of("title","不合法画面出处","clips",java.util.List.of(((java.util.List<?>)proposal.get("clips")).get(0),invalidVisual)));
+        assertEquals(false,json(internal(task,"validate-edit",candidate)).path("data").path("valid").asBoolean());
+        candidate.put("producerKey","silent-valid");candidate.put("proposal",proposal);var checked=internal(task,"validate-edit",candidate);assertEquals(true,json(checked).path("data").path("valid").asBoolean(),checked.body());
+        var completion=new java.util.HashMap<String,Object>(credentials);completion.put("producerKey","silent-publish");completion.put("resultType","EDIT_PROPOSAL");completion.put("result",java.util.Map.of("content","原声与静音画面顺序编排。","proposal",proposal));var completed=internal(task,"complete",completion);assertEquals(200,completed.statusCode(),completed.body());
+        var output=json(owner.get("/revisions/"+json(completed).path("data").path("revisionId").asText())).path("data").path("content").path("outputs").get(0);assertEquals(5000,output.path("durationMs").asLong());assertEquals(1,output.path("subtitles").path("cues").size());assertEquals(3000,output.path("subtitles").path("cues").get(0).path("endMs").asLong());
+        assertEquals("第一步，上传素材。",output.path("subtitles").path("cues").get(0).path("text").asText());
+    }
+
+    @Test
+    void montageOrderCannotEscapeTheFixedScopeOrRepeatSources() throws Exception {
+        BrowserApi owner=signedIn("montage-scope-owner");String project=json(owner.post("/projects","{\"name\":\"混剪范围\"}")).path("data").path("id").asText();
+        var first=speechFixture(project);var excluded=speechFixture(project);
+        String session=json(owner.post("/projects/"+project+"/conversations",new ObjectMapper().writeValueAsString(java.util.Map.of("title","固定一份素材","assetIds",java.util.List.of(first.asset()))))).path("data").path("id").asText();
+        for(var order:java.util.List.of(java.util.List.of(first.asset()),java.util.List.of(first.asset(),first.asset()),java.util.List.of(first.asset(),excluded.asset()),java.util.List.of(first.asset(),java.util.UUID.randomUUID()))){
+            String body=new ObjectMapper().writeValueAsString(java.util.Map.of("content","混剪","context",java.util.Map.of("editing",java.util.Map.of("kind","MONTAGE","orderedAssetIds",order,"topic","步骤","minDurationMs",1000,"maxDurationMs",10000,"profile","LANDSCAPE_720"))));
+            assertEquals(400,owner.post("/conversations/"+session+"/turns",body,java.util.UUID.randomUUID().toString()).statusCode());
+        }
+        assertEquals(0,json(owner.get("/projects/"+project+"/plans")).path("data").path("items").size());assertEquals(0,json(owner.get("/conversations/"+session+"/messages")).path("data").path("items").size());
+    }
+
     private record Speech(java.util.UUID asset, java.util.UUID first, java.util.UUID second) {}
     private Speech speechFixture(String project) {
         var projectId=java.util.UUID.fromString(project);
