@@ -43,9 +43,9 @@ public class ConversationProduction {
         String text=content.replaceAll("\\s+","");
         if(revision&&java.util.regex.Pattern.compile("(?i)V"+number+"(?![0-9])").matcher(text).find())return true;
         String unit=revision?"(?:版|版本)":"(?:条|个成片)";
-        if(java.util.regex.Pattern.compile("(?:第)?"+number+unit+"|"+unit+number+"(?![0-9])").matcher(text).find())return true;
+        if(java.util.regex.Pattern.compile("(?<![0-9])(?:第)?"+number+unit+"|"+unit+number+"(?![0-9])").matcher(text).find())return true;
         var chinese=List.of("一","二","三","四","五","六","七","八","九","十");
-        return number<=chinese.size()&&java.util.regex.Pattern.compile("(?:第)?"+chinese.get(number-1)+unit).matcher(text).find();
+        return number<=chinese.size()&&java.util.regex.Pattern.compile("(?<![零一二三四五六七八九十百千两])(?:第)?"+chinese.get(number-1)+unit).matcher(text).find();
     }
     private static final String SENT_VERSIONS = """
         FROM plan_revisions r WHERE r.project_id=?

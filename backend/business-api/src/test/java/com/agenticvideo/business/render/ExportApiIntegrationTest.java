@@ -137,6 +137,17 @@ class ExportApiIntegrationTest {
         String explicitTask=data(owner.post("/conversations/"+session+"/turns",explicit)).path("taskId").asText();JsonNode explicitClaim=data(internal(explicitTask,"claim",Map.of("executorId","preview-chat","claimRequestId",UUID.randomUUID())));
         response=commandTool(explicitTask,explicitClaim,"explicit-admit","submit_production_request",admission);assertEquals(200,response.statusCode(),response.body());assertEquals(plan.first().toString(),data(response).path("productionTarget").path("revisionId").asText());
     }
+    @Test void aVersionNumberCannotBeMatchedInsideALargerNumber() throws Exception {
+        BrowserApi owner=signedIn("exact-production-number");UUID project=UUID.fromString(data(owner.post("/projects",Map.of("name","版本号完整匹配"))).path("id").asText());Plan plan=planFixture(project);
+        for(String content:List.of("请预览第12版","请预览第十二版")) {
+            String session=data(owner.post("/projects/"+project+"/conversations",Map.of())).path("id").asText(),planId=data(owner.get("/revisions/"+plan.first())).path("planId").asText();
+            assertEquals(200,owner.patch("/conversations/"+session+"/view",Map.of("planId",planId,"revisionId",plan.second(),"expectedRowVersion",0)).statusCode());
+            String task=data(owner.post("/conversations/"+session+"/turns",Map.of("content",content,"context",Map.of("naturalLanguage",true)))).path("taskId").asText();
+            JsonNode claim=data(internal(task,"claim",Map.of("executorId","exact-number","claimRequestId",UUID.randomUUID())));
+            var admission=commandTool(task,claim,"partial-number","submit_production_request",Map.of("intent","PREVIEW","newRequirement",false,"fields",Map.of(),"target",Map.of("revisionNumber",2)));
+            assertEquals(400,admission.statusCode(),admission.body());assertEquals(0,data(owner.get("/revisions/"+plan.second()+"/previews")).path("items").size());
+        }
+    }
     @Test void longVersionHistoryKeepsChatBoundedAndResolvesOldTargetsAtTheSentSnapshot() throws Exception {
         BrowserApi owner=signedIn("bounded-production-history");UUID project=UUID.fromString(data(owner.post("/projects",Map.of("name","长会话版本定位"))).path("id").asText());Plan plan=planFixture(project);
         String session=data(owner.post("/projects/"+project+"/conversations",Map.of())).path("id").asText(),planId=data(owner.get("/revisions/"+plan.first())).path("planId").asText();
