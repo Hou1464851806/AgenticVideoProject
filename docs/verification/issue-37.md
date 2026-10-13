@@ -16,4 +16,4 @@
 
 前端类型检查／构建、Python 语法检查通过。日志位于 backend/business-api/target/issue-37-*.log。实际导出核查文件位于 .scratch/montage-verification/natural-language/。
 
-审查与最终统一回归在 #38 完成后记录。
+Standards 与 Spec 按固定差异 `0c4d9de...45c1345` 分别只读审查，均 PASS，没有遗留发现。#38 完成后运行最终统一回归。
