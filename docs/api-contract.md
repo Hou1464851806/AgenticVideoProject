@@ -2,6 +2,19 @@
 
 状态：依据 Q58 已确认设计整理的可实施规格 v1；应用按下述逐票实施说明交付，表中其余端点仍是后续设计，尚未生成 OpenAPI 文件。既有文档中的路径示意以本文 `/api/v1` 和 `/internal/v1` 命名为准。字段校验、鉴权、幂等和结果发布语义为必须实现的契约，模型／媒体参数通过配置与集成验证固定。
 
+2026-10-12 已确认 [统一自然语言设计](natural-language-workflow-design.md)，待实施。下文 #18／#20／#27 的模式参数、显式应用简报和独立澄清端点描述当前已实现接口，不能视为未来对话入口的强制用户步骤。以下补充定义新增契约语义，具体新字段和路径在实施时校准。
+
+## 统一自然语言契约补充（待实施）
+
+- 默认消息输入为用户原文、可选对象引用和发送时查看上下文；不强制提交 requirements／editing 模式、证据类型或完整制作表单。首次发送可自动创建会话，创建与消息接纳仍鉴权、幂等，素材范围由后端核对。
+- 消息接纳先固定原文与上下文；理解结果经业务校验后保存关联执行请求、绑定实际对象并分配方案或取得编辑占用。已接纳任务输入不可变，重放返回既有解析、执行回执或结果。用户明确要求的连续步骤保存实际前序结果绑定。
+- 同一消息入口在 WAITING_INPUT 时可接收回答、取消或新需求；系统解析后必须持久记录 questionId 关联，再进入既有恢复／结束等待校验。含糊消息不恢复；同会话活动资格、幂等、目标变更和尝试发布校验继续有效。现有独立问题端点可作为可选明确入口。
+- 简报按制作需求保存，区分明确条件与已说明默认值及消息来源；缺少时长时可以说明采用 30–45 秒初稿。条件完整自动衔接执行，无需用户提交 briefRevision 或点击应用简报；服务端仍固定实际使用的简报版本，冲突不能偷偷换条件。
+- 自动补查的批准／撤回来自直接用户消息，限定当前项目；默认每个制作需求累计最多 4 次新增视觉调用，跨关联任务、修改、澄清和重试共享。额外额度或完整分析须记录另行批准的范围，费用阈值不充当授权或金额硬上限。
+- 预览、版本确认和导出可以从对话进入已有业务能力；具体版本确认与另行明确导出指令保留。Agent 提议、普通评价及素材中的指令不得制造授权。
+
+本轮仅更新设计，没有新增端点、Schema、迁移或应用实现。统一入口验收见 requirements.md 的 AC-NL 系列。
+
 ## 通用协议
 
 - 浏览器仅访问 Spring 业务 API；分片 PUT 例外，使用 Spring 签发 URL 直传 Silo。Python／Worker／基础设施不作为浏览器业务入口。
@@ -112,7 +125,7 @@
 
 当前 #11 已实现主题检索：`literalPhrase=false` 使用 Dense、BM25、LITERAL 三路 RRF，返回 channels、semanticAvailable、rankings，以及命中的 rrfScore / channelRanks。字面模式仍只匹配原文；有有效索引时 semanticAvailable=true。coverage.assets 增加 indexStatus。召回前强制账号、项目、当前分析及已发布索引代次；Agent 另加固定素材范围，BM25 的 IDF 语料仍限定当前项目。`POST /api/v1/assets/{assetId}/search-index` 返回 202 和 taskId / generationId，重复活跃构建复用任务；`GET` 返回 publishedGeneration 及最近代次状态。新代次未核验、取消或失效时不能替换可查询 head，语音证据仍可字面查询。assetIds / sourceKinds / timeRange 查询入参尚待对应后续票实现。
 
-深度检索由 Agent 的受控 CONTENT_REFINE 工具在预算内请求；超预算澄清，不开放任意模型参数／全素材高密度调用给浏览器。普通查询 API 也限制查询长度、返回量与频率。
+目标行为（待接入）：深度检索由 Agent 的受控 CONTENT_REFINE 能力在项目自动补查授权及需求累计额度内请求；超出时澄清，不开放任意模型参数／全素材高密度调用给浏览器。当前 #13 的复查仍由界面发起，不能视为 Agent 自动补查已实现。普通查询 API 也限制查询长度、返回量与频率。
 
 SearchHit 基线：assetId、retrievalUnitId、evidenceIds、sourceKind、text、observedAtMs 或 startMs／endMs、temporalPrecision、candidateWindow、contextAvailable、coverage。`candidateWindow` 不能代替观察时间；排名分数不是事实置信度，返回阶段缺口供 Agent 解释未命中。播放授权单独按需获取，不把大量临时 URL 塞入模型上下文。
 

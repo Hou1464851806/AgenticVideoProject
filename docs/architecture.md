@@ -1,6 +1,6 @@
 # Agent 视频编排剪辑系统架构
 
-状态：Q58 已确认整体共同理解，首期 MVP 设计基线已成立，进入详细规格阶段；应用实施尚未开始。Agent 设计详见 agent-design.md，视频理解与检索详见 video-understanding-retrieval.md，上传与对话详见 upload-design.md／conversation-design.md；详细规格见 database-design.md、api-contract.md、event-protocol.md，开发任务见 development-backlog.md，验收见 implementation-plan.md。
+状态：Q58 及 2026-10-12 统一自然语言共识已确认；已有实现进度见 implementation-status.md，新增对话设计待实施。Agent 设计详见 agent-design.md，视频理解与检索详见 video-understanding-retrieval.md，上传与对话详见 upload-design.md／conversation-design.md；详细规格见 database-design.md、api-contract.md、event-protocol.md，开发任务见 development-backlog.md，验收见 implementation-plan.md。
 
 ## 已确认的部署边界
 
@@ -13,6 +13,14 @@
 
 初期在本机 Docker Compose 部署。业务后端和媒体 Worker 可同属 Maven 多模块工程，但独立进程／容器；Worker 保留迁移和扩容能力。模型通过 API 调用，本机媒体处理以 CPU 执行为基线。
 
+## 统一自然语言流程的模块职责
+
+用户通过一个聊天入口提出目标；现有 Python Agent 的对话理解模块解析意图、对象和条件，Spring 的业务控制模块校验并保存固定执行请求，再由既有视频执行模块完成检索、分析、编辑或渲染。三个模块按职责划分，继续沿用上述部署范围。
+
+前端提供原文、可选引用与查看上下文；对话理解返回制作请求；业务控制管理权限、版本、预算、编辑占用和发布资格；执行模块接收经过校验的输入并返回进度／结果。用户无需先选择需求类型或证据来源，不另建分类服务、多自主 Agent 或重复的需求记录。
+
+消息接纳与理解后的执行接纳持久关联，方案分配和编辑占用在理解并校验之后进行；已接纳任务输入保持固定，解析结果和后续执行请求另行关联保存。明确的连续步骤使用前一步实际成功结果，不靠重新阅读聊天猜执行目标。完整决定见 [统一自然语言设计](natural-language-workflow-design.md)与 ADR-0015。
+
 ## 已确认的领域结构
 
 ```mermaid
@@ -24,7 +32,7 @@ flowchart TD
     R --> O[一个或多个成片定义]
     O --> C[有序剪辑片段]
     C --> A
-    R --> V[手动请求低清预览]
+    R --> V[明确请求低清预览]
     R --> F[确认版本并明确导出]
     F --> M[正式成片]
 ```
@@ -124,7 +132,7 @@ sequenceDiagram
     A->>B: 提交基于固定版本的结构化方案
     B->>B: 校验并追加版本，释放占用
     B-->>U: SSE通知新版本就绪
-    U->>B: 手动请求某个版本的低清预览
+    U->>B: 明确请求某个版本的低清预览（对话或按钮）
     B->>W: 复用已有结果或派发预览任务
     W->>B: 提交低清产物与媒体信息
     U->>B: 确认版本并明确导出指定输出
@@ -137,7 +145,7 @@ sequenceDiagram
 
 ## 已确认的保留与成本策略
 
-- 预览手动生成，同版本／输出／规格复用，重复点击合并任务。起步每项目缓存 2 GB、7 天未访问可清理，均可配置；正在生成或播放的文件跳过清理，清理后按需重建。
+- 预览由用户明确请求，对话或按钮均可；同版本／输出／规格复用，重复请求合并任务。起步每项目缓存 2 GB、7 天未访问可清理，均可配置；正在生成或播放的文件跳过清理，清理后按需重建。
 - 任一历史版本引用的原始素材允许隐藏，彻底删除前必须处理引用并说明影响。
 - 正式成片需用户明确删除，下载不删除；展示分类存储用量。
 - 记录模型用量与估算费用，设置调用次数上限和可配置预警；分析结果复用，暂无固定月预算。
@@ -154,4 +162,4 @@ sequenceDiagram
 
 ## 整体核对与实施边界
 
-Q58 已确认产品边界、服务职责、交互协议、基础设施、检索与视频理解、上传与对话／前端、提供方、系统验收及 Agent 行为的整体设计。database-design.md、api-contract.md、event-protocol.md 将决定展开为表约束、接口、提交与恢复规则，development-backlog.md 给出依赖和完成标准；此阶段交付详细规格，应用实施尚未开始。版本、超时、分片／抽帧／检索数值参数和派生缓存容量需实测固定，Silo 分片、浏览器 SSE 与云模型媒体读取仍需实际联调。
+Q58 已确认原整体设计，2026-10-12 补充确认统一自然语言流程与 ADR-0015。database-design.md、api-contract.md、event-protocol.md 将决定展开为表约束、接口、提交与恢复规则，development-backlog.md 给出依赖和完成标准。已有实现、真实验证与剩余边界见 implementation-status.md 及 verification/；新增自然语言流程仍待实施和验收。版本、超时、分片／抽帧／检索数值参数和派生缓存容量以对应实施的实测记录固定，未验证条件继续明确标记。
