@@ -131,6 +131,7 @@ def run_conversation(execution, root):
     editing = execution.input.get("editing")
     requirements = execution.input.get("context", {}).get("requirements", False)
     natural = execution.input.get("context", {}).get("naturalLanguage", False)
+    admitted_intent = execution.input.get("intent")
     public = PublicReply(execution)
 
     def model_node(state):
@@ -302,10 +303,10 @@ def run_conversation(execution, root):
                 history = [{"role": "user", "content": execution.input["content"]}]
             if natural and not editing:
                 history = [{"role":"user", "content":execution.input["content"]}]
-            scope_context = json.dumps({"assetIds": execution.input["assetIds"], "references": execution.input.get("references", []), "editing": editing, "brief": {} if natural and not editing else execution.input.get("brief", {}).get("fields", {}), "clarification": execution.input.get("clarification"), "startsNewRequirement": execution.input.get("startsNewRequirement", False), "assets":execution.input.get("assets", []), "pendingQuestion":execution.input.get("pendingQuestion")}, ensure_ascii=False)
-            outcome = workflow.invoke({"messages": [{"role": "system", "content": (BRIEF_SYSTEM if requirements else EDIT_SYSTEM if editing else NATURAL_INSTRUCTIONS + SYSTEM.replace("编辑方案须使用用户指定的生成方案入口。", "明确制作请求直接接纳并生成保存方案。") if natural else SYSTEM) + "\n本次业务固定范围及用户明确引用：" + scope_context}] + history,
+            scope_context = json.dumps({"assetIds": execution.input["assetIds"], "references": execution.input.get("references", []), "editing": editing, "intent":admitted_intent, "questionAction":execution.input.get("questionAction"), "brief": {} if natural and not editing and not admitted_intent else execution.input.get("brief", {}).get("fields", {}), "clarification": execution.input.get("clarification"), "startsNewRequirement": execution.input.get("startsNewRequirement", False), "assets":execution.input.get("assets", []), "pendingQuestion":execution.input.get("pendingQuestion")}, ensure_ascii=False)
+            outcome = workflow.invoke({"messages": [{"role": "system", "content": (BRIEF_SYSTEM if requirements else EDIT_SYSTEM if editing else NATURAL_INSTRUCTIONS + SYSTEM.replace("编辑方案须使用用户指定的生成方案入口。", "明确制作请求直接接纳并生成保存方案。") if natural else SYSTEM) + ("\n本轮意图及回答关系已由业务接纳并固定；直接继续该意图的剩余步骤，不再理解或接纳请求。取消已生效，只回复确认；含糊回复保留问题，只请用户明确。" if admitted_intent else "") + "\n本次业务固定范围及用户明确引用：" + scope_context}] + history,
                 "calls": 0, "tools_used": 0, "pending": [], "answer": {}, "candidate": {},
-                "reviewing": False, "self_checked": False, "candidate_checks": 0, "editing":editing, "admitted":bool(editing), "windows":{}, "review_candidate":{}, "clarifying":False}, config)
+                "reviewing": False, "self_checked": False, "candidate_checks": 0, "editing":editing, "admitted":bool(editing or admitted_intent), "windows":{}, "review_candidate":{}, "clarifying":admitted_intent == "CLARIFY", "reply_only":admitted_intent == "CANCEL" or execution.input.get("questionAction") == "AMBIGUOUS"}, config)
         execution.check()
         if "question" not in outcome["answer"]:
             public.update(outcome["answer"].get("content", ""), force=True)

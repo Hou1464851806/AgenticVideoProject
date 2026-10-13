@@ -369,7 +369,10 @@ public class ConversationTurns {
         var scopes=database.queryForList("SELECT asset_ids_json FROM conversation_message_scopes WHERE message_id=?",identifier(input.path("messageId").asText()));
         if(scopes.isEmpty())return input;
         var fixed=(com.fasterxml.jackson.databind.node.ObjectNode)input.deepCopy();
-        fixed.set("assetIds",(com.fasterxml.jackson.databind.JsonNode)decode(scopes.get(0).get("asset_ids_json")));
+        var narrowed=json.createArrayNode();
+        var messageScope=(com.fasterxml.jackson.databind.JsonNode)decode(scopes.get(0).get("asset_ids_json"));
+        for(var asset:input.path("assetIds"))for(var selected:messageScope)if(asset.equals(selected)){narrowed.add(asset);break;}
+        fixed.set("assetIds",narrowed);
         return fixed;
     }
 

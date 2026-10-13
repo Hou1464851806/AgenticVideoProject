@@ -37,7 +37,7 @@ public class ConversationRequests {
             return parse(previous.get(0).get("input_json"));
         }
         UUID conversation=UUID.fromString(input.path("conversationId").asText());
-        replies.answer(task,input,request);
+        replies.admit(task,input,request);
         database.queryForMap("SELECT id FROM conversations WHERE id=? FOR UPDATE",conversation);
         UUID requirement;
         var prior=database.queryForList("SELECT requirement_id FROM conversation_execution_requests r JOIN conversation_turns t ON t.task_id=r.task_id WHERE t.conversation_id=? ORDER BY r.created_at DESC LIMIT 1",conversation);
@@ -52,6 +52,7 @@ public class ConversationRequests {
         }
         if(!fields.isEmpty())briefs.append(task,input,fields);
         ObjectNode fixed=input.deepCopy();fixed.put("requirementId",requirement.toString());
+        if(request.has("questionAction"))fixed.set("questionAction",request.path("questionAction"));
         fixed.put("intent",request.path("intent").asText());fixed.set("brief",json.valueToTree(briefs.snapshot(conversation)));
         if(fields.has("assetIds")){
             JsonNode scope=fields.path("assetIds").path("value");fixed.set("assetIds",scope);

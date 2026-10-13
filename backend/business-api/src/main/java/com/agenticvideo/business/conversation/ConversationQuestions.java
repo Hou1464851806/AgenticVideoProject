@@ -18,10 +18,11 @@ public class ConversationQuestions {
     private final JdbcTemplate database;
     private final ObjectMapper json;
     private final ConversationBriefs briefs;
+    private final ConversationReplies replies;
     private final ConversationTurns turns;
     private final com.agenticvideo.business.plan.EditPlans plans;
     private final TransactionTemplate transactions;
-    public ConversationQuestions(ConversationBriefs briefs,JdbcTemplate database,ObjectMapper json,ConversationTurns turns,com.agenticvideo.business.plan.EditPlans plans,PlatformTransactionManager manager){this.briefs=briefs;this.database=database;this.json=json;this.turns=turns;this.plans=plans;this.transactions=new TransactionTemplate(manager);}
+    public ConversationQuestions(ConversationReplies replies,ConversationBriefs briefs,JdbcTemplate database,ObjectMapper json,ConversationTurns turns,com.agenticvideo.business.plan.EditPlans plans,PlatformTransactionManager manager){this.replies=replies;this.briefs=briefs;this.database=database;this.json=json;this.turns=turns;this.plans=plans;this.transactions=new TransactionTemplate(manager);}
     /** Runs inside the task completion transaction, after current attempt validation. */
     public Object publish(Map<String,Object> task,JsonNode input,JsonNode question){
         String prompt=question.path("prompt").asText(),reason=question.path("reason").asText();JsonNode fields=question.path("fields");
@@ -37,19 +38,14 @@ public class ConversationQuestions {
     public Object answer(UUID conversation,UUID question,String key,ConversationController.QuestionAnswer request){
         if(key.isBlank()||key.length()>120)throw new ResponseStatusException(BAD_REQUEST,"回答幂等键不符合要求");
         return transactions.execute(tx->{
-            var identities=database.queryForList("SELECT task_id FROM conversation_questions WHERE id=? AND conversation_id=?",question,conversation);
-            if(identities.isEmpty())throw new ResponseStatusException(NOT_FOUND,"澄清问题不存在或不属于本会话");
-            var source=database.queryForMap("SELECT * FROM tasks WHERE id=? FOR UPDATE",identities.get(0).get("task_id"));
-            var session=database.queryForMap("SELECT * FROM conversations WHERE id=? FOR UPDATE",conversation);
-            var questions=database.queryForList("SELECT * FROM conversation_questions WHERE id=? AND conversation_id=? FOR UPDATE",question,conversation);
-            if(questions.isEmpty())throw new ResponseStatusException(NOT_FOUND,"澄清问题不存在或不属于本会话");
-            var original=questions.get(0);String payload=encode(request);
+            var waiting=replies.lock(conversation,question);
+            var source=waiting.source();var session=waiting.session();var original=waiting.question();String payload=encode(request);
             if(original.get("answer_key")!=null){
                 boolean same=Boolean.TRUE.equals(database.queryForObject("SELECT answer_json=?::jsonb AND answer_key=? FROM conversation_questions WHERE id=?",Boolean.class,payload,key,question));
                 if(same)return decode(original.get("answer_receipt").toString());
                 throw new ResponseStatusException(CONFLICT,"该问题已被回答，不能作为另一轮的回答");
             }
-            if(!"OPEN".equals(original.get("status"))||!"WAITING_INPUT".equals(source.get("status")))throw new ResponseStatusException(CONFLICT,"问题已结束，不能恢复原等待");
+            replies.requireOpen(waiting);
             if(database.queryForObject("SELECT count(*) FROM conversation_turns WHERE conversation_id=? AND request_key=?",Integer.class,conversation,key)>0)throw new ResponseStatusException(CONFLICT,"回答幂等键已用于其他需求");
             ObjectNode input=(ObjectNode)decode(source.get("input_json").toString());turns.validateRetry(session,input);
             UUID turn=UUID.randomUUID(),message=UUID.randomUUID(),task=UUID.randomUUID(),event=UUID.randomUUID();
@@ -67,33 +63,22 @@ public class ConversationQuestions {
             database.update("INSERT INTO conversation_turns(id,conversation_id,message_id,task_id,request_key,request_json,resumes_task_id) VALUES (?,?,?,?,?,?::jsonb,?)",turn,conversation,message,task,key,payload,source.get("id"));
             database.update("INSERT INTO outbox_events(id,task_id,type,payload_json) VALUES (?,?,'AGENT_TURN',jsonb_build_object('schemaVersion','1.0','eventId',?::text,'taskId',?::text,'taskType','AGENT_TURN','projectId',?::text,'occurredAt',now()))",event,task,event,task,session.get("project_id"));
             var receipt=new java.util.LinkedHashMap<String,Object>();receipt.put("taskId",task);receipt.put("turnId",turn);receipt.put("messageId",message);receipt.put("resumesTaskId",source.get("id"));receipt.put("questionId",question);if(input.has("editing"))receipt.put("planId",input.path("editing").path("planId").asText());
-            database.update("UPDATE conversation_questions SET status='ANSWERED',answer_key=?,answer_json=?::jsonb,answer_receipt=?::jsonb,answer_message_id=? WHERE id=?",key,payload,encode(receipt),message,question);
-            database.update("UPDATE tasks SET status='SUCCEEDED',result_json=?::jsonb WHERE id=?",encode(Map.of("continuedTaskId",task,"questionId",question)),source.get("id"));
+            database.update("UPDATE conversation_questions SET answer_key=?,answer_json=?::jsonb,answer_receipt=?::jsonb WHERE id=?",key,payload,encode(receipt),question);
+            replies.answered(waiting,task,message);
             return receipt;
         });
     }
     public Object startNew(UUID conversation,UUID question,String key,ConversationController.Turn request){
         return transactions.execute(tx->{
-            var identities=database.queryForList("SELECT task_id FROM conversation_questions WHERE id=? AND conversation_id=?",question,conversation);
-            if(identities.isEmpty())throw new ResponseStatusException(NOT_FOUND,"澄清问题不存在或不属于本会话");
-            var source=database.queryForMap("SELECT * FROM tasks WHERE id=? FOR UPDATE",identities.get(0).get("task_id"));
-            database.queryForMap("SELECT id FROM conversations WHERE id=? FOR UPDATE",conversation);
+            var waiting=replies.lock(conversation,question);
             if(database.queryForObject("SELECT count(*) FROM conversation_turns WHERE conversation_id=? AND request_key=?",Integer.class,conversation,key)>0)return turns.accept(conversation,key,request,true);
-            var original=database.queryForMap("SELECT * FROM conversation_questions WHERE id=? FOR UPDATE",question);
-            if(!"WAITING_INPUT".equals(source.get("status"))||!"OPEN".equals(original.get("status")))throw new ResponseStatusException(CONFLICT,"原等待已结束，请使用新的会话需求入口");
-            dismiss((UUID)source.get("id"));
-            database.update("UPDATE tasks SET status='CANCELLED',result_json=?::jsonb WHERE id=?",encode(Map.of("reason","EXPLICIT_NEW_REQUIREMENT")),source.get("id"));
-            plans.release((UUID)source.get("id"));
+            replies.requireOpen(waiting);
+            replies.end(waiting,"EXPLICIT_NEW_REQUIREMENT");
             return turns.accept(conversation,key,request,true);
         });
     }
     /** The caller holds the task lock; take conversation then question locks in the same order as answer. */
-    public void dismiss(UUID task){
-        var rows=database.queryForList("SELECT conversation_id FROM conversation_questions WHERE task_id=?",task);
-        if(rows.isEmpty())return;
-        database.queryForMap("SELECT id FROM conversations WHERE id=? FOR UPDATE",rows.get(0).get("conversation_id"));
-        database.update("UPDATE conversation_questions SET status='CANCELLED' WHERE task_id=? AND status='OPEN'",task);
-    }
+    public void dismiss(UUID task){replies.dismiss(task);}
     private String encode(Object value){try{return json.writeValueAsString(value);}catch(java.io.IOException invalid){throw new IllegalStateException(invalid);}}
     private JsonNode decode(String value){try{return json.readTree(value);}catch(java.io.IOException invalid){throw new IllegalStateException(invalid);}}
 }

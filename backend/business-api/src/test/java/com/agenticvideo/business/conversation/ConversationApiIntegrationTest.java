@@ -163,6 +163,13 @@ class ConversationApiIntegrationTest {
             var response=naturalAdmission(next,claim,"action",Map.of("intent",action.equals("CANCEL")?"CANCEL":"DISCUSS","newRequirement",false,"questionAction",action,"fields",Map.of()));
             assertEquals(200,response.statusCode(),response.body());
             assertEquals(false,json(response).path("data").has("editing"));
+            assertEquals(200,internal(next,"fail",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","after-action-failed","code","CONVERSATION_FAILED","message","确认回复暂时失败")).statusCode());
+            var retryResponse=owner.post("/conversations/"+session+"/tasks/"+next+"/retry","{}",action+"-retry");
+            assertEquals(202,retryResponse.statusCode(),retryResponse.body());
+            next=json(retryResponse).path("data").path("taskId").asText();
+            claim=json(internal(next,"claim",Map.of("executorId","cancel-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+            assertEquals(action,claim.path("input").path("questionAction").asText());
+            assertEquals(action.equals("CANCEL")?"CANCEL":"DISCUSS",claim.path("input").path("intent").asText());
             assertEquals(200,internal(next,"complete",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","answer","resultType","CONVERSATION_ANSWERED","result",Map.of("content",action.equals("CANCEL")?"已取消":"请告诉我主题","evidenceIds",List.of()))).statusCode());
             JsonNode snapshot=json(owner.get("/conversations/"+session+"/snapshot")).path("data");
             assertEquals(action.equals("CANCEL")?"CANCELLED":"OPEN",snapshot.path("questions").get(0).path("status").asText());
@@ -253,6 +260,23 @@ class ConversationApiIntegrationTest {
         assertEquals("WAITING_INPUT",json(owner.get("/tasks/"+source)).path("data").path("status").asText());
         assertEquals("OPEN",json(owner.get("/conversations/"+session+"/snapshot")).path("data").path("questions").get(0).path("status").asText());
         assertEquals(0,json(owner.get("/projects/"+project+"/plans")).path("data").path("items").size());
+    }
+
+    @Test
+    void messageScopeCannotReintroduceAForbiddenAssetIntoExecutionOrRetry() throws Exception {
+        BrowserApi owner=signedIn("natural-forbidden");
+        String project=json(owner.post("/projects","{\"name\":\"素材范围与禁止条件共同生效\"}")).path("data").path("id").asText();
+        var allowed=newChatAsset(java.util.UUID.fromString(project),"A.mp4");var forbidden=newChatAsset(java.util.UUID.fromString(project),"B.mp4");
+        String session=json(owner.post("/projects/"+project+"/conversations","{}","forbidden-chat")).path("data").path("id").asText();
+        String task=json(owner.post("/conversations/"+session+"/turns","{\"content\":\"范围A和B，禁用B，做成本短视频\",\"context\":{\"naturalLanguage\":true}}","forbidden-message")).path("data").path("taskId").asText();
+        JsonNode claim=json(internal(task,"claim",Map.of("executorId","forbidden-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        var admitted=naturalAdmission(task,claim,"understood",Map.of("intent","GENERATE_SPEECH","newRequirement",true,"fields",Map.of("topic",Map.of("value","成本","basis","EXPLICIT"),"assetIds",Map.of("value",List.of(allowed,forbidden),"basis","EXPLICIT"),"forbiddenAssetIds",Map.of("value",List.of(forbidden),"basis","EXPLICIT"))));
+        assertEquals(200,admitted.statusCode(),admitted.body());
+        assertEquals(List.of(allowed.toString()),new ObjectMapper().convertValue(json(admitted).path("data").path("assetIds"),List.class));
+        assertEquals(200,internal(task,"fail",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","after-admission-failed","code","CONVERSATION_FAILED","message","暂时失败")).statusCode());
+        var response=owner.post("/conversations/"+session+"/tasks/"+task+"/retry","{}","forbidden-retry");assertEquals(202,response.statusCode(),response.body());
+        JsonNode retry=json(internal(json(response).path("data").path("taskId").asText(),"claim",Map.of("executorId","forbidden-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        assertEquals(List.of(allowed.toString()),new ObjectMapper().convertValue(retry.path("input").path("assetIds"),List.class));
     }
 
     private HttpResponse<String> naturalAdmission(String task,JsonNode claim,String key,Map<String,Object> arguments) throws Exception {

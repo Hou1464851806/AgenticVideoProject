@@ -53,7 +53,7 @@ public class ConversationRetries {
             }
             ObjectNode input=(ObjectNode)turns.executionInput(source,parse(original.get("input_json"))).deepCopy();
             UUID waitingSource=null;
-            if(input.has("pendingQuestion")&&!input.has("intent")){
+            if(input.has("pendingQuestion")&&(!input.has("intent")||"AMBIGUOUS".equals(input.path("questionAction").asText()))){
                 JsonNode pending=input.path("pendingQuestion");
                 waitingSource=UUID.fromString(pending.path("taskId").asText());
                 if(database.queryForObject("SELECT count(*) FROM conversation_questions q JOIN tasks t ON t.id=q.task_id WHERE q.id=? AND q.task_id=? AND q.conversation_id=? AND q.status='OPEN' AND t.status='WAITING_INPUT'",Integer.class,UUID.fromString(pending.path("questionId").asText()),waitingSource,conversation)!=1)
