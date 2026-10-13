@@ -17,8 +17,14 @@
 
 ## 单票验证
 
-公开 HTTP 文件：ConversationApiIntegrationTest、PreviewApiIntegrationTest、ExportApiIntegrationTest。覆盖发送后换版、明确引用优先、禁止模型猜版本、独立确认／导出、未确认新版、项目权限、同输入框对象补答、重复工具回执、丢失答复恢复以及实际对象存储下载。
+公开 HTTP：ConversationApiIntegrationTest 30/30、PreviewApiIntegrationTest 5/5、ExportApiIntegrationTest 9/9。覆盖发送后换版、明确引用优先、禁止模型猜版本、独立确认／导出、未确认新版、项目权限、同输入框对象补答、重复工具回执、丢失答复恢复以及实际对象存储下载。
 
 真实浏览器闭环 1/1 通过：无查看版时预览最近生成版；实际低清 MP4 播放下载；确认 V1；生成并查看真实 V2；普通评价与未来导出不确认 V2；V2 未确认拒绝导出；当前查看版预览使用 V2，明确导出 V1 使用已确认的 V1；重复发送只保留一份导出；刷新后播放下载正式 MP4；查询引文不制造授权；同时引用两个版本先问，再在原输入框回答“第一版”继续。
 
-前端类型检查／生产构建和 Python 语法检查通过。日志位于 backend/business-api/target/issue-38-*.log；最终统一回归与双轴审查完成后补充结果。
+前端类型检查／生产构建和 Python 语法检查通过。日志位于 backend/business-api/target/issue-38-*.log；完整 Maven 回归已通过 123/123（无失败、错误或跳过），包含最终并发快照和版本数字修复。浏览器完整回归 85/86（27.5 分钟）：唯一失败为旧版 editing-brief 的初始化时选择“查看版本”超时，尚未进入 Agent 执行；同一代码、未修改测试，独立复验 1/1（17.2 秒）通过。整轮并非零失败，因此保留首次失败及复验日志，不将复验写成整轮 86/86。#36–#38 所有新增真实浏览器用例均在整轮通过，使用最终构建的业务服务镜像。
+
+最终日志：`issue-38-final-maven.log`、`issue-38-final-browser.log`、`issue-38-browser-recheck.log`、`issue-38-final-types.log`。
+
+## 独立审查
+
+Standards 与 Spec 两轴均 PASS，最终审查终点为 `4da831a`。Standards 的两项发现（无界版本目录、并发提交越过发送快照）均按公开 HTTP TDD 修复；Spec 确认目标固定、明确指令、补答及重试行为满足 #38。
