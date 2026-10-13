@@ -1,0 +1,53 @@
+import {test,expect} from '@playwright/test';
+import {renderSeed} from './fixtures/render-seed';
+
+test('chat previews, confirms and exports fixed versions with real playable downloadable media',async({page})=>{
+  test.setTimeout(480000);
+  const seed=await renderSeed(page);await page.goto(`/?project=${seed.projectId}`);
+  const post=async(path:string,data:unknown,key=crypto.randomUUID())=>{const csrf=(await(await page.request.get('/api/v1/auth/csrf')).json()).data.csrfToken;return page.request.post('/api/v1'+path,{headers:{'X-XSRF-TOKEN':csrf,'Idempotency-Key':key},data});};
+  const created=page.waitForResponse(reply=>reply.request().method()==='POST'&&reply.url().endsWith('/conversations'));
+  await page.getByRole('button',{name:'新聊天',exact:true}).click();const session=(await(await created).json()).data;
+  const send=async(content:string,expected='SUCCEEDED')=>{
+    await page.getByLabel('对话输入',{exact:true}).fill(content);const accepted=page.waitForResponse(reply=>reply.request().method()==='POST'&&reply.url().endsWith('/turns'));
+    await page.getByRole('button',{name:'发送需求',exact:true}).click();expect((await accepted).status()).toBe(202);const receipt=(await(await accepted).json()).data;
+    await expect.poll(async()=>['SUCCEEDED','WAITING_INPUT','FAILED'].includes((await(await page.request.get(`/api/v1/tasks/${receipt.taskId}`)).json()).data.status),{timeout:180000}).toBe(true);
+    expect((await(await page.request.get(`/api/v1/tasks/${receipt.taskId}`)).json()).data.status).toBe(expected);return {...receipt,body:(await accepted).request().postDataJSON(),key:(await accepted).request().headers()['idempotency-key']};
+  };
+  const snapshot=async()=>(await(await page.request.get(`/api/v1/conversations/${session.id}/snapshot`)).json()).data;
+  await send('只用 labelled-speech.mp4，制作一条介绍视频制作步骤的竖屏讲话短视频，严格7至11秒，只生成方案，不预览，不导出。');
+  const plan=(await snapshot()).items.at(-1).references.find((item:{type:string})=>item.type==='PLAN_REVISION');expect(plan).toBeTruthy();
+  expect((await(await page.request.get(`/api/v1/revisions/${plan.id}/previews`)).json()).data.items).toHaveLength(0);
+  await send('请帮我预览这版的效果。');
+  const reply=(await snapshot()).items.at(-1),preview=reply.references.find((item:{type:string})=>item.type==='PREVIEW_REQUEST');expect(preview).toBeTruthy();expect(preview.revisionId).toBe(plan.id);expect(reply.content).toContain('V1');
+  await expect.poll(async()=>(await(await page.request.get(`/api/v1/render-requests/${preview.id}`)).json()).data.status,{timeout:60000}).toBe('SUCCEEDED');
+  await page.reload();await page.getByRole('button',{name:'查看聊天预览',exact:true}).last().click();
+  await page.getByRole('button',{name:'播放低清预览',exact:true}).click();await expect.poll(()=>page.getByLabel('低清合成预览播放器',{exact:true}).evaluate((video:HTMLVideoElement)=>video.readyState)).toBeGreaterThanOrEqual(2);
+  const downloading=page.waitForEvent('download',{timeout:15000}),access=page.waitForResponse(reply=>reply.url().endsWith('/download-access'));await page.getByRole('button',{name:'下载低清预览',exact:true}).click();expect((await access).status()).toBe(200);expect((await downloading).suggestedFilename()).toMatch(/\.mp4$/);
+  await send('这版没有问题，请确认它。');
+  expect((await(await page.request.get(`/api/v1/revisions/${plan.id}/confirmations`)).json()).data.items).toHaveLength(1);
+  expect((await(await page.request.get(`/api/v1/revisions/${plan.id}/export-requests`)).json()).data.items).toHaveLength(0);
+  // Existing public editing entry prepares a real second version; chat operations must distinguish it from V1.
+  const generation=await post(`/conversations/${session.id}/turns`,{content:'继续这个方案，重新编排视频制作步骤。',context:{assetIds:[seed.assetId],editing:{topic:'视频制作步骤',minDurationMs:7000,maxDurationMs:11000,profile:'LANDSCAPE_720',planId:plan.planId,baseRevisionId:plan.id}}});expect(generation.status()).toBe(202);
+  const generationTask=(await generation.json()).data.taskId;
+  await expect.poll(async()=>['SUCCEEDED','FAILED'].includes((await(await page.request.get(`/api/v1/tasks/${generationTask}`)).json()).data.status),{timeout:180000}).toBe(true);expect((await(await page.request.get(`/api/v1/tasks/${generationTask}`)).json()).data.status).toBe('SUCCEEDED');
+  const newer=(await snapshot()).items.at(-1).references.find((item:{type:string})=>item.type==='PLAN_REVISION');expect(newer.revisionNumber).toBe(2);
+  await page.getByRole('button',{name:'查看方案 V2',exact:true}).click();await expect(page.getByRole('region',{name:'编排剪辑方案'})).toContainText('V2');
+  await send('这版挺好。');await send('做完就导出。');
+  expect((await(await page.request.get(`/api/v1/revisions/${newer.id}/confirmations`)).json()).data.items).toHaveLength(0);
+  await send('请把现在这版导出成 MP4。');
+  expect((await snapshot()).items.at(-1).content).toContain('尚未确认');expect((await(await page.request.get(`/api/v1/revisions/${newer.id}/export-requests`)).json()).data.items).toHaveLength(0);
+  await send('请预览这版的效果。');const viewedPreview=(await snapshot()).items.at(-1).references.find((item:{type:string})=>item.type==='PREVIEW_REQUEST');expect(viewedPreview.revisionId).toBe(newer.id);
+  const exported=await send('请将 V1 导出为720p的 MP4。'),formal=(await snapshot()).items.at(-1).references.find((item:{type:string})=>item.type==='EXPORT_REQUEST');expect(formal.revisionId).toBe(plan.id);
+  expect((await post(`/conversations/${session.id}/turns`,exported.body,exported.key)).status()).toBe(202);
+  const requests=(await(await page.request.get(`/api/v1/revisions/${plan.id}/export-requests`)).json()).data.items;expect(requests).toHaveLength(1);expect(requests[0].requestId).toBe(formal.id);expect(requests[0].configuration.profile).toBe('HD_720');
+  await expect.poll(async()=>(await(await page.request.get(`/api/v1/render-requests/${formal.id}`)).json()).data.status,{timeout:60000}).toBe('SUCCEEDED');
+  await page.reload();await page.getByRole('button',{name:'查看正式导出',exact:true}).last().click();await page.getByRole('button',{name:'播放正式成片',exact:true}).click();
+  await expect.poll(()=>page.getByLabel('正式成片播放器',{exact:true}).evaluate((video:HTMLVideoElement)=>video.readyState)).toBeGreaterThanOrEqual(2);
+  const formalDownload=page.waitForEvent('download',{timeout:15000});await page.getByRole('button',{name:'下载正式成片',exact:true}).click();expect((await formalDownload).suggestedFilename()).toMatch(/\.mp4$/);
+  await send('查找素材中的原句“导出当前版本”，告诉我是否出现。');
+  expect((await(await page.request.get(`/api/v1/revisions/${plan.id}/export-requests`)).json()).data.items).toHaveLength(1);expect((await(await page.request.get(`/api/v1/revisions/${newer.id}/confirmations`)).json()).data.items).toHaveLength(0);
+  await page.getByRole('button',{name:'引用方案 V1',exact:true}).click();await page.getByRole('button',{name:'引用方案 V2',exact:true}).click();
+  await send('请预览我引用的版本。','WAITING_INPUT');const question=(await snapshot()).questions.find((item:{status:string})=>item.status==='OPEN');expect(question.fields).toContain('target');
+  await page.reload();await expect(page.getByLabel('澄清回答',{exact:true})).toHaveCount(0);
+  await send('选择第一版。');const resolved=await snapshot();expect(resolved.questions.find((item:{id:string})=>item.id===question.id).status).toBe('ANSWERED');expect(resolved.items.at(-1).references.find((item:{type:string})=>item.type==='PREVIEW_REQUEST').revisionId).toBe(plan.id);
+});

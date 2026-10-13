@@ -31,11 +31,6 @@ public class ExportArtifacts {
         Long bytes="REMOVED".equals(row.get("state"))?0L:storage.objectSize(row.get("object_key").toString());
         return Map.of("artifactId",id,"state",row.get("state"),"storedBytes",bytes==null?0L:bytes);
     }
-    public Object download(UUID id) {
-        exported(id);
-        if(!artifacts.available(id))throw new ResponseStatusException(GONE,"成片文件不可用");
-        return Map.of("artifactId",id,"url",storage.downloadUrl(artifacts.row(id).get("object_key").toString(),id),"expiresInSeconds",300);
-    }
     public Object delete(UUID id, UUID actor, JsonNode body) {
         if(body==null || !body.isObject() || body.size()!=1 || !"DELETE".equals(body.path("explicitIntent").asText()))
             throw new ResponseStatusException(BAD_REQUEST,"需要明确删除成片文件");

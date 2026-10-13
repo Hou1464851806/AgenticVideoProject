@@ -105,11 +105,15 @@ class PreviewApiIntegrationTest {
         JsonNode reused=data(owner.post("/revisions/"+plan.revision()+"/previews",Map.of("outputId",plan.output(),"previewProfile","LOW_360")));
         assertEquals(task,reused.path("taskId").asText());assertEquals(artifact,reused.path("artifactId").asText());
         assertEquals(404,outsider.post("/artifacts/"+artifact+"/playback-access",Map.of()).statusCode());
+        assertEquals(404,outsider.post("/artifacts/"+artifact+"/download-access",Map.of()).statusCode());
+        var access=owner.post("/artifacts/"+artifact+"/download-access",Map.of());assertEquals(200,access.statusCode(),access.body());
+        var downloaded=HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create(data(access).path("url").asText())).GET().build(),HttpResponse.BodyHandlers.ofByteArray());assertEquals(200,downloaded.statusCode());org.junit.jupiter.api.Assertions.assertArrayEquals(bytes,downloaded.body());
         var playback=owner.post("/artifacts/"+artifact+"/playback-access",Map.of());assertEquals(200,playback.statusCode(),playback.body());
         var download=HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create(data(playback).path("url").asText())).GET().build(),HttpResponse.BodyHandlers.ofByteArray());
         assertEquals(200,download.statusCode());org.junit.jupiter.api.Assertions.assertArrayEquals(bytes,download.body());
         try(var storage=storage()){storage.deleteObject(builder -> builder.bucket("preview-tests").key(key));}
         assertEquals(410,owner.post("/artifacts/"+artifact+"/playback-access",Map.of()).statusCode());
+        assertEquals(410,owner.post("/artifacts/"+artifact+"/download-access",Map.of()).statusCode());
         JsonNode regenerated=data(owner.post("/revisions/"+plan.revision()+"/previews",Map.of("outputId",plan.output(),"previewProfile","LOW_360")));
         org.junit.jupiter.api.Assertions.assertNotEquals(task,regenerated.path("taskId").asText());
         assertEquals("PENDING",regenerated.path("status").asText());
@@ -148,6 +152,7 @@ class PreviewApiIntegrationTest {
             store.putObject(b->b.bucket("preview-tests").key(key),software.amazon.awssdk.core.sync.RequestBody.fromBytes(new byte[]{1,2,3}));
             assertEquals("CANCEL_REQUESTED",data(owner.post("/tasks/"+task+"/cancel",Map.of())).path("status").asText());
             assertEquals(410,owner.post("/artifacts/"+artifact+"/playback-access",Map.of()).statusCode());
+        assertEquals(410,owner.post("/artifacts/"+artifact+"/download-access",Map.of()).statusCode());
             var stopped=Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"processExited",false);
             assertEquals(409,internal(task,"cancelled",stopped).statusCode());
             assertEquals(3,store.headObject(b->b.bucket("preview-tests").key(key)).contentLength());

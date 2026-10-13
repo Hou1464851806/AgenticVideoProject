@@ -17,6 +17,5 @@ public class ExportArtifactController {
     private void owned(UUID id, Authentication account) {access.requireOwned((UUID)artifacts.row(id).get("project_id"),account);}
     private Object envelope(Object value) {return Map.of("data",value,"requestId",UUID.randomUUID());}
     @GetMapping public Object read(@PathVariable UUID artifactId,Authentication account) {owned(artifactId,account);return envelope(exports.read(artifactId));}
-    @PostMapping("/download-access") public Object download(@PathVariable UUID artifactId,Authentication account) {owned(artifactId,account);return envelope(exports.download(artifactId));}
     @DeleteMapping public Object delete(@PathVariable UUID artifactId,@RequestBody JsonNode body,Authentication account) {owned(artifactId,account);return envelope(exports.delete(artifactId,access.currentUserId(account),body));}
 }

@@ -73,6 +73,10 @@ public class RenderArtifacts {
         if(!exists)database.update("UPDATE artifacts SET state='UNAVAILABLE' WHERE id=? AND state='AVAILABLE'",id);
         return exists;
     }
+    public Object download(UUID id) {
+        if(!available(id))throw new ResponseStatusException(GONE,"视频文件不可用");
+        return Map.of("artifactId",id,"url",storage.downloadUrl(row(id).get("object_key").toString(),id),"expiresInSeconds",300);
+    }
     public Object playback(UUID id) {
         if(!available(id))throw new ResponseStatusException(GONE,"预览产物不可用，请手动重新生成");
         var artifact=row(id);database.update("UPDATE artifacts SET last_accessed_at=now() WHERE id=?",id);

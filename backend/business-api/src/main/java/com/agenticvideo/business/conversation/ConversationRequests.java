@@ -19,12 +19,15 @@ public class ConversationRequests {
     private final ConversationBriefs briefs;
     private final EditPlans plans;
     private final ConversationReplies replies;
-    public ConversationRequests(JdbcTemplate database,ObjectMapper json,ConversationBriefs briefs,EditPlans plans,ConversationReplies replies){this.database=database;this.json=json;this.briefs=briefs;this.plans=plans;this.replies=replies;}
+    private final com.agenticvideo.business.render.ConversationProduction production;
+    public ConversationRequests(JdbcTemplate database,ObjectMapper json,ConversationBriefs briefs,EditPlans plans,ConversationReplies replies,com.agenticvideo.business.render.ConversationProduction production){this.database=database;this.json=json;this.briefs=briefs;this.plans=plans;this.replies=replies;this.production=production;}
 
     public void validate(JsonNode input,JsonNode request){
         if(!input.path("context").path("naturalLanguage").asBoolean(false))throw new ResponseStatusException(BAD_REQUEST,"本轮不是自然语言需求");
-        if(!java.util.Set.of("GENERATE_SPEECH","GENERATE_MONTAGE","DISCUSS","QUERY","CLARIFY","CANCEL").contains(request.path("intent").asText())||!request.path("newRequirement").isBoolean())throw new ResponseStatusException(BAD_REQUEST,"需求意图不受支持");
+        if(!java.util.Set.of("GENERATE_SPEECH","GENERATE_MONTAGE","DISCUSS","QUERY","CLARIFY","CANCEL","PREVIEW","CONFIRM","EXPORT").contains(request.path("intent").asText())||!request.path("newRequirement").isBoolean())throw new ResponseStatusException(BAD_REQUEST,"需求意图不受支持");
         if(!request.path("fields").isObject())throw new ResponseStatusException(BAD_REQUEST,"需求条件须为对象");
+        if(production.handles(request.path("intent").asText()))production.validate(input,request);
+        else if(request.has("target"))throw new ResponseStatusException(BAD_REQUEST,"该意图不能指定操作目标");
         if(!request.path("fields").isEmpty())briefs.validate(input,request.path("fields"));
     }
 
@@ -36,13 +39,26 @@ public class ConversationRequests {
             if(!parse(previous.get(0).get("request_json")).equals(request))throw new ResponseStatusException(CONFLICT,"本轮解释已接纳，不能改写执行请求");
             return parse(previous.get(0).get("input_json"));
         }
+        if(production.handles(request.path("intent").asText())){
+            if(!request.path("fields").isEmpty()||request.path("newRequirement").asBoolean())throw new ResponseStatusException(BAD_REQUEST,"预览不能重置或修改制作条件");
+            ObjectNode fixed=input.deepCopy();fixed.put("projectId",task.get("project_id").toString());
+            JsonNode target=production.bind(fixed,request);fixed.put("intent",target.has("question")?"CLARIFY":request.path("intent").asText());
+            fixed.put("productionIntent",request.path("intent").asText());
+            if(target.has("question")){
+                if(input.has("pendingQuestion")){fixed.put("intent","DISCUSS");fixed.put("questionAction","AMBIGUOUS");fixed.set("productionReply",json.valueToTree(Map.of("content",target.path("question").path("prompt").asText(),"references",java.util.List.of())));}
+                else fixed.set("productionQuestion",target.path("question"));
+            }else {fixed.set("productionTarget",target);replies.admit(task,input,request);}
+            if(request.has("questionAction")&&!fixed.has("questionAction"))fixed.set("questionAction",request.path("questionAction"));
+            UUID requirement=previousRequirement(UUID.fromString(input.path("conversationId").asText()));if(requirement==null)requirement=UUID.randomUUID();fixed.put("requirementId",requirement.toString());
+            database.update("INSERT INTO conversation_execution_requests(task_id,requirement_id,request_json,input_json) VALUES (?,?,?::jsonb,?::jsonb)",task.get("id"),requirement,request.toString(),fixed.toString());return fixed;
+        }
         UUID conversation=UUID.fromString(input.path("conversationId").asText());
         replies.admit(task,input,request);
         database.queryForMap("SELECT id FROM conversations WHERE id=? FOR UPDATE",conversation);
         UUID requirement;
-        var prior=database.queryForList("SELECT requirement_id FROM conversation_execution_requests r JOIN conversation_turns t ON t.task_id=r.task_id WHERE t.conversation_id=? ORDER BY r.created_at DESC LIMIT 1",conversation);
-        boolean fresh=request.path("newRequirement").asBoolean()||input.path("startsNewRequirement").asBoolean()||prior.isEmpty();
-        requirement=fresh?UUID.randomUUID():(UUID)prior.get(0).get("requirement_id");
+        UUID prior=previousRequirement(conversation);
+        boolean fresh=request.path("newRequirement").asBoolean()||input.path("startsNewRequirement").asBoolean()||prior==null;
+        requirement=fresh?UUID.randomUUID():prior;
         if(fresh)briefs.start(conversation,(UUID)task.get("id"),UUID.fromString(input.path("messageId").asText()));
         ObjectNode fields=request.path("fields").deepCopy();
         JsonNode current=(JsonNode)briefs.snapshot(conversation).get("fields");
@@ -76,6 +92,10 @@ public class ConversationRequests {
             database.update("UPDATE conversation_execution_requests SET input_json=?::jsonb WHERE task_id=?",fixed.toString(),task.get("id"));
         }else database.update("INSERT INTO conversation_execution_requests(task_id,requirement_id,request_json,input_json) VALUES (?,?,?::jsonb,?::jsonb)",task.get("id"),requirement,request.toString(),fixed.toString());
         return fixed;
+    }
+    private UUID previousRequirement(UUID conversation){
+        var rows=database.queryForList("SELECT requirement_id FROM conversation_execution_requests r JOIN conversation_turns t ON t.task_id=r.task_id WHERE t.conversation_id=? ORDER BY r.created_at DESC LIMIT 1",conversation);
+        return rows.isEmpty()?null:(UUID)rows.get(0).get("requirement_id");
     }
     private void defaults(ObjectNode changes,JsonNode current,String field,Object value){if(!changes.has(field)&&!current.has(field))changes.set(field,json.valueToTree(Map.of("value",value,"basis","DEFAULT")));}
     public JsonNode execution(UUID task,JsonNode accepted){

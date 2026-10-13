@@ -31,6 +31,11 @@ public class PreviewController {
         return envelope(previews.read(requestId));
     }
     private Object envelope(Object data) {return Map.of("data",data,"requestId",UUID.randomUUID());}
+    @PostMapping("/artifacts/{artifactId}/download-access")
+    public Object download(@PathVariable UUID artifactId,Authentication account) {
+        access.requireOwned((UUID)artifacts.row(artifactId).get("project_id"),account);
+        return envelope(artifacts.download(artifactId));
+    }
     @PostMapping("/artifacts/{artifactId}/playback-access")
     public Object playback(@PathVariable UUID artifactId,Authentication account) {
         access.requireOwned((UUID)artifacts.row(artifactId).get("project_id"),account);

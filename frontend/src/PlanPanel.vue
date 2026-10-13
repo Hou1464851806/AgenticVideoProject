@@ -4,7 +4,7 @@ import { request } from './api';
 import type { Playback } from './AssetLibrary.vue';
 export type PlanSelection = { planId: string; revisionId: string; sessionId: string };
 export type PlanBase = { planId: string; revisionId: string };
-const props = defineProps<{ projectId: string; sessionId: string; selection: PlanSelection | null; exportRequestId?:string }>();
+const props = defineProps<{ projectId: string; sessionId: string; selection: PlanSelection | null; exportRequestId?:string; previewRequestId?:string }>();
 const emit = defineEmits<{ play: [value: Playback]; base: [value: PlanBase | null] }>();
 type Plan = { id: string; title: string; editingTaskId: string | null };
 type Version = { id: string; revisionNumber: number; parentRevisionId: string | null };
@@ -74,11 +74,18 @@ async function refreshPreview(){
   catch(failure){if(alive)error.value=failure instanceof Error?failure.message:'无法读取预览';}
   finally{previewRefreshing=false;}
 }
-async function playPreview(){
-  const artifact=preview.value?.artifactId;if(!artifact)return;
-  try{const result=await request<{url:string}>(`/artifacts/${artifact}/playback-access`,'POST',{});if(alive && preview.value?.artifactId===artifact)previewUrl.value=result.url;}
-  catch(failure){if(alive)error.value=failure instanceof Error?failure.message:'无法播放预览';}
+async function openStoredPreview(id:string){
+  try{const result=await request<RenderRequest>(`/render-requests/${id}`);const version=await request<Revision>(`/revisions/${result.revisionId}`);if(alive&&props.previewRequestId===id){preview.value=result;previewVersion.value=version.revisionNumber;previewUrl.value='';}}
+  catch(failure){if(alive)error.value=failure instanceof Error?failure.message:'无法读取聊天预览';}
 }
+async function previewAccess(action:'playback-access'|'download-access'){
+  const artifact=preview.value?.artifactId;if(!artifact)return;
+  try{const result=await request<{url:string}>(`/artifacts/${artifact}/${action}`,'POST',{});if(!alive||preview.value?.artifactId!==artifact)return;
+    if(action==='playback-access')previewUrl.value=result.url;
+    else{const link=document.createElement('a');link.href=result.url;link.download=`preview-${artifact}.mp4`;document.body.appendChild(link);link.click();link.remove();}}
+  catch(failure){if(alive)error.value=failure instanceof Error?failure.message:'无法访问预览';}
+}
+async function playPreview(){await previewAccess('playback-access');}
 async function cancelPreview(){
   const task=preview.value?.taskId;if(!task)return;
   try{await request(`/tasks/${task}/cancel`,'POST',{});await refreshPreview();}
@@ -177,6 +184,7 @@ async function refreshExportHistory(){
   finally{exportHistoryReading=false;}
 }
 function exportLabel(item:RenderRequest){return `${item.createdAt?new Date(item.createdAt).toLocaleString():''} · ${item.configuration?.profile==='FULL_HD_1080'?'1080p':'720p'} · ${({PENDING:'等待',RUNNING:'执行中',SUCCEEDED:'成功',FAILED:'失败',CANCEL_REQUESTED:'停止中',CANCELLED:'已停止'} as Record<string,string>)[item.status]??item.status}`;}
+watch(()=>props.previewRequestId,id=>{if(id)void openStoredPreview(id);});
 watch(()=>props.exportRequestId,id=>{if(id)void openStoredExport(id);});
 watch(() => props.selection, selection => { if (selection) void openRevision(selection.planId,selection.revisionId); });
 watch(() => props.sessionId, () => { void restoreView(); });
@@ -243,6 +251,7 @@ onUnmounted(() => { alive = false; ++epoch; clearInterval(timer); });
       <p v-if="preview.error" role="alert">{{ preview.error.message }}</p>
       <button v-if="['PENDING','RUNNING'].includes(preview.status)" class="secondary" @click="cancelPreview">停止预览</button>
       <button v-if="preview.status==='SUCCEEDED'" class="secondary" @click="playPreview">播放低清预览</button>
+      <button v-if="preview.status==='SUCCEEDED'" class="secondary" @click="previewAccess('download-access')">下载低清预览</button>
       <video v-if="previewUrl" :src="previewUrl" controls aria-label="低清合成预览播放器" style="width:100%;max-height:420px" />
     </section>
   </section>

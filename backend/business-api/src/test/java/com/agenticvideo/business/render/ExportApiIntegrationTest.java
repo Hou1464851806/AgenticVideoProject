@@ -111,6 +111,96 @@ class ExportApiIntegrationTest {
         var missingRemoved=owner.delete("/artifacts/"+missingArtifact,Map.of("explicitIntent","DELETE"));assertEquals(200,missingRemoved.statusCode());
         assertEquals(0,data(missingRemoved).path("removedBytes").asLong());
     }
+    @Test void naturalPreviewFreezesTheSentViewAndExplicitReferencesTakePriority() throws Exception {
+        BrowserApi owner=signedIn("preview-chat-freeze");
+        UUID project=UUID.fromString(data(owner.post("/projects",Map.of("name","聊天固定版本"))).path("id").asText());Plan plan=planFixture(project);
+        String session=data(owner.post("/projects/"+project+"/conversations",Map.of())).path("id").asText();
+        String planId=data(owner.get("/revisions/"+plan.first())).path("planId").asText();
+        assertEquals(200,owner.patch("/conversations/"+session+"/view",Map.of("planId",planId,"revisionId",plan.first(),"expectedRowVersion",0)).statusCode());
+        var body=Map.of("content","请帮我看看这版做出来的效果","context",Map.of("naturalLanguage",true));
+        JsonNode turn=data(owner.post("/conversations/"+session+"/turns",body,"fixed-preview"));String task=turn.path("taskId").asText();
+        JsonNode claim=data(internal(task,"claim",Map.of("executorId","preview-chat","claimRequestId",UUID.randomUUID())));
+        assertEquals(200,owner.patch("/conversations/"+session+"/view",Map.of("planId",planId,"revisionId",plan.second(),"expectedRowVersion",1)).statusCode());
+        var forged=commandTool(task,claim,"invented-version","submit_production_request",Map.of("intent","PREVIEW","newRequirement",false,"fields",Map.of(),"target",Map.of("revisionNumber",2)));assertEquals(400,forged.statusCode(),forged.body());
+        var admission=Map.of("intent","PREVIEW","newRequirement",false,"fields",Map.of());
+        var response=commandTool(task,claim,"preview-admit","submit_production_request",admission);assertEquals(200,response.statusCode(),response.body());
+        JsonNode fixed=data(response);assertEquals(plan.first().toString(),fixed.path("productionTarget").path("revisionId").asText());
+        assertEquals(0,data(owner.get("/revisions/"+plan.first()+"/previews")).path("items").size());
+        response=commandTool(task,claim,"preview-execute","execute_production_command",Map.of());assertEquals(200,response.statusCode(),response.body());JsonNode result=data(response);
+        assertEquals(plan.first().toString(),result.path("references").get(0).path("revisionId").asText());
+        assertEquals(result,data(commandTool(task,claim,"preview-execute","execute_production_command",Map.of())));
+        assertEquals(1,data(owner.get("/revisions/"+plan.first()+"/previews")).path("items").size());
+        assertEquals(0,data(owner.get("/revisions/"+plan.second()+"/previews")).path("items").size());
+        assertEquals(200,internal(task,"complete",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","preview-answer","resultType","CONVERSATION_ANSWERED","result",Map.of("content",result.path("content").asText(),"evidenceIds",List.of()))).statusCode());
+        JsonNode history=data(owner.get("/conversations/"+session+"/snapshot"));assertEquals("PREVIEW_REQUEST",history.path("items").get(history.path("items").size()-1).path("references").get(0).path("type").asText());
+        var explicit=Map.of("content","请预览我明确引用的这个版本","references",List.of(Map.of("type","PLAN_REVISION","id",plan.first())),"context",Map.of("naturalLanguage",true));
+        String explicitTask=data(owner.post("/conversations/"+session+"/turns",explicit)).path("taskId").asText();JsonNode explicitClaim=data(internal(explicitTask,"claim",Map.of("executorId","preview-chat","claimRequestId",UUID.randomUUID())));
+        response=commandTool(explicitTask,explicitClaim,"explicit-admit","submit_production_request",admission);assertEquals(200,response.statusCode(),response.body());assertEquals(plan.first().toString(),data(response).path("productionTarget").path("revisionId").asText());
+    }
+    @Test void naturalConfirmationAndExportRequireSeparateMessagesAndAnExistingConfirmedVersion() throws Exception {
+        BrowserApi owner=signedIn("production-chat-authority");UUID project=UUID.fromString(data(owner.post("/projects",Map.of("name","聊天授权边界"))).path("id").asText());Plan plan=planFixture(project);
+        String session=data(owner.post("/projects/"+project+"/conversations",Map.of())).path("id").asText(),planId=data(owner.get("/revisions/"+plan.first())).path("planId").asText();
+        assertEquals(200,owner.patch("/conversations/"+session+"/view",Map.of("planId",planId,"revisionId",plan.first(),"expectedRowVersion",0)).statusCode());
+        String path="/conversations/"+session+"/turns";
+        String task=data(owner.post(path,Map.of("content","这版没有问题，请确认它。","context",Map.of("naturalLanguage",true)))).path("taskId").asText();JsonNode claim=data(internal(task,"claim",Map.of("executorId","production-chat","claimRequestId",UUID.randomUUID())));
+        var response=commandTool(task,claim,"confirm-admit","submit_production_request",Map.of("intent","CONFIRM","newRequirement",false,"fields",Map.of()));assertEquals(200,response.statusCode(),response.body());
+        String requirement=data(response).path("requirementId").asText();assertFalse(requirement.isBlank());
+        JsonNode result=data(commandTool(task,claim,"confirm-execute","execute_production_command",Map.of()));assertEquals("CONFIRMATION",result.path("references").get(0).path("type").asText());
+        assertEquals(1,data(owner.get("/revisions/"+plan.first()+"/confirmations")).path("items").size());assertEquals(0,data(owner.get("/revisions/"+plan.first()+"/export-requests")).path("items").size());
+        finishCommand(task,claim,result);
+        assertEquals(200,owner.patch("/conversations/"+session+"/view",Map.of("planId",planId,"revisionId",plan.second(),"expectedRowVersion",1)).statusCode());
+        task=data(owner.post(path,Map.of("content","请将 V1 导出为720p的 MP4。","context",Map.of("naturalLanguage",true)))).path("taskId").asText();claim=data(internal(task,"claim",Map.of("executorId","production-chat","claimRequestId",UUID.randomUUID())));
+        response=commandTool(task,claim,"export-admit","submit_production_request",Map.of("intent","EXPORT","newRequirement",false,"fields",Map.of(),"target",Map.of("revisionNumber",1,"profile","HD_720")));assertEquals(200,response.statusCode(),response.body());assertEquals(plan.first().toString(),data(response).path("productionTarget").path("revisionId").asText());assertEquals(requirement,data(response).path("requirementId").asText());
+        response=commandTool(task,claim,"export-execute","execute_production_command",Map.of());assertEquals(200,response.statusCode(),response.body());result=data(response);assertEquals("EXPORT_REQUEST",result.path("references").get(0).path("type").asText());assertEquals(result,data(commandTool(task,claim,"export-execute","execute_production_command",Map.of())));
+        assertEquals(1,data(owner.get("/revisions/"+plan.first()+"/export-requests")).path("items").size());assertEquals("HD_720",data(owner.get("/render-requests/"+result.path("references").get(0).path("id").asText())).path("configuration").path("profile").asText());
+        assertEquals(200,internal(task,"fail",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","reply-lost","code","CONVERSATION_UNVERIFIED","message","导出已接纳，但回复丢失")).statusCode());
+        try(var store=storage()){store.deleteObject(b->b.bucket("export-tests").key("originals/"+plan.asset()));}
+        String retry=data(owner.post("/conversations/"+session+"/tasks/"+task+"/retry",Map.of())).path("taskId").asText();JsonNode retryClaim=data(internal(retry,"claim",Map.of("executorId","production-chat","claimRequestId",UUID.randomUUID())));
+        assertEquals(plan.first().toString(),retryClaim.path("input").path("productionTarget").path("revisionId").asText());
+        var recovered=commandTool(retry,retryClaim,"export-recovered","execute_production_command",Map.of());assertEquals(200,recovered.statusCode(),recovered.body());assertEquals(result,data(recovered));finishCommand(retry,retryClaim,data(recovered));
+        assertEquals(1,data(owner.get("/revisions/"+plan.first()+"/export-requests")).path("items").size());
+        task=data(owner.post(path,Map.of("content","请把现在这版导出成 MP4。","context",Map.of("naturalLanguage",true)))).path("taskId").asText();claim=data(internal(task,"claim",Map.of("executorId","production-chat","claimRequestId",UUID.randomUUID())));
+        assertEquals(200,commandTool(task,claim,"unconfirmed-admit","submit_production_request",Map.of("intent","EXPORT","newRequirement",false,"fields",Map.of())).statusCode());
+        result=data(commandTool(task,claim,"unconfirmed-execute","execute_production_command",Map.of()));assertTrue(result.path("content").asText().contains("确认"));assertTrue(result.path("references").isEmpty());assertEquals(0,data(owner.get("/revisions/"+plan.second()+"/confirmations")).path("items").size());assertEquals(0,data(owner.get("/revisions/"+plan.second()+"/export-requests")).path("items").size());finishCommand(task,claim,result);
+        for(String content:List.of("我觉得不错。","查询原句“确认当前版本”是否出现。","做完就导出。","请确认这版然后马上导出。")){
+            task=data(owner.post(path,Map.of("content",content,"context",Map.of("naturalLanguage",true)))).path("taskId").asText();claim=data(internal(task,"claim",Map.of("executorId","production-chat","claimRequestId",UUID.randomUUID())));
+            response=commandTool(task,claim,"forged-authority","submit_production_request",Map.of("intent",content.contains("导出")?"EXPORT":"CONFIRM","newRequirement",false,"fields",Map.of()));assertEquals(400,response.statusCode(),response.body());assertEquals(202,owner.post("/tasks/"+task+"/cancel",Map.of()).statusCode());
+            assertEquals(200,internal(task,"cancelled",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"processExited",true)).statusCode());
+        }
+        assertEquals(0,data(owner.get("/revisions/"+plan.second()+"/confirmations")).path("items").size());
+    }
+    @Test void conflictingTargetsWaitAndANaturalAnswerResolvesTheOriginalOperation() throws Exception {
+        BrowserApi owner=signedIn("production-chat-targets");UUID project=UUID.fromString(data(owner.post("/projects",Map.of("name","聊天对象澄清"))).path("id").asText());Plan plan=planFixture(project);
+        String session=data(owner.post("/projects/"+project+"/conversations",Map.of())).path("id").asText(),planId=data(owner.get("/revisions/"+plan.first())).path("planId").asText();
+        assertEquals(200,owner.patch("/conversations/"+session+"/view",Map.of("planId",planId,"revisionId",plan.first(),"expectedRowVersion",0)).statusCode());
+        String path="/conversations/"+session+"/turns";var body=Map.of("content","请预览这两个引用中的一个版本。","references",List.of(Map.of("type","PLAN_REVISION","id",plan.first()),Map.of("type","PLAN_REVISION","id",plan.second())),"context",Map.of("naturalLanguage",true));
+        JsonNode turn=data(owner.post(path,body,"ambiguous-preview"));String task=turn.path("taskId").asText();JsonNode claim=data(internal(task,"claim",Map.of("executorId","production-targets","claimRequestId",UUID.randomUUID())));
+        var admitted=commandTool(task,claim,"ambiguous-admit","submit_production_request",Map.of("intent","PREVIEW","newRequirement",false,"fields",Map.of()));assertEquals(200,admitted.statusCode(),admitted.body());JsonNode fixed=data(admitted);assertEquals("CLARIFY",fixed.path("intent").asText());assertFalse(fixed.has("productionTarget"));
+        assertEquals(200,internal(task,"complete",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","target-question","resultType","CONVERSATION_WAITING","result",Map.of("question",fixed.path("productionQuestion")))).statusCode());
+        assertEquals(0,data(owner.get("/revisions/"+plan.first()+"/previews")).path("items").size());
+        String unresolved=data(owner.post(path,Map.of("content","随便吧。","context",Map.of("naturalLanguage",true)))).path("taskId").asText();JsonNode unresolvedClaim=data(internal(unresolved,"claim",Map.of("executorId","production-targets","claimRequestId",UUID.randomUUID())));
+        var unresolvedResult=commandTool(unresolved,unresolvedClaim,"empty-target-answer","submit_production_request",Map.of("intent","PREVIEW","newRequirement",false,"questionAction","ANSWER","fields",Map.of()));assertEquals(400,unresolvedResult.statusCode(),unresolvedResult.body());
+        assertEquals(202,owner.post("/tasks/"+unresolved+"/cancel",Map.of()).statusCode());assertEquals(200,internal(unresolved,"cancelled",Map.of("attemptId",unresolvedClaim.path("attemptId").asText(),"leaseToken",unresolvedClaim.path("leaseToken").asText(),"processExited",true)).statusCode());
+        String unknown=data(owner.post(path,Map.of("content","选择第99版。","context",Map.of("naturalLanguage",true)))).path("taskId").asText();JsonNode unknownClaim=data(internal(unknown,"claim",Map.of("executorId","production-targets","claimRequestId",UUID.randomUUID())));
+        var unknownResult=commandTool(unknown,unknownClaim,"unknown-target-answer","submit_production_request",Map.of("intent","PREVIEW","newRequirement",false,"questionAction","ANSWER","target",Map.of("revisionNumber",99),"fields",Map.of()));assertEquals(200,unknownResult.statusCode(),unknownResult.body());assertEquals("DISCUSS",data(unknownResult).path("intent").asText());assertEquals("AMBIGUOUS",data(unknownResult).path("questionAction").asText());
+        finishCommand(unknown,unknownClaim,data(unknownResult).path("productionReply"));assertEquals(1,data(owner.get("/conversations/"+session+"/snapshot")).path("questions").size());
+        assertEquals(200,owner.patch("/conversations/"+session+"/view",Map.of("planId",planId,"revisionId",plan.second(),"expectedRowVersion",1)).statusCode());
+        String replyTask=data(owner.post(path,Map.of("content","选择第一版。","context",Map.of("naturalLanguage",true)))).path("taskId").asText();JsonNode replyClaim=data(internal(replyTask,"claim",Map.of("executorId","production-targets","claimRequestId",UUID.randomUUID())));
+        admitted=commandTool(replyTask,replyClaim,"target-answer","submit_production_request",Map.of("intent","PREVIEW","newRequirement",false,"questionAction","ANSWER","target",Map.of("revisionNumber",1),"fields",Map.of()));assertEquals(200,admitted.statusCode(),admitted.body());assertEquals(plan.first().toString(),data(admitted).path("productionTarget").path("revisionId").asText());
+        JsonNode result=data(commandTool(replyTask,replyClaim,"answered-preview","execute_production_command",Map.of()));finishCommand(replyTask,replyClaim,result);
+        JsonNode snapshot=data(owner.get("/conversations/"+session+"/snapshot"));assertEquals("ANSWERED",snapshot.path("questions").get(0).path("status").asText());assertEquals("SUCCEEDED",data(owner.get("/tasks/"+task)).path("status").asText());
+        BrowserApi other=signedIn("production-target-foreign");UUID foreign=UUID.fromString(data(other.post("/projects",Map.of("name","另一个项目"))).path("id").asText());Plan foreignPlan=planFixture(foreign);
+        assertEquals(404,owner.post(path,Map.of("content","预览这版","references",List.of(Map.of("type","PLAN_REVISION","id",foreignPlan.first())),"context",Map.of("naturalLanguage",true))).statusCode());
+    }
+
+    private void finishCommand(String task,JsonNode claim,JsonNode result) throws Exception {
+        assertEquals(200,internal(task,"complete",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","command-answer","resultType","CONVERSATION_ANSWERED","result",Map.of("content",result.path("content").asText(),"evidenceIds",List.of()))).statusCode());
+    }
+
+    private HttpResponse<String> commandTool(String task,JsonNode claim,String key,String name,Object arguments) throws Exception {
+        return internal(task,"tool",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey",key,"name",name,"arguments",arguments));
+    }
+
     @Test void directNaturalLanguageUsesTheViewedVersionAndAmbiguityNeverStartsExport() throws Exception {
         BrowserApi owner=signedIn("export-natural-owner");
         UUID project=UUID.fromString(data(owner.post("/projects",Map.of("name","自然语言制作路由"))).path("id").asText());Plan plan=planFixture(project);

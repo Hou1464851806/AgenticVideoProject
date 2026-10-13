@@ -88,6 +88,11 @@ public class ExportRequests {
         });
     }
     public record Prepared(UUID revision,UUID output,Map<UUID,Object> sources) {}
+    public Prepared prepareFromMessage(UUID revision,UUID output,UUID message) {
+        UUID project=(UUID)revisions.revision(revision).get("project_id");
+        if(database.queryForObject("SELECT count(*) FROM production_intents WHERE project_id=? AND operation='EXPORT' AND idempotency_key=?",Integer.class,project,"message-"+message)>0)return null;
+        return prepare(revision,output);
+    }
     /** Storage reads occur before taking any project, revision or conversation lock. */
     public Prepared prepare(UUID revisionId,UUID outputId) {
         var revision=revisions.revision(revisionId);UUID project=(UUID)revision.get("project_id");
