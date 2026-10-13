@@ -47,7 +47,7 @@ public class ConversationQuestions {
             }
             replies.requireOpen(waiting);
             if(database.queryForObject("SELECT count(*) FROM conversation_turns WHERE conversation_id=? AND request_key=?",Integer.class,conversation,key)>0)throw new ResponseStatusException(CONFLICT,"回答幂等键已用于其他需求");
-            ObjectNode input=(ObjectNode)decode(source.get("input_json").toString());turns.validateRetry(session,input);
+            ObjectNode input=(ObjectNode)turns.executionInput((UUID)source.get("id"),decode(source.get("input_json").toString())).deepCopy();turns.validateRetry(session,input);
             UUID turn=UUID.randomUUID(),message=UUID.randomUUID(),task=UUID.randomUUID(),event=UUID.randomUUID();
             long sequence=database.queryForObject("SELECT coalesce(max(message_seq),0)+1 FROM conversation_messages WHERE conversation_id=?",Long.class,conversation);
             database.update("INSERT INTO conversation_messages(id,conversation_id,message_seq,role,content,references_json) VALUES (?,?,?,'USER',?,?::jsonb)",message,conversation,sequence,request.content(),encode(List.of(Map.of("type","CLARIFICATION","id",question,"turnId",original.get("turn_id")))));

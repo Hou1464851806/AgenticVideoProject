@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { request } from './api';
 import { useProjectEvents } from './projectEvents';
 import type { Playback } from './AssetLibrary.vue';
-import type { PlanBase, PlanSelection } from './PlanPanel.vue';
-const props = defineProps<{ projectId: string; editingBase?: PlanBase | null }>();
+import type { PlanBase, PlanSelection, PlanReference } from './PlanPanel.vue';
+const props = defineProps<{ projectId: string; editingBase?: PlanBase | null; editReference?: PlanReference|null }>();
 const emit = defineEmits<{ play: [value: Playback]; plan: [value: PlanSelection]; session: [value: string]; exported: [requestId:string]; previewed:[requestId:string] }>();
 type Session = { id: string; title: string; assetIds: string[]; naturalLanguage?:boolean };
 type Asset = { id: string; filename: string };
@@ -22,6 +22,8 @@ const title = ref('');
 const selected = ref('');
 const drafts = ref<Record<string,string>>({});
 const references = ref<Record<string,string[]>>({});
+const editReferences=ref<Record<string,PlanReference|null>>({});
+watch(()=>props.editReference,value=>{if(value&&selected.value)editReferences.value[selected.value]=value;});
 const planReferences=ref<Record<string,string[]>>({});
 function togglePlanReference(id:string){const values=planReferences.value[selected.value]??[];planReferences.value[selected.value]=values.includes(id)?values.filter(value=>value!==id):[...values,id];}
 const messages = ref<Message[]>([]);
@@ -179,7 +181,9 @@ async function send() {
     context.editing = {...(condition.mode==='MONTAGE'?{kind:'MONTAGE',orderedAssetIds:condition.orderedAssetIds}:{}),topic:condition.topic,minDurationMs:Math.round(condition.minSeconds*1000),maxDurationMs:Math.round(condition.maxSeconds*1000),profile:condition.profile,
       ...(condition.useBase && props.editingBase ? {planId:props.editingBase.planId,baseRevisionId:props.editingBase.revisionId} : {})};
   }
-  const body = { content, references: [...(references.value[id] ?? []).map(assetId => ({ type: 'ASSET', id: assetId })),...(planReferences.value[id]??[]).map(revisionId=>({type:'PLAN_REVISION',id:revisionId}))], context };
+  let body = { content, references: [...(references.value[id] ?? []).map(assetId => ({ type: 'ASSET', id: assetId })),...(editReferences.value[id]?[editReferences.value[id]!]:planReferences.value[id]?.length?(planReferences.value[id]??[]).map(revisionId=>({type:'PLAN_REVISION',id:revisionId})):[])], context };
+  const uncertain=pending.get(id);
+  if(uncertain&&JSON.parse(uncertain.serialized).content===content)body=JSON.parse(uncertain.serialized);
   const serialized = JSON.stringify(body);
   const identity = pending.get(id)?.serialized === serialized ? pending.get(id)! : { key: crypto.randomUUID(), serialized };
   pending.set(id, identity);
@@ -187,7 +191,7 @@ async function send() {
   try {
     const accepted = await request<{taskId:string}>(`/conversations/${id}/turns`, 'POST', body, { 'Idempotency-Key': identity.key });
     pending.delete(id);
-    planReferences.value[id]=[];
+    planReferences.value[id]=[];editReferences.value[id]=null;
     if (drafts.value[id] === content) drafts.value[id] = '';
     if (selected.value === id) { latestTask.value = { taskId: accepted.taskId, status: 'PENDING' }; await loadHistory(); }
   } catch (failure) { if (selected.value === id) error.value = failure instanceof Error ? failure.message : '无法发送需求'; }
@@ -305,6 +309,7 @@ onUnmounted(() => { alive = false; clearInterval(timer); });
         <fieldset v-if="session.assetIds.length"><legend>本次明确引用</legend>
           <label v-for="asset in assets.filter(item => session?.assetIds.includes(item.id))" :key="asset.id" class="choice"><input v-model="references[selected]" type="checkbox" :value="asset.id" :aria-label="`引用素材 ${asset.filename}`">{{ asset.filename }}</label>
         </fieldset>
+        <p v-if="editReferences[selected]">已固定引用{{editReferences[selected]?.clipId?'片段':editReferences[selected]?.outputId?'成片':'版本'}}；切换查看不会改变此引用。<button type="button" class="secondary" @click="editReferences[selected]=null">移除方案引用</button></p>
         <label for="conversation-input">对话输入</label><textarea id="conversation-input" v-model="draft" maxlength="8000" required placeholder="例如：素材里介绍了哪些制作步骤？"></textarea>
         <button type="submit" :disabled="sending || blocksSending || !draft.trim()">发送需求</button>
       </form>

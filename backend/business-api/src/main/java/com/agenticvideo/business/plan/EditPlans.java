@@ -25,7 +25,7 @@ public class EditPlans {
     public JsonNode allocate(UUID project, UUID task, JsonNode editing, JsonNode scope) {
         if (!editing.isObject()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "制作条件必须是对象");
         editing.fieldNames().forEachRemaining(field -> {
-            if (!Set.of("topic", "minDurationMs", "maxDurationMs", "profile", "planId", "baseRevisionId", "kind", "orderedAssetIds", "forbiddenContent").contains(field))
+            if (!Set.of("topic", "minDurationMs", "maxDurationMs", "profile", "planId", "baseRevisionId", "kind", "orderedAssetIds", "forbiddenContent", "modification").contains(field))
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "制作条件字段不受支持");
         });
         if(editing.has("forbiddenContent")){
@@ -73,6 +73,21 @@ public class EditPlans {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "已有版本的方案必须明确发送基准版本");
             database.update("UPDATE edit_plans SET editing_task_id=?,editing_attempt_id=NULL WHERE id=?", task, plan);
         }
+        if(editing.has("modification")){
+            if(!editing.hasNonNull("baseRevisionId"))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"修改必须固定基准版本");
+            var base=database.queryForMap("SELECT r.content_json,coalesce(x.input_json,t.input_json) AS source_input FROM plan_revisions r JOIN tasks t ON t.id=r.source_task_id LEFT JOIN conversation_execution_requests x ON x.task_id=t.id WHERE r.id=? AND r.plan_id=?",UUID.fromString(editing.path("baseRevisionId").asText()),plan);
+            JsonNode content=(JsonNode)parse(base.get("content_json")),conditions=((JsonNode)parse(base.get("source_input"))).path("editing");
+            if(!content.equals(editing.path("modification").path("baseContent")))throw new ResponseStatusException(HttpStatus.CONFLICT,"修改快照与原版本不一致");
+            JsonNode source=(JsonNode)parse(base.get("source_input"));
+            var forbidden=new java.util.HashSet<String>();for(var id:source.path("brief").path("fields").path("forbiddenAssetIds").path("value"))forbidden.add(id.asText());
+            var originalScope=new java.util.HashSet<String>();for(var id:source.path("assetIds"))originalScope.add(id.asText());
+            for(var id:scope)if(forbidden.contains(id.asText())||source.path("brief").path("fields").path("assetIds").has("value")&&!originalScope.contains(id.asText()))throw new ResponseStatusException(HttpStatus.CONFLICT,"修改不能扩大原需求的明确素材范围或使用禁用素材");
+            for(String field:java.util.List.of("topic","minDurationMs","maxDurationMs","profile","kind","orderedAssetIds","forbiddenContent"))if(!conditions.path(field).equals(editing.path(field)))throw new ResponseStatusException(HttpStatus.CONFLICT,"修改不能改变原方案硬约束");
+            for(var output:content.path("outputs"))for(var clip:output.path("clips")){
+                UUID asset=UUID.fromString(clip.path("assetId").asText());
+                if(database.queryForObject("SELECT count(*) FROM assets WHERE id=? AND project_id=? AND validation_status='VALID'",Integer.class,asset,project)!=1)throw new ResponseStatusException(HttpStatus.CONFLICT,"基准素材已失效，不能恢复修改");
+            }
+        }
         var input = editing.deepCopy();
         ((com.fasterxml.jackson.databind.node.ObjectNode)input).put("planId", plan.toString());
         return input;
@@ -112,14 +127,18 @@ public class EditPlans {
         database.update("UPDATE edit_plans SET next_revision_number=next_revision_number+1,editing_task_id=NULL,editing_attempt_id=NULL WHERE id=?", planId);
         var publication = json.createObjectNode();
         String content=result.path("content").asText();
-        if(input.path("context").path("naturalLanguage").asBoolean(false)){
+        if(input.path("editing").has("modification")){
+            content="方案 V"+number+" 已就绪；基于 V"+input.path("editing").path("modification").path("revisionNumber").asLong()+" 修改。"+json.valueToTree(validated.content()).path("changeSummary").asText()+" 当前查看版本保持不变。";
+        }else if(input.path("context").path("naturalLanguage").asBoolean(false)){
             JsonNode output=json.valueToTree(validated.content()).path("outputs").get(0);
             var order=new java.util.ArrayList<String>();
             for(var clip:output.path("clips"))order.add(clip.path("reason").asText());
             content="方案 V"+number+" 已保存："+input.path("editing").path("topic").asText()+"。内容顺序："+String.join(" → ",order)+"。实际时长 "+(output.path("durationMs").asLong()/1000.0)+" 秒，"+("PORTRAIT_720".equals(output.path("render").path("profile").asText())?"竖屏":"横屏")+("MONTAGE".equals(input.path("editing").path("kind").asText())?"，有原声片段保留原声，无原声片段保持静音，字幕来自原语音。":"，保留原声并提供原文字幕。")+"请展开方案核查片段和证据；原视频已有停顿可能随选段保留。";
         }
         publication.put("content", content);
-        publication.set("evidenceIds", json.valueToTree(validated.evidence()));
+        var citations=new java.util.HashSet<UUID>(validated.evidence());
+        if(input.path("editing").has("modification"))citations.clear(); // The complete snapshot retains old citations; the public revision card is the source for this edit.
+        publication.set("evidenceIds", json.valueToTree(citations));
         publication.set("planRevision", json.valueToTree(Map.of("planId", planId, "revisionId", revision, "revisionNumber", number)));
         return publication;
     }

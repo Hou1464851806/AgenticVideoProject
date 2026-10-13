@@ -3,14 +3,15 @@ import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { request } from './api';
 import type { Playback } from './AssetLibrary.vue';
 export type PlanSelection = { planId: string; revisionId: string; sessionId: string };
+export type PlanReference = { type: 'PLAN_REVISION'; id: string; outputId?: string; clipId?: string };
 export type PlanBase = { planId: string; revisionId: string };
 const props = defineProps<{ projectId: string; sessionId: string; selection: PlanSelection | null; exportRequestId?:string; previewRequestId?:string }>();
-const emit = defineEmits<{ play: [value: Playback]; base: [value: PlanBase | null] }>();
+const emit = defineEmits<{ play: [value: Playback]; base: [value: PlanBase | null]; reference: [value: PlanReference] }>();
 type Plan = { id: string; title: string; editingTaskId: string | null };
 type Version = { id: string; revisionNumber: number; parentRevisionId: string | null };
 type Clip = { clipId: string; assetId: string; sourceInMs: number; sourceOutMs: number; reason: string; evidenceIds: string[] };
 type Output = { outputId:string; title: string; durationMs: number; clips: Clip[]; render: {width:number;height:number}; subtitles: {cues:{startMs:number;endMs:number;text:string}[]} };
-type Revision = Version & { planId: string; content: {outputs: Output[]} };
+type Revision = Version & { planId: string; content: {outputs: Output[];changeSummary?:string} };
 const plans = ref<Plan[]>([]), versions = ref<Version[]>([]);
 const selectedPlan = ref(''), selectedRevision = ref('');
 const current = ref<Revision | null>(null), names = ref<Record<string,string>>({});
@@ -213,16 +214,20 @@ onUnmounted(() => { alive = false; ++epoch; clearInterval(timer); });
       <p v-if="loading" role="status">正在读取版本…</p>
       <div v-if="current && !loading">
         <h4>V{{ current.revisionNumber }} · {{ current.content.outputs[0]?.title }}</h4>
+        <p v-if="current.content.changeSummary">变更说明：{{current.content.changeSummary}}</p>
+        <button class="secondary" @click="emit('reference',{type:'PLAN_REVISION',id:current.id})">引用当前版本</button>
         <p v-if="confirmationId">当前版本已确认；导出仍需另行操作。</p>
         <button v-else class="secondary" :disabled="exportBusy" @click="confirmVersion">确认当前版本</button>
         <label for="export-profile-select">成片导出清晰度</label><select id="export-profile-select" v-model="exportProfile"><option value="HD_720">720p</option><option value="FULL_HD_1080">1080p</option></select>
         <label v-if="exportHistory.length" for="export-history-select">查看正式导出记录</label><select v-if="exportHistory.length" id="export-history-select" :value="exported?.revisionId===current.id?exported.requestId:''" @change="openStoredExport(($event.target as HTMLSelectElement).value)"><option value="">选择导出记录</option><option v-for="item in exportHistory" :key="item.requestId" :value="item.requestId">{{ exportLabel(item) }}</option></select>
-        <div v-for="output in current.content.outputs" :key="output.title">
+        <div v-for="(output,outputIndex) in current.content.outputs" :key="output.outputId">
+          <h5>成片 {{outputIndex+1}} · {{output.title}}</h5>
+          <button class="secondary" @click="emit('reference',{type:'PLAN_REVISION',id:current.id,outputId:output.outputId})">引用成片 {{outputIndex+1}}</button>
           <p>{{ (output.durationMs/1000).toFixed(3) }} 秒 · {{ output.render.width }} × {{ output.render.height }} · 原声与原文字幕</p>
           <article v-for="(clip,index) in output.clips" :key="clip.clipId" aria-label="方案剪辑片段" class="clip">
             <strong>片段 {{ index+1 }} · {{ names[clip.assetId] }}</strong>
             <p>原素材 {{ (clip.sourceInMs/1000).toFixed(3) }}–{{ (clip.sourceOutMs/1000).toFixed(3) }} 秒</p>
-            <p>选取依据：{{ clip.reason }}</p><button class="secondary" @click="play(clip)">播放源片段</button>
+            <p>选取依据：{{ clip.reason }}</p><button class="secondary" @click="emit('reference',{type:'PLAN_REVISION',id:current.id,outputId:output.outputId,clipId:clip.clipId})">引用片段 {{index+1}}</button><button class="secondary" @click="play(clip)">播放源片段</button>
           </article>
           <button class="secondary" :disabled="previewBusy" @click="generatePreview(output)">生成低清效果预览</button>
           <button class="secondary" :disabled="!confirmationId || exportBusy" @click="exportOutput(output)">导出正式成片</button>

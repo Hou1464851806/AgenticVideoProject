@@ -18,15 +18,17 @@ public class ConversationRequests {
     private final ObjectMapper json;
     private final ConversationBriefs briefs;
     private final EditPlans plans;
+    private final com.agenticvideo.business.plan.PlanModifications modifications;
     private final ConversationReplies replies;
     private final com.agenticvideo.business.render.ConversationProduction production;
-    public ConversationRequests(JdbcTemplate database,ObjectMapper json,ConversationBriefs briefs,EditPlans plans,ConversationReplies replies,com.agenticvideo.business.render.ConversationProduction production){this.database=database;this.json=json;this.briefs=briefs;this.plans=plans;this.replies=replies;this.production=production;}
+    public ConversationRequests(JdbcTemplate database,ObjectMapper json,ConversationBriefs briefs,EditPlans plans,ConversationReplies replies,com.agenticvideo.business.render.ConversationProduction production,com.agenticvideo.business.plan.PlanModifications modifications){this.database=database;this.json=json;this.briefs=briefs;this.plans=plans;this.replies=replies;this.production=production;this.modifications=modifications;}
 
     public void validate(JsonNode input,JsonNode request){
         if(!input.path("context").path("naturalLanguage").asBoolean(false))throw new ResponseStatusException(BAD_REQUEST,"本轮不是自然语言需求");
-        if(!java.util.Set.of("GENERATE_SPEECH","GENERATE_MONTAGE","DISCUSS","QUERY","CLARIFY","CANCEL","PREVIEW","CONFIRM","EXPORT").contains(request.path("intent").asText())||!request.path("newRequirement").isBoolean())throw new ResponseStatusException(BAD_REQUEST,"需求意图不受支持");
+        if(!java.util.Set.of("GENERATE_SPEECH","GENERATE_MONTAGE","DISCUSS","QUERY","CLARIFY","CANCEL","PREVIEW","CONFIRM","EXPORT","MODIFY_PLAN").contains(request.path("intent").asText())||!request.path("newRequirement").isBoolean())throw new ResponseStatusException(BAD_REQUEST,"需求意图不受支持");
         if(!request.path("fields").isObject())throw new ResponseStatusException(BAD_REQUEST,"需求条件须为对象");
-        if(production.handles(request.path("intent").asText()))production.validate(input,request);
+        if("MODIFY_PLAN".equals(request.path("intent").asText()))modifications.validate(input,request);
+        else if(production.handles(request.path("intent").asText()))production.validate(input,request);
         else if(request.has("target"))throw new ResponseStatusException(BAD_REQUEST,"该意图不能指定操作目标");
         if(!request.path("fields").isEmpty())briefs.validate(input,request.path("fields"));
     }
@@ -38,6 +40,17 @@ public class ConversationRequests {
         if(!previous.isEmpty()){
             if(!parse(previous.get(0).get("request_json")).equals(request))throw new ResponseStatusException(CONFLICT,"本轮解释已接纳，不能改写执行请求");
             return parse(previous.get(0).get("input_json"));
+        }
+        if("MODIFY_PLAN".equals(request.path("intent").asText())){
+            JsonNode fixed=modifications.bind(task,input,request);
+            if(input.has("pendingQuestion")&&fixed.has("productionQuestion"))throw new ResponseStatusException(BAD_REQUEST,"修改目标仍不明确，请明确版本、成片和片段后继续");
+            replies.admit(task,input,request);
+            UUID requirement=fixed.has("requirementId")?UUID.fromString(fixed.path("requirementId").asText()):UUID.randomUUID();
+            ((ObjectNode)fixed).put("requirementId",requirement.toString());
+            if(request.has("questionAction"))((ObjectNode)fixed).set("questionAction",request.path("questionAction"));
+            database.update("INSERT INTO conversation_execution_requests(task_id,requirement_id,request_json,input_json) VALUES (?,?,?::jsonb,?::jsonb)",task.get("id"),requirement,request.toString(),fixed.toString());
+            if(fixed.has("editing"))plans.bindAttempt((UUID)task.get("id"),(UUID)task.get("current_attempt_id"));
+            return fixed;
         }
         if(production.handles(request.path("intent").asText())){
             if(!request.path("fields").isEmpty()||request.path("newRequirement").asBoolean())throw new ResponseStatusException(BAD_REQUEST,"预览不能重置或修改制作条件");

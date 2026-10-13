@@ -8,7 +8,7 @@
 
 ## 2026-10-12 新增设计，待实施
 
-[统一自然语言流程](natural-language-workflow-design.md)及 ADR-0015 已确认；本轮只落地文档。自动会话、意图理解后接纳、同输入框澄清、需求隔离、自动补查授权与累计额度、连续步骤和单条完整对话验收尚未实施。局部修改沿用待实施的 #23；多条生成 #21 与批量导出 #26 留在后续里程碑，仍属于原 MVP 范围。
+[统一自然语言流程](natural-language-workflow-design.md)及 ADR-0015 已确认；本轮只落地文档。自动会话、意图理解后接纳、同输入框澄清、需求隔离、自动补查授权与累计额度、连续步骤和单条完整对话验收尚未实施。局部修改 #23 于 2026-10-13 实施；多条生成 #21 与批量导出 #26 留在后续里程碑，仍属于原 MVP 范围。
 
 新增本地任务 NL1–NL5 见 [开发任务](development-backlog.md)。这些编号不是 GitHub Issue，尚未创建或修改外部任务；既有已完成票的状态不因新增设计变更。
 
@@ -51,7 +51,7 @@
 | [#20](https://github.com/Hou1464851806/AgenticVideoProject/issues/20) [T19] 从讲话视频生成一条可核查的短视频方案 | P0 | #15 | 实现与验证完成，见 [记录](verification/issue-20.md) |
 | [#21](https://github.com/Hou1464851806/AgenticVideoProject/issues/21) [T20] 一次生成多条短视频成片定义 | P1 | #20 | 待实施 |
 | [#22](https://github.com/Hou1464851806/AgenticVideoProject/issues/22) [T21] 手动调整片段并从任意历史版本继续 | P1 | #20 | 待实施 |
-| [#23](https://github.com/Hou1464851806/AgenticVideoProject/issues/23) [T22] 对话替换指定片段并保留其他内容 | P1 | #18, #20 | 待实施 |
+| [#23](https://github.com/Hou1464851806/AgenticVideoProject/issues/23) [T22] 对话替换指定片段并保留其他内容 | P1 | #18, #20 | 已实现，验证见 [记录](verification/issue-23.md) |
 | [#24](https://github.com/Hou1464851806/AgenticVideoProject/issues/24) [T23] 手动生成带原声与字幕的低清效果预览 | P0 | #20 | 实现与验证完成，见 [记录](verification/issue-24.md) |
 | [#25](https://github.com/Hou1464851806/AgenticVideoProject/issues/25) [T24] 确认具体版本后明确导出并下载一条成片 | P0 | #24 | 实现与验证完成，见 [记录](verification/issue-25.md) |
 | [#26](https://github.com/Hou1464851806/AgenticVideoProject/issues/26) [T25] 批量导出选定成片并展示部分完成 | P1 | #21, #25 | 待实施 |

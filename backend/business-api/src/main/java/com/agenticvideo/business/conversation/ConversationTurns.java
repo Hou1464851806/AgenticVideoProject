@@ -153,7 +153,16 @@ public class ConversationTurns {
             String type = reference.path("type").asText();
             if (!java.util.Set.of("ASSET", "EVIDENCE", "PLAN_REVISION").contains(type)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "查询引用类型不受支持");
             UUID id = identifier(reference.path("id").asText());
-            if("PLAN_REVISION".equals(type)){if(database.queryForObject("SELECT count(*) FROM plan_revisions WHERE id=? AND project_id=?",Integer.class,id,session.get("project_id"))!=1)throw new ResponseStatusException(HttpStatus.NOT_FOUND,"方案版本不存在或无权访问");}
+            if("PLAN_REVISION".equals(type)){if(database.queryForObject("SELECT count(*) FROM plan_revisions WHERE id=? AND project_id=?",Integer.class,id,session.get("project_id"))!=1)throw new ResponseStatusException(HttpStatus.NOT_FOUND,"方案版本不存在或无权访问");
+                if(reference.has("outputId")||reference.has("clipId")){
+                    var content=(com.fasterxml.jackson.databind.JsonNode)decode(database.queryForObject("SELECT content_json FROM plan_revisions WHERE id=?",String.class,id));
+                    boolean found=false;for(var output:content.path("outputs"))if(output.path("outputId").asText().equals(reference.path("outputId").asText())){
+                        if(!reference.has("clipId"))found=true;
+                        for(var clip:output.path("clips"))if(clip.path("clipId").asText().equals(reference.path("clipId").asText()))found=true;
+                    }
+                    if(!found)throw new ResponseStatusException(HttpStatus.NOT_FOUND,"成片或片段不属于引用版本");
+                }
+            }
             else if ("ASSET".equals(type)) requireAsset(id, session.get("project_id"), allowed);
             else {
                 var evidence = database.queryForList("SELECT e.asset_id FROM evidence_segments e JOIN asset_analysis_heads h ON h.analysis_id=e.analysis_id WHERE e.id=? AND e.project_id=?", id, session.get("project_id"));

@@ -301,6 +301,144 @@ class EditPlanApiIntegrationTest {
         assertEquals(0,json(owner.get("/plans/"+accepted.path("planId").asText()+"/revisions")).path("data").path("items").size());
     }
 
+    @Test
+    void targetedModificationPreservesOtherClipsAndAppendsFromTheSentOldVersion() throws Exception {
+        BrowserApi owner=signedIn("modify-owner");
+        String project=json(owner.post("/projects","{\"name\":\"定向修改\"}")).path("data").path("id").asText();
+        var speech=speechFixture(project);
+        String session=json(owner.post("/projects/"+project+"/conversations",new ObjectMapper().writeValueAsString(java.util.Map.of("title","修改","naturalLanguage",true,"assetIds",java.util.List.of(speech.asset()))))).path("data").path("id").asText();
+        var accepted=acceptPlan(owner,session,java.util.Map.of("topic","步骤","minDurationMs",6000,"maxDurationMs",12000,"profile","LANDSCAPE_720"),"modify-base");
+        var first=java.util.Map.of("assetId",speech.asset(),"sourceInMs",2000,"sourceOutMs",5000,"evidenceIds",java.util.List.of(speech.first()),"reason","保留上传步骤");
+        var second=java.util.Map.of("assetId",speech.asset(),"sourceInMs",5000,"sourceOutMs",10000,"evidenceIds",java.util.List.of(speech.second()),"reason","保留核查结论");
+        var base=publishProposal(accepted,speech,java.util.Map.of("title","两段步骤","clips",java.util.List.of(first,second)));
+        String revision=base.path("revisionId").asText(),plan=base.path("planId").asText();
+        var original=json(owner.get("/revisions/"+revision)).path("data").path("content").path("outputs").get(0);
+        var body=java.util.Map.of("content","基于 V1 替换第二段，其他内容不变","references",java.util.List.of(java.util.Map.of("type","PLAN_REVISION","id",revision)),"context",java.util.Map.of("naturalLanguage",true));
+        var sent=json(owner.post("/conversations/"+session+"/turns",new ObjectMapper().writeValueAsString(body),"modify-turn")).path("data");
+        String task=sent.path("taskId").asText();
+        var claim=json(internal(task,"claim",java.util.Map.of("executorId","modify-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        var credentials=new java.util.HashMap<String,Object>();credentials.put("attemptId",claim.path("attemptId").asText());credentials.put("leaseToken",claim.path("leaseToken").asText());
+        var tool=new java.util.HashMap<String,Object>(credentials);tool.put("producerKey","admit-modification");tool.put("name","submit_production_request");tool.put("arguments",java.util.Map.of("intent","MODIFY_PLAN","newRequirement",false,"fields",java.util.Map.of(),"target",java.util.Map.of("clipNumber",2)));
+        var admitted=internal(task,"tool",tool);assertEquals(200,admitted.statusCode(),admitted.body());
+        assertEquals(revision,json(admitted).path("data").path("editing").path("baseRevisionId").asText());
+        var proposal=java.util.Map.of("clips",java.util.List.of(java.util.Map.of("clipId",original.path("clips").get(0).path("clipId").asText()),java.util.Map.of("assetId",speech.asset(),"sourceInMs",5000,"sourceOutMs",11000,"evidenceIds",java.util.List.of(speech.second()),"reason","替换核查段并保留完整结论")));
+        tool.put("producerKey","read-modify");tool.put("name","read_evidence_context");tool.put("arguments",java.util.Map.of("evidenceId",speech.second()));assertEquals(200,internal(task,"tool",tool).statusCode());
+        var candidate=new java.util.HashMap<String,Object>(credentials);candidate.put("producerKey","check-modify");candidate.put("proposal",proposal);
+        var unchanged=java.util.Map.of("clips",java.util.List.of(java.util.Map.of("clipId",original.path("clips").get(0).path("clipId").asText()),second));
+        candidate.put("producerKey","reject-no-change");candidate.put("proposal",unchanged);
+        assertEquals(false,json(internal(task,"validate-edit",candidate)).path("data").path("valid").asBoolean());
+        candidate.put("producerKey","reject-outside");candidate.put("proposal",java.util.Map.of("clips",java.util.List.of(second)));
+        assertEquals(false,json(internal(task,"validate-edit",candidate)).path("data").path("valid").asBoolean());
+        candidate.put("producerKey","check-modify");candidate.put("proposal",proposal);
+        var checked=internal(task,"validate-edit",candidate);assertEquals(true,json(checked).path("data").path("valid").asBoolean(),checked.body());
+        var complete=new java.util.HashMap<String,Object>(credentials);complete.put("producerKey","publish-modify");complete.put("resultType","EDIT_PROPOSAL");complete.put("result",java.util.Map.of("content","修改完成","proposal",proposal));
+        var response=internal(task,"complete",complete);assertEquals(200,response.statusCode(),response.body());assertEquals(json(response).path("data"),json(internal(task,"complete",complete)).path("data"));
+        var saved=json(owner.get("/revisions/"+json(response).path("data").path("revisionId").asText())).path("data");
+        assertEquals(revision,saved.path("parentRevisionId").asText());assertEquals(2,saved.path("revisionNumber").asInt());
+        var output=saved.path("content").path("outputs").get(0);
+        assertEquals(original.path("clips").get(0),output.path("clips").get(0));assertEquals(original.path("render"),output.path("render"));assertEquals(original.path("title"),output.path("title"));
+        assertEquals(9000,output.path("durationMs").asLong());assertEquals(original.path("subtitles").path("cues").get(0),output.path("subtitles").path("cues").get(0));
+        assertEquals(2,json(owner.get("/plans/"+plan+"/revisions")).path("data").path("items").size());
+    }
+
+    @Test
+    void oldVersionModificationSerializesSessionsPreservesOtherOutputsAndRecoversFromClarification() throws Exception {
+        BrowserApi owner=signedIn("modify-history-owner"),outsider=signedIn("modify-history-outsider");
+        String project=json(owner.post("/projects","{\"name\":\"旧版修改与互斥\"}")).path("data").path("id").asText();
+        var speech=speechFixture(project);String session=newSession(owner,project,speech),other=newSession(owner,project,speech);
+        var initial=acceptPlan(owner,session,java.util.Map.of("topic","步骤","minDurationMs",6000,"maxDurationMs",12000,"profile","LANDSCAPE_720"),"initial");
+        var first=java.util.Map.of("assetId",speech.asset(),"sourceInMs",1000,"sourceOutMs",5000,"evidenceIds",java.util.List.of(speech.first()),"reason","完整上传步骤和停顿");
+        var second=java.util.Map.of("assetId",speech.asset(),"sourceInMs",5000,"sourceOutMs",10000,"evidenceIds",java.util.List.of(speech.second()),"reason","完整核查结论");
+        var original=publishProposal(initial,speech,java.util.Map.of("title","两段步骤","clips",java.util.List.of(first,second)));
+        String plan=original.path("planId").asText();
+        var originalContent=(com.fasterxml.jackson.databind.node.ObjectNode)json(owner.get("/revisions/"+original.path("revisionId").asText())).path("data").path("content").deepCopy();
+        var extra=(com.fasterxml.jackson.databind.node.ObjectNode)originalContent.path("outputs").get(0).deepCopy();extra.put("outputId",java.util.UUID.randomUUID().toString());extra.put("title","目标外输出");((com.fasterxml.jackson.databind.node.ArrayNode)originalContent.path("outputs")).add(extra);
+        // Previously committed multi-output versions are setup; behavior is observed only through HTTP.
+        String base=seedVersion(project,plan,2,original.path("revisionId").asText(),initial.path("taskId").asText(),originalContent);
+        String newest=seedVersion(project,plan,3,base,initial.path("taskId").asText(),originalContent);
+        String unclearSession=newSession(owner,project,speech);
+        assertEquals(200,owner.patch("/conversations/"+unclearSession+"/view",new ObjectMapper().writeValueAsString(java.util.Map.of("planId",plan,"revisionId",base,"expectedRowVersion",0))).statusCode());
+        var unclearBody=java.util.Map.of("content","更紧凑，完整保留第二段结论","context",java.util.Map.of("naturalLanguage",true));
+        var unclear=json(owner.post("/conversations/"+unclearSession+"/turns",new ObjectMapper().writeValueAsString(unclearBody),"unclear-output")).path("data");String unclearTask=unclear.path("taskId").asText();var unclearCredentials=claimCredentials(unclearTask);
+        var unclearSelector=java.util.Map.of("intent","MODIFY_PLAN","newRequirement",false,"fields",java.util.Map.of(),"target",java.util.Map.of("preserveClipNumbers",java.util.List.of(2)));
+        var unclearResult=tool(unclearTask,unclearCredentials,"admit","submit_production_request",unclearSelector);assertEquals(200,unclearResult.statusCode(),unclearResult.body());
+        var questionBody=new java.util.HashMap<String,Object>(unclearCredentials);questionBody.put("producerKey","wait");questionBody.put("resultType","CONVERSATION_WAITING");questionBody.put("result",java.util.Map.of("question",json(unclearResult).path("data").path("productionQuestion")));assertEquals(200,internal(unclearTask,"complete",questionBody).statusCode());
+        assertEquals(200,owner.patch("/conversations/"+unclearSession+"/view",new ObjectMapper().writeValueAsString(java.util.Map.of("planId",plan,"revisionId",newest,"expectedRowVersion",1))).statusCode());
+        var answer=json(owner.post("/conversations/"+unclearSession+"/turns",new ObjectMapper().writeValueAsString(java.util.Map.of("content","第一条","references",java.util.List.of(java.util.Map.of("type","PLAN_REVISION","id",base)),"context",java.util.Map.of("naturalLanguage",true))),"choose-output")).path("data");String answerTask=answer.path("taskId").asText();var answerCredentials=claimCredentials(answerTask);
+        var answerRequest=java.util.Map.of("intent","MODIFY_PLAN","newRequirement",false,"questionAction","ANSWER","fields",java.util.Map.of(),"target",java.util.Map.of("outputNumber",1));
+        var answered=tool(answerTask,answerCredentials,"admit","submit_production_request",answerRequest);assertEquals(200,answered.statusCode(),answered.body());assertEquals(base,json(answered).path("data").path("editing").path("baseRevisionId").asText());assertEquals(plan,json(answered).path("data").path("requirementId").asText());
+        cancelEditing(owner,answerTask,answerCredentials);
+        var conflictBody=java.util.Map.of("content","第一条更紧凑，完整保留第二段结论","references",java.util.List.of(java.util.Map.of("type","PLAN_REVISION","id",base),java.util.Map.of("type","PLAN_REVISION","id",newest)),"context",java.util.Map.of("naturalLanguage",true));
+        var conflict=json(owner.post("/conversations/"+unclearSession+"/turns",new ObjectMapper().writeValueAsString(conflictBody),"conflicting-references")).path("data");String conflictTask=conflict.path("taskId").asText();var conflictCredentials=claimCredentials(conflictTask);
+        var conflictSelector=java.util.Map.of("intent","MODIFY_PLAN","newRequirement",false,"fields",java.util.Map.of(),"target",java.util.Map.of("outputNumber",1,"preserveClipNumbers",java.util.List.of(2)));
+        var conflictResult=tool(conflictTask,conflictCredentials,"admit","submit_production_request",conflictSelector);assertEquals(200,conflictResult.statusCode(),conflictResult.body());
+        questionBody=new java.util.HashMap<>(conflictCredentials);questionBody.put("producerKey","wait");questionBody.put("resultType","CONVERSATION_WAITING");questionBody.put("result",java.util.Map.of("question",json(conflictResult).path("data").path("productionQuestion")));assertEquals(200,internal(conflictTask,"complete",questionBody).statusCode());
+        var narrow=java.util.Map.of("content","就用引用的这个版本","references",java.util.List.of(java.util.Map.of("type","PLAN_REVISION","id",base)),"context",java.util.Map.of("naturalLanguage",true));
+        var narrowed=json(owner.post("/conversations/"+unclearSession+"/turns",new ObjectMapper().writeValueAsString(narrow),"narrow-reference")).path("data");String narrowedTask=narrowed.path("taskId").asText();var narrowedCredentials=claimCredentials(narrowedTask);
+        var narrowRequest=java.util.Map.of("intent","MODIFY_PLAN","newRequirement",false,"questionAction","ANSWER","fields",java.util.Map.of(),"target",java.util.Map.of());
+        var narrowedResult=tool(narrowedTask,narrowedCredentials,"admit","submit_production_request",narrowRequest);assertEquals(200,narrowedResult.statusCode(),narrowedResult.body());assertEquals(base,json(narrowedResult).path("data").path("editing").path("baseRevisionId").asText());cancelEditing(owner,narrowedTask,narrowedCredentials);
+        var body=java.util.Map.of("content","第一条更紧凑，但完整保留第二段结论","references",java.util.List.of(java.util.Map.of("type","PLAN_REVISION","id",base)),"context",java.util.Map.of("naturalLanguage",true));
+        assertEquals(404,outsider.post("/conversations/"+session+"/turns",new ObjectMapper().writeValueAsString(body),"outsider").statusCode());
+        var sent=json(owner.post("/conversations/"+session+"/turns",new ObjectMapper().writeValueAsString(body),"compact")).path("data");String task=sent.path("taskId").asText();var credentials=claimCredentials(task);
+        var selector=java.util.Map.of("intent","MODIFY_PLAN","newRequirement",false,"fields",java.util.Map.of("profile",java.util.Map.of("value","LANDSCAPE_720","basis","EXPLICIT")),"target",java.util.Map.of("outputNumber",1,"preserveClipNumbers",java.util.List.of(2),"profile","LANDSCAPE_720"));
+        assertEquals(200,tool(task,credentials,"admit","submit_production_request",selector).statusCode());
+        var view=java.util.Map.of("planId",plan,"revisionId",newest,"expectedRowVersion",0);
+        assertEquals(200,owner.patch("/conversations/"+session+"/view",new ObjectMapper().writeValueAsString(view)).statusCode());
+        var concurrent=json(owner.post("/conversations/"+other+"/turns",new ObjectMapper().writeValueAsString(body),"concurrent")).path("data");String otherTask=concurrent.path("taskId").asText();var otherCredentials=claimCredentials(otherTask);
+        assertEquals(409,tool(otherTask,otherCredentials,"admit","submit_production_request",selector).statusCode());
+        var waiting=new java.util.HashMap<String,Object>(credentials);waiting.put("producerKey","question");waiting.put("resultType","CONVERSATION_WAITING");waiting.put("result",java.util.Map.of("question",java.util.Map.of("prompt","是否只收紧第一段停顿？","reason","CONTENT_UNCLEAR","fields",java.util.List.of("target"))));
+        var question=internal(task,"complete",waiting);assertEquals(200,question.statusCode(),question.body());
+        assertEquals(200,tool(otherTask,otherCredentials,"admit-after-wait","submit_production_request",selector).statusCode());
+        assertEquals(202,owner.post("/tasks/"+otherTask+"/cancel","{}","cancel-other").statusCode());
+        var cancel=new java.util.HashMap<String,Object>(otherCredentials);cancel.put("processExited",true);cancel.put("producerKey","cancelled");
+        assertEquals(200,internal(otherTask,"cancelled",cancel).statusCode());
+        var answerBody=java.util.Map.of("content","是，第一段收紧停顿，第二段结论不变","context",java.util.Map.of("naturalLanguage",true));
+        var resumed=json(owner.post("/conversations/"+session+"/turns",new ObjectMapper().writeValueAsString(answerBody),"answer")).path("data");String resumedTask=resumed.path("taskId").asText();var resumedCredentials=claimCredentials(resumedTask);
+        var answerSelector=new java.util.HashMap<String,Object>(selector);answerSelector.put("questionAction","ANSWER");answerSelector.put("target",java.util.Map.of());
+        var admitted=tool(resumedTask,resumedCredentials,"answer-admit","submit_production_request",answerSelector);assertEquals(200,admitted.statusCode(),admitted.body());assertEquals(base,json(admitted).path("data").path("editing").path("baseRevisionId").asText());assertEquals(plan,json(admitted).path("data").path("requirementId").asText());
+        assertEquals(200,tool(resumedTask,resumedCredentials,"read","read_evidence_context",java.util.Map.of("evidenceId",speech.first())).statusCode());
+        var originalOutput=originalContent.path("outputs").get(0);
+        var proposal=java.util.Map.of("clips",java.util.List.of(java.util.Map.of("assetId",speech.asset(),"sourceInMs",2000,"sourceOutMs",5000,"evidenceIds",java.util.List.of(speech.first()),"reason","收紧第一段停顿，保留完整上传步骤"),java.util.Map.of("clipId",originalOutput.path("clips").get(1).path("clipId").asText())));
+        var candidate=new java.util.HashMap<String,Object>(resumedCredentials);candidate.put("producerKey","check");candidate.put("proposal",proposal);var checked=internal(resumedTask,"validate-edit",candidate);assertEquals(true,json(checked).path("data").path("valid").asBoolean(),checked.body());
+        candidate.remove("proposal");candidate.put("producerKey","publish");candidate.put("resultType","EDIT_PROPOSAL");candidate.put("result",java.util.Map.of("content","完成","proposal",proposal));
+        var completed=internal(resumedTask,"complete",candidate);assertEquals(200,completed.statusCode(),completed.body());assertEquals(json(completed).path("data"),json(internal(resumedTask,"complete",candidate)).path("data"));
+        var stored=json(owner.get("/revisions/"+json(completed).path("data").path("revisionId").asText())).path("data");assertEquals(base,stored.path("parentRevisionId").asText());assertEquals(4,stored.path("revisionNumber").asInt());
+        assertEquals(extra,stored.path("content").path("outputs").get(1));assertEquals(originalOutput.path("clips").get(1),stored.path("content").path("outputs").get(0).path("clips").get(1));assertEquals(8000,stored.path("content").path("outputs").get(0).path("durationMs").asLong());
+        assertEquals(newest,json(owner.get("/conversations/"+session+"/messages")).path("data").path("view").path("revisionId").asText());
+        assertEquals(4,json(owner.get("/plans/"+plan+"/revisions")).path("data").path("items").size());
+    }
+    private void cancelEditing(BrowserApi owner,String task,java.util.Map<String,Object> credentials) throws Exception {
+        assertEquals(202,owner.post("/tasks/"+task+"/cancel","{}","cancel-"+task).statusCode());
+        var body=new java.util.HashMap<String,Object>(credentials);body.put("processExited",true);assertEquals(200,internal(task,"cancelled",body).statusCode());
+    }
+    private String newSession(BrowserApi owner,String project,Speech speech) throws Exception {
+        return json(owner.post("/projects/"+project+"/conversations",new ObjectMapper().writeValueAsString(java.util.Map.of("title","修改历史","assetIds",java.util.List.of(speech.asset()))))).path("data").path("id").asText();
+    }
+    private String seedVersion(String project,String plan,int number,String parent,String source,JsonNode content){
+        var task=java.util.UUID.randomUUID();var revision=java.util.UUID.randomUUID();
+        fixtures.update("INSERT INTO tasks(id,project_id,type,status,input_json) SELECT ?,project_id,'AGENT_TURN','SUCCEEDED',input_json FROM tasks WHERE id=?",task,java.util.UUID.fromString(source));
+        fixtures.update("INSERT INTO plan_revisions(id,project_id,plan_id,revision_number,parent_revision_id,source_task_id,content_json) VALUES (?,?,?,?,?,?,?::jsonb)",revision,java.util.UUID.fromString(project),java.util.UUID.fromString(plan),number,java.util.UUID.fromString(parent),task,content.toString());
+        fixtures.update("UPDATE edit_plans SET next_revision_number=? WHERE id=?",number+1,java.util.UUID.fromString(plan));return revision.toString();
+    }
+    private java.util.Map<String,Object> claimCredentials(String task) throws Exception {
+        var claim=json(internal(task,"claim",java.util.Map.of("executorId","modification-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        return java.util.Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText());
+    }
+    private HttpResponse<String> tool(String task,java.util.Map<String,Object> credentials,String key,String name,Object arguments) throws Exception {
+        var body=new java.util.HashMap<String,Object>(credentials);body.put("producerKey",key);body.put("name",name);body.put("arguments",arguments);return internal(task,"tool",body);
+    }
+
+    private JsonNode publishProposal(JsonNode accepted,Speech speech,Object proposal) throws Exception {
+        String task=accepted.path("taskId").asText();
+        var claim=json(internal(task,"claim",java.util.Map.of("executorId","proposal-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        var request=new java.util.HashMap<String,Object>();request.put("attemptId",claim.path("attemptId").asText());request.put("leaseToken",claim.path("leaseToken").asText());
+        request.put("producerKey","read");request.put("name","read_evidence_context");request.put("arguments",java.util.Map.of("evidenceId",speech.first()));assertEquals(200,internal(task,"tool",request).statusCode());
+        request.remove("name");request.remove("arguments");request.put("producerKey","check");request.put("proposal",proposal);
+        var checked=internal(task,"validate-edit",request);assertEquals(true,json(checked).path("data").path("valid").asBoolean(),checked.body());
+        request.remove("proposal");request.put("producerKey","publish");request.put("resultType","EDIT_PROPOSAL");request.put("result",java.util.Map.of("content","方案就绪","proposal",proposal));
+        var done=internal(task,"complete",request);assertEquals(200,done.statusCode(),done.body());return json(done).path("data");
+    }
+
     private JsonNode acceptPlan(BrowserApi owner,String session,Object editing,String key) throws Exception {
         var response=owner.post("/conversations/"+session+"/turns",new ObjectMapper().writeValueAsString(java.util.Map.of("content","生成完整观点方案","context",java.util.Map.of("editing",editing))),key);
         assertEquals(202,response.statusCode(),response.body());return json(response).path("data");

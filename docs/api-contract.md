@@ -316,3 +316,11 @@ complete 结果类型为 MEDIA_PREPARED、ANALYSIS_RESULT、INDEX_VERIFIED、AGE
 - `POST /conversations/{id}/questions/{questionId}/new-requirement`：普通 Turn 请求体与 Idempotency-Key；原等待取消，开始独立新需求并重置当前简报，历史仍保留。以上入口核验所有者及当前固定对象。
 - WAITING_INPUT 不被执行器领取，仍阻止普通 turn 接纳；问题完成重放复用同一问题。原等待的回答会将旧任务结束为 SUCCEEDED，取消／新需求则 CANCELLED，旧尝试不再有发布资格。
 - 显式应用简报：context.briefRevision 与 context.editing 同时提交。版本必须等于当前简报，主题／硬时长／画幅由简报派生，禁用素材排除，forbiddenContent 固定；数量大于一明确400。版本变化409要求重新检查，不偷偷采用新版本。
+
+### 对话定向修改（#23）
+
+自然语言轮次接纳 `MODIFY_PLAN`：`newRequirement=false`、通常 `fields={}`（用户重述条件仅允许与原值一致），目标可含明确版本／成片／片段序号 `revisionNumber`、`outputNumber`、`clipNumber`；紧凑化可用 `preserveClipNumbers` 指定完整保留的片段。`PLAN_REVISION` 引用可附该版本内的 `outputId`、`clipId`。对象歧义发布具身份的 `target` 问题；回答关联原轮次并恢复原发送快照，重新校验项目、素材、版本与编辑权。
+
+解析后固定执行输入包含原硬约束及 `editing.modification`：基准完整快照、输出标识、可变片段标识与 `REPLACE`／`COMPACT`。专用 `propose_plan_modification` 候选仅提供目标输出的完整 `clips` 顺序：未改变的片段仅传 `{clipId}`；替换范围提供带已核查证据的新片段。后端合并其他输出与片段，映射字幕并检查完整成片的原硬时长、参与顺序、范围及重叠。紧凑化须实际缩短；无实际选段变化不能追加版本。版本 `changeSummary` 由实际合并结果生成，历史序号按创建顺序递增，`parentRevisionId` 保留真实修改来源。
+
+该流程复用当前尝试、任务完成幂等和方案编辑互斥。等待问题、终态故障与取消确认释放编辑权；查看／切换旧版不改执行输入，新版本完成不自动切换。

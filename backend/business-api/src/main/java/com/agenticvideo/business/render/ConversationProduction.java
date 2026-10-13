@@ -85,7 +85,13 @@ public class ConversationProduction {
         var row=rows.get(0);
         if(!refs.isEmpty()&&selector.has("revisionNumber")&&selector.path("revisionNumber").asInt()!=((Number)row.get("revision_number")).intValue())return question("明确引用和文字指定的版本冲突，请只指定一个版本。");
         JsonNode outputs=parse(row.get("content_json")).path("outputs");
+        var referencedOutputs=new LinkedHashSet<String>();for(var ref:input.path("references"))if("PLAN_REVISION".equals(ref.path("type").asText())&&ref.has("outputId"))referencedOutputs.add(ref.path("outputId").asText());
+        if(referencedOutputs.size()>1)return question("引用了多个成片，请明确操作目标。");
         int output=selector.path("outputNumber").asInt(outputs.size()==1?1:0)-1;
+        if(!referencedOutputs.isEmpty()){
+            int referenced=-1;for(int index=0;index<outputs.size();index++)if(referencedOutputs.contains(outputs.get(index).path("outputId").asText()))referenced=index;
+            if(referenced<0||selector.has("outputNumber")&&referenced!=output)return question("成片引用与指定序号冲突，请明确操作目标。");output=referenced;
+        }
         if(output<0||output>=outputs.size())return question("请明确该版本中的成片序号，例如第一条。");
         var target=new LinkedHashMap<String,Object>(Map.of("revisionId",id,"planId",row.get("plan_id"),"revisionNumber",row.get("revision_number"),"outputId",outputs.get(output).path("outputId").asText(),"profile","PREVIEW".equals(request.path("intent").asText())?"LOW_360":selector.path("profile").asText("HD_720")));
         if("EXPORT".equals(request.path("intent").asText())){JsonNode confirmations=json.valueToTree(exports.confirmations(id)).path("items");if(!confirmations.isEmpty())target.put("confirmationId",confirmations.get(0).path("confirmationId").asText());}

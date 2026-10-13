@@ -22,7 +22,7 @@ public class ConversationReplies {
         if(rows.size()!=1)throw new ResponseStatusException(CONFLICT,"存在多个待回答问题，请先明确要处理的问题");
         var row=rows.get(0);JsonNode source=parse(row.get("source_input"));
         var original=json.createObjectNode();
-        for(String field:java.util.List.of("content","intent","requirementId","editing","brief","assetIds","production","view","productionIntent"))if(source.has(field))original.set(field,source.path(field));
+        for(String field:java.util.List.of("content","intent","requirementId","editing","brief","assetIds","production","view","productionIntent","modificationIntent","modificationSelector","modificationFields","references"))if(source.has(field))original.set(field,source.path(field));
         return json.valueToTree(Map.of("questionId",row.get("id"),"taskId",row.get("task_id"),"prompt",row.get("prompt"),"fields",parse(row.get("fields_json")),"originalRequest",original));
     }
     /** Caller owns the current task lock; use the same source-task/conversation/question order as explicit answers. */

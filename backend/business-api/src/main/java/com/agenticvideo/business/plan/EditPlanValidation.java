@@ -11,11 +11,20 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class EditPlanValidation {
     private final JdbcTemplate database;
+    private final PlanModificationValidation modifications;
     private final com.agenticvideo.business.analysis.SpeechTimings timings;
-    public EditPlanValidation(JdbcTemplate database, com.agenticvideo.business.analysis.SpeechTimings timings) { this.database = database; this.timings = timings; }
+    public EditPlanValidation(JdbcTemplate database, com.agenticvideo.business.analysis.SpeechTimings timings,PlanModificationValidation modifications) { this.database = database; this.timings = timings;this.modifications=modifications; }
     public record Validated(Map<String,Object> content, Set<UUID> assets, Set<UUID> evidence) {}
 
     public Validated validate(Map<String,Object> task, JsonNode input, JsonNode proposal) {
+        if(input.path("editing").has("modification")){
+            var partial=(com.fasterxml.jackson.databind.node.ObjectNode)input.deepCopy();
+            var conditions=(com.fasterxml.jackson.databind.node.ObjectNode)partial.path("editing");conditions.remove("modification");conditions.put("minDurationMs",1);
+            return modifications.validate(input,proposal,fragment->validateGenerated(task,partial,fragment,true));
+        }
+        return validateGenerated(task,input,proposal,false);
+    }
+    private Validated validateGenerated(Map<String,Object> task,JsonNode input,JsonNode proposal,boolean fragment){
         fields(proposal, Set.of("title", "clips"));
         String title = text(proposal.path("title"), 120);
         JsonNode clips = proposal.path("clips");
@@ -101,7 +110,7 @@ public class EditPlanValidation {
                     "reason", text(clip.path("reason"), 1000)));
             duration += end-start; // source ranges and clip count make this sum bounded.
         }
-        if(montage && !actualOrder.equals(requiredOrder))reject("片段素材须完整遵循用户指定顺序，不能遗漏或交错素材");
+        if(montage && !fragment && !actualOrder.equals(requiredOrder))reject("片段素材须完整遵循用户指定顺序，不能遗漏或交错素材");
         JsonNode editing = input.path("editing");
         if (duration < editing.path("minDurationMs").asLong() || duration > editing.path("maxDurationMs").asLong()) reject("选段总时长不满足用户硬时长范围");
         boolean portrait = "PORTRAIT_720".equals(editing.path("profile").asText());
