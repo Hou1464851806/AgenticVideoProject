@@ -18,7 +18,7 @@
 
 完整回归中的自然语言浏览器文件 6/6 和取消后回复重试 1/1 已通过；其中真实模型验证提问、刷新、原输入框补答、含糊回复、取消、新需求及冲突时长。另加外部模型故障边界测试：取消接纳后确认回复返回 503，用户明确接受未知调用费用并重试，只恢复答复；原问题保持取消状态，Agent 不再请求重新接纳需求。故障测试红灯看到错误的接纳工具，修复后通过。
 
-完整 Maven `verify`：117/117，零失败／错误／跳过，构建成功。完整 82 项浏览器回归仍在运行，测试进程显式使用 `DOCKER_BIN=/usr/local/bin/docker`。最终日志保存在 `backend/business-api/target/issue-36-verification/`；TDD 红灯过程使用 `/tmp/agenticvideo-issue36-` 前缀。
+完整 Maven `verify`：117/117，零失败／错误／跳过，构建成功。完整浏览器回归 82/82 全部通过（23.6 分钟），测试进程显式使用 `DOCKER_BIN=/usr/local/bin/docker`。最终日志保存在 `backend/business-api/target/issue-36-verification/`；TDD 红灯过程使用 `/tmp/agenticvideo-issue36-` 前缀。
 
 ## Standards 审查
 
