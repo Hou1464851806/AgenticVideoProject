@@ -1,4 +1,5 @@
 import {test,expect} from '@playwright/test';
+import {renderSeed} from './fixtures/render-seed';
 import {execFileSync} from 'node:child_process';
 import {mkdirSync,readFileSync,writeFileSync} from 'node:fs';
 import {resolve} from 'node:path';
@@ -100,4 +101,18 @@ test('duplicate source names are clarified in the same chat before generating a 
   const ref=done.items.at(-1).references.find((item:{type:string})=>item.type==='PLAN_REVISION');expect(ref).toBeTruthy();
   const version=(await(await page.request.get(`/api/v1/revisions/${ref.id}`)).json()).data;
   expect(version.content.outputs[0].clips.every((clip:{assetId:string})=>clip.assetId===ids[0])).toBe(true);expect(version.content.outputs[0].render.profile).toBe('PORTRAIT_720');
+});
+
+
+test('a missing mandatory source is clarified without substituting an optional source',async({page})=>{
+  test.setTimeout(180000);
+  const seed=await renderSeed(page);await page.goto(`/?project=${seed.projectId}`);
+  const created=page.waitForResponse(reply=>reply.request().method()==='POST'&&reply.url().endsWith('/conversations'));
+  await page.getByRole('button',{name:'新聊天',exact:true}).click();const session=(await(await created).json()).data;
+  await page.getByLabel('对话输入',{exact:true}).fill('只用 labelled-speech.mp4 和还没上传的 products.mp4，两份都必须参加跨素材混剪。先讲视频制作步骤，再用 products.mp4 展示产品，做一条竖屏短视频，严格3至30秒。不能用别的素材代替产品视频，也不能省略它。');
+  const accepted=page.waitForResponse(reply=>reply.request().method()==='POST'&&reply.url().endsWith('/turns'));await page.getByRole('button',{name:'发送需求',exact:true}).click();expect((await accepted).status()).toBe(202);const task=(await(await accepted).json()).data.taskId;
+  await expect.poll(async()=>['SUCCEEDED','WAITING_INPUT','FAILED'].includes((await(await page.request.get(`/api/v1/tasks/${task}`)).json()).data.status),{timeout:120000}).toBe(true);expect((await(await page.request.get(`/api/v1/tasks/${task}`)).json()).data.status).toBe('WAITING_INPUT');
+  const snapshot=(await(await page.request.get(`/api/v1/conversations/${session.id}/snapshot`)).json()).data;
+  expect(snapshot.questions.some((item:{status:string})=>item.status==='OPEN')).toBe(true);expect(snapshot.items.some((item:{references:Array<{type:string}>})=>item.references.some(ref=>ref.type==='PLAN_REVISION'))).toBe(false);
+  await expect(page.getByRole('article',{name:'待回答的澄清问题',exact:true})).toContainText('products.mp4');await expect(page.getByLabel('澄清回答',{exact:true})).toHaveCount(0);
 });
