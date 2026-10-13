@@ -148,15 +148,23 @@ class ExportApiIntegrationTest {
         var admitted=commandTool(task,claim,"old-version","submit_production_request",Map.of("intent","PREVIEW","newRequirement",false,"fields",Map.of(),"target",Map.of("revisionNumber",1)));
         assertEquals(200,admitted.statusCode(),admitted.body());assertEquals(plan.first().toString(),data(admitted).path("productionTarget").path("revisionId").asText());
         finishCommand(task,claim,data(commandTool(task,claim,"old-preview","execute_production_command",Map.of())));
-        task=data(owner.post("/conversations/"+session+"/turns",Map.of("content","请预览第43版","context",Map.of("naturalLanguage",true)))).path("taskId").asText();
-        claim=data(internal(task,"claim",Map.of("executorId","bounded-chat","claimRequestId",UUID.randomUUID())));
-        addRevisionFixture(project,planId,plan.first(),43);
+        try(var publishing=java.sql.DriverManager.getConnection(POSTGRES.getJdbcUrl(),POSTGRES.getUsername(),POSTGRES.getPassword())) {
+            publishing.setAutoCommit(false);
+            var concurrentFixture=new org.springframework.jdbc.core.JdbcTemplate(new org.springframework.jdbc.datasource.SingleConnectionDataSource(publishing,true));
+            addRevisionFixture(concurrentFixture,project,plan.first(),43);
+            task=data(owner.post("/conversations/"+session+"/turns",Map.of("content","请预览第43版","context",Map.of("naturalLanguage",true)))).path("taskId").asText();
+            claim=data(internal(task,"claim",Map.of("executorId","bounded-chat","claimRequestId",UUID.randomUUID())));
+            publishing.commit();
+        }
         admitted=commandTool(task,claim,"future-version","submit_production_request",Map.of("intent","PREVIEW","newRequirement",false,"fields",Map.of(),"target",Map.of("revisionNumber",43)));
         assertEquals(200,admitted.statusCode(),admitted.body());assertEquals("CLARIFY",data(admitted).path("intent").asText());assertFalse(data(admitted).has("productionTarget"));
     }
     private void addRevisionFixture(UUID project,String planId,UUID source,int number) {
-        UUID task=UUID.randomUUID();fixtures.update("INSERT INTO tasks(id,project_id,type,status,input_json) VALUES (?,?,'AGENT_TURN','SUCCEEDED','{}')",task,project);
-        fixtures.update("INSERT INTO plan_revisions(id,project_id,plan_id,revision_number,parent_revision_id,source_task_id,content_json) SELECT ?,project_id,plan_id,?,id,?,content_json FROM plan_revisions WHERE id=?",UUID.randomUUID(),number,task,source);
+        addRevisionFixture(fixtures,project,source,number);
+    }
+    private void addRevisionFixture(org.springframework.jdbc.core.JdbcTemplate fixture,UUID project,UUID source,int number) {
+        UUID task=UUID.randomUUID();fixture.update("INSERT INTO tasks(id,project_id,type,status,input_json) VALUES (?,?,'AGENT_TURN','SUCCEEDED','{}')",task,project);
+        fixture.update("INSERT INTO plan_revisions(id,project_id,plan_id,revision_number,parent_revision_id,source_task_id,content_json) SELECT ?,project_id,plan_id,?,id,?,content_json FROM plan_revisions WHERE id=?",UUID.randomUUID(),number,task,source);
     }
     @Test void naturalConfirmationAndExportRequireSeparateMessagesAndAnExistingConfirmedVersion() throws Exception {
         BrowserApi owner=signedIn("production-chat-authority");UUID project=UUID.fromString(data(owner.post("/projects",Map.of("name","聊天授权边界"))).path("id").asText());Plan plan=planFixture(project);
