@@ -47,19 +47,22 @@ public class ConversationProduction {
         var chinese=List.of("一","二","三","四","五","六","七","八","九","十");
         return number<=chinese.size()&&java.util.regex.Pattern.compile("(?:第)?"+chinese.get(number-1)+unit).matcher(text).find();
     }
+    private static final String SENT_VERSIONS = """
+        FROM plan_revisions r WHERE r.project_id=? AND r.created_at<=?::timestamptz
+        AND (r.plan_id=? OR r.id IN (
+          SELECT (ref->>'id')::uuid FROM conversation_messages m,
+          LATERAL jsonb_array_elements(m.references_json) ref
+          WHERE m.conversation_id=? AND m.message_seq<=? AND m.role='ASSISTANT'
+            AND ref->>'type'='PLAN_REVISION'))
+        """;
     public JsonNode snapshot(UUID conversation,UUID project,Object viewedPlan){
-        var versions=database.queryForList("""
-            SELECT r.id,r.plan_id,r.revision_number,r.content_json FROM plan_revisions r
-            WHERE r.project_id=? AND (r.plan_id=? OR r.id IN (
-              SELECT (ref->>'id')::uuid FROM conversation_messages m,
-              LATERAL jsonb_array_elements(m.references_json) ref
-              WHERE m.conversation_id=? AND m.role='ASSISTANT' AND ref->>'type'='PLAN_REVISION'))
-            ORDER BY r.created_at DESC,r.id DESC
-            """,project,viewedPlan,conversation);
+        var boundary=database.queryForMap("SELECT clock_timestamp()::text AS cutoff,COALESCE(MAX(message_seq),0) AS sequence FROM conversation_messages WHERE conversation_id=?",conversation);
+        Object cutoff=boundary.get("cutoff"),sequence=boundary.get("sequence");
+        var versions=database.queryForList("SELECT r.id,r.plan_id,r.revision_number,r.content_json "+SENT_VERSIONS+" ORDER BY r.created_at DESC,r.id DESC LIMIT 12",project,cutoff,viewedPlan,conversation,sequence);
         var candidates=new ArrayList<Object>();
         for(var row:versions){var outputs=new ArrayList<Object>();for(var output:parse(row.get("content_json")).path("outputs"))outputs.add(Map.of("outputId",output.path("outputId").asText(),"title",output.path("title").asText()));candidates.add(Map.of("revisionId",row.get("id"),"planId",row.get("plan_id"),"revisionNumber",row.get("revision_number"),"outputs",outputs));}
-        var latest=database.queryForList("SELECT ref->>'id' AS id FROM conversation_messages m,LATERAL jsonb_array_elements(m.references_json) ref WHERE m.conversation_id=? AND m.role='ASSISTANT' AND ref->>'type'='PLAN_REVISION' ORDER BY m.message_seq DESC LIMIT 1",conversation);
-        var result=new LinkedHashMap<String,Object>();result.put("candidates",candidates);if(!latest.isEmpty())result.put("latestRevisionId",latest.get(0).get("id"));return json.valueToTree(result);
+        var latest=database.queryForList("SELECT ref->>'id' AS id FROM conversation_messages m,LATERAL jsonb_array_elements(m.references_json) ref WHERE m.conversation_id=? AND m.message_seq<=? AND m.role='ASSISTANT' AND ref->>'type'='PLAN_REVISION' ORDER BY m.message_seq DESC LIMIT 1",conversation,sequence);
+        var result=new LinkedHashMap<String,Object>();result.put("candidates",candidates);result.put("cutoffTime",cutoff);result.put("cutoffSequence",sequence);if(!latest.isEmpty())result.put("latestRevisionId",latest.get(0).get("id"));return json.valueToTree(result);
     }
     public JsonNode bind(JsonNode input,JsonNode request){
         JsonNode basis=input;
@@ -67,10 +70,11 @@ public class ConversationProduction {
         var selector=request.path("target");var refs=new LinkedHashSet<String>();for(var ref:input.path("references"))if("PLAN_REVISION".equals(ref.path("type").asText()))refs.add(ref.path("id").asText());
         if(refs.size()>1)return question("你引用了多个版本，请明确要操作哪一个版本。");
         String revision=refs.isEmpty()?null:refs.iterator().next();
-        JsonNode candidates=basis.path("production").path("candidates");
         if(revision==null&&selector.has("revisionNumber")){
-            var matches=new ArrayList<String>();for(var candidate:candidates)if(candidate.path("revisionNumber").asInt()==selector.path("revisionNumber").asInt())matches.add(candidate.path("revisionId").asText());
-            if(matches.size()!=1)return question("指定版本不存在或对应多个方案，请明确引用要操作的版本。");revision=matches.get(0);
+            JsonNode sent=basis.path("production");
+            // Resolve outside the small model catalogue, but never outside the sent snapshot.
+            var matches=database.queryForList("SELECT r.id "+SENT_VERSIONS+" AND r.revision_number=? LIMIT 2",identifier(input.path("projectId").asText()),sent.path("cutoffTime").asText(),basis.path("view").path("planId").isTextual()?identifier(basis.path("view").path("planId").asText()):null,identifier(input.path("conversationId").asText()),sent.path("cutoffSequence").asLong(),selector.path("revisionNumber").asInt());
+            if(matches.size()!=1)return question("指定版本不存在或对应多个方案，请明确引用要操作的版本。");revision=matches.get(0).get("id").toString();
         }
         if(revision==null)revision=basis.path("view").path("revisionId").asText(null);
         if(revision==null)revision=basis.path("production").path("latestRevisionId").asText(null);

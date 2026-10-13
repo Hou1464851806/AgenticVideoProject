@@ -137,6 +137,27 @@ class ExportApiIntegrationTest {
         String explicitTask=data(owner.post("/conversations/"+session+"/turns",explicit)).path("taskId").asText();JsonNode explicitClaim=data(internal(explicitTask,"claim",Map.of("executorId","preview-chat","claimRequestId",UUID.randomUUID())));
         response=commandTool(explicitTask,explicitClaim,"explicit-admit","submit_production_request",admission);assertEquals(200,response.statusCode(),response.body());assertEquals(plan.first().toString(),data(response).path("productionTarget").path("revisionId").asText());
     }
+    @Test void longVersionHistoryKeepsChatBoundedAndResolvesOldTargetsAtTheSentSnapshot() throws Exception {
+        BrowserApi owner=signedIn("bounded-production-history");UUID project=UUID.fromString(data(owner.post("/projects",Map.of("name","长会话版本定位"))).path("id").asText());Plan plan=planFixture(project);
+        String session=data(owner.post("/projects/"+project+"/conversations",Map.of())).path("id").asText(),planId=data(owner.get("/revisions/"+plan.first())).path("planId").asText();
+        for(int number=3;number<=42;number++)addRevisionFixture(project,planId,plan.first(),number);
+        assertEquals(200,owner.patch("/conversations/"+session+"/view",Map.of("planId",planId,"revisionId",plan.second(),"expectedRowVersion",0)).statusCode());
+        String task=data(owner.post("/conversations/"+session+"/turns",Map.of("content","请预览第一版","context",Map.of("naturalLanguage",true)))).path("taskId").asText();
+        JsonNode claim=data(internal(task,"claim",Map.of("executorId","bounded-chat","claimRequestId",UUID.randomUUID())));
+        assertTrue(claim.path("input").path("production").path("candidates").size()<=12,"长会话不能无限携带版本目录");
+        var admitted=commandTool(task,claim,"old-version","submit_production_request",Map.of("intent","PREVIEW","newRequirement",false,"fields",Map.of(),"target",Map.of("revisionNumber",1)));
+        assertEquals(200,admitted.statusCode(),admitted.body());assertEquals(plan.first().toString(),data(admitted).path("productionTarget").path("revisionId").asText());
+        finishCommand(task,claim,data(commandTool(task,claim,"old-preview","execute_production_command",Map.of())));
+        task=data(owner.post("/conversations/"+session+"/turns",Map.of("content","请预览第43版","context",Map.of("naturalLanguage",true)))).path("taskId").asText();
+        claim=data(internal(task,"claim",Map.of("executorId","bounded-chat","claimRequestId",UUID.randomUUID())));
+        addRevisionFixture(project,planId,plan.first(),43);
+        admitted=commandTool(task,claim,"future-version","submit_production_request",Map.of("intent","PREVIEW","newRequirement",false,"fields",Map.of(),"target",Map.of("revisionNumber",43)));
+        assertEquals(200,admitted.statusCode(),admitted.body());assertEquals("CLARIFY",data(admitted).path("intent").asText());assertFalse(data(admitted).has("productionTarget"));
+    }
+    private void addRevisionFixture(UUID project,String planId,UUID source,int number) {
+        UUID task=UUID.randomUUID();fixtures.update("INSERT INTO tasks(id,project_id,type,status,input_json) VALUES (?,?,'AGENT_TURN','SUCCEEDED','{}')",task,project);
+        fixtures.update("INSERT INTO plan_revisions(id,project_id,plan_id,revision_number,parent_revision_id,source_task_id,content_json) SELECT ?,project_id,plan_id,?,id,?,content_json FROM plan_revisions WHERE id=?",UUID.randomUUID(),number,task,source);
+    }
     @Test void naturalConfirmationAndExportRequireSeparateMessagesAndAnExistingConfirmedVersion() throws Exception {
         BrowserApi owner=signedIn("production-chat-authority");UUID project=UUID.fromString(data(owner.post("/projects",Map.of("name","聊天授权边界"))).path("id").asText());Plan plan=planFixture(project);
         String session=data(owner.post("/projects/"+project+"/conversations",Map.of())).path("id").asText(),planId=data(owner.get("/revisions/"+plan.first())).path("planId").asText();
