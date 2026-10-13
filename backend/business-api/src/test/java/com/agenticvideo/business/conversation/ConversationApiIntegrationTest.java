@@ -112,6 +112,153 @@ class ConversationApiIntegrationTest {
         assertEquals(execution.path("editing"),retried.path("editing"));
     }
 
+    @Test
+    void naturalReplyResumesThePersistedQuestionAndKeepsUntouchedConditions() throws Exception {
+        BrowserApi owner=signedIn("natural-question");
+        String project=json(owner.post("/projects","{\"name\":\"同输入框澄清\"}")).path("data").path("id").asText();
+        newChatAsset(java.util.UUID.fromString(project),"讲话.mp4");
+        String session=json(owner.post("/projects/"+project+"/conversations","{}","question-chat")).path("data").path("id").asText();
+        JsonNode original=json(owner.post("/conversations/"+session+"/turns","{\"content\":\"做一条7至11秒竖屏短视频，主题还没确定\",\"context\":{\"naturalLanguage\":true}}","question-original")).path("data");
+        String task=original.path("taskId").asText();
+        JsonNode claim=json(internal(task,"claim",Map.of("executorId","question-natural-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        var understood=internal(task,"tool",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","understood-question","name","submit_production_request","arguments",Map.of("intent","CLARIFY","newRequirement",true,"fields",Map.of("duration",Map.of("value",Map.of("minMs",7000,"maxMs",11000),"basis","EXPLICIT"),"profile",Map.of("value","PORTRAIT_720","basis","EXPLICIT")))));
+        assertEquals(200,understood.statusCode(),understood.body());
+        JsonNode request=json(understood).path("data");
+        var waiting=internal(task,"complete",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","natural-question","resultType","CONVERSATION_WAITING","result",Map.of("question",Map.of("prompt","你想制作什么主题？","reason","主题影响选段","fields",List.of("topic")))));
+        assertEquals(200,waiting.statusCode(),waiting.body());String question=json(waiting).path("data").path("questionId").asText();
+        assertEquals(question,json(owner.get("/conversations/"+session+"/snapshot")).path("data").path("questions").get(0).path("id").asText());
+        var response=owner.post("/conversations/"+session+"/turns","{\"content\":\"主题是视频制作步骤\",\"context\":{\"naturalLanguage\":true}}","natural-answer");
+        assertEquals(202,response.statusCode(),response.body());String next=json(response).path("data").path("taskId").asText();
+        JsonNode resumed=json(internal(next,"claim",Map.of("executorId","question-natural-answer","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        assertEquals(question,resumed.path("input").path("pendingQuestion").path("questionId").asText());
+        var unanswered=naturalAdmission(next,resumed,"not-an-answer",Map.of("intent","GENERATE_SPEECH","newRequirement",false,"questionAction","ANSWER","fields",Map.of()));
+        assertEquals(400,unanswered.statusCode(),unanswered.body());
+        assertEquals("OPEN",json(owner.get("/conversations/"+session+"/snapshot")).path("data").path("questions").get(0).path("status").asText());
+        var admission=internal(next,"tool",Map.of("attemptId",resumed.path("attemptId").asText(),"leaseToken",resumed.path("leaseToken").asText(),"producerKey","linked-answer","name","submit_production_request","arguments",Map.of("intent","GENERATE_SPEECH","newRequirement",false,"questionAction","ANSWER","fields",Map.of("topic",Map.of("value","视频制作步骤","basis","EXPLICIT")))));
+        assertEquals(200,admission.statusCode(),admission.body());JsonNode fixed=json(admission).path("data");
+        assertEquals(request.path("requirementId"),fixed.path("requirementId"));
+        assertEquals(7000,fixed.path("editing").path("minDurationMs").asInt());assertEquals("PORTRAIT_720",fixed.path("editing").path("profile").asText());
+        assertEquals(original.path("messageId"),fixed.path("brief").path("fields").path("duration").path("sourceMessageId"));
+        JsonNode snapshot=json(owner.get("/conversations/"+session+"/snapshot")).path("data");
+        assertEquals("ANSWERED",snapshot.path("questions").get(0).path("status").asText());
+        assertEquals(json(response).path("data").path("messageId"),snapshot.path("questions").get(0).path("answerMessageId"));
+        assertEquals("SUCCEEDED",json(owner.get("/tasks/"+task)).path("data").path("status").asText());
+    }
+
+    @Test
+    void ambiguousReplyKeepsTheQuestionAndExplicitCancelRevokesOldPublication() throws Exception {
+        BrowserApi owner=signedIn("natural-cancel");
+        String project=json(owner.post("/projects","{\"name\":\"取消待回答需求\"}")).path("data").path("id").asText();
+        newChatAsset(java.util.UUID.fromString(project),"讲话.mp4");
+        String session=json(owner.post("/projects/"+project+"/conversations","{}","cancel-chat")).path("data").path("id").asText();
+        String source=json(owner.post("/conversations/"+session+"/turns","{\"content\":\"做一条短视频，主题未定\",\"context\":{\"naturalLanguage\":true}}","cancel-original")).path("data").path("taskId").asText();
+        JsonNode initial=json(internal(source,"claim",Map.of("executorId","cancel-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        assertEquals(200,naturalAdmission(source,initial,"initial",Map.of("intent","CLARIFY","newRequirement",true,"fields",Map.of())).statusCode());
+        var waiting=Map.of("attemptId",initial.path("attemptId").asText(),"leaseToken",initial.path("leaseToken").asText(),"producerKey","waiting","resultType","CONVERSATION_WAITING","result",Map.of("question",Map.of("prompt","想做什么主题？","reason","主题未定","fields",List.of("topic"))));
+        assertEquals(200,internal(source,"complete",waiting).statusCode());
+        for(String action:List.of("AMBIGUOUS","CANCEL")){
+            String content=action.equals("CANCEL")?"先不做了":"好的";
+            String next=json(owner.post("/conversations/"+session+"/turns",new ObjectMapper().writeValueAsString(Map.of("content",content,"context",Map.of("naturalLanguage",true))),action)).path("data").path("taskId").asText();
+            JsonNode claim=json(internal(next,"claim",Map.of("executorId","cancel-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+            var response=naturalAdmission(next,claim,"action",Map.of("intent",action.equals("CANCEL")?"CANCEL":"DISCUSS","newRequirement",false,"questionAction",action,"fields",Map.of()));
+            assertEquals(200,response.statusCode(),response.body());
+            assertEquals(false,json(response).path("data").has("editing"));
+            assertEquals(200,internal(next,"complete",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","answer","resultType","CONVERSATION_ANSWERED","result",Map.of("content",action.equals("CANCEL")?"已取消":"请告诉我主题","evidenceIds",List.of()))).statusCode());
+            JsonNode snapshot=json(owner.get("/conversations/"+session+"/snapshot")).path("data");
+            assertEquals(action.equals("CANCEL")?"CANCELLED":"OPEN",snapshot.path("questions").get(0).path("status").asText());
+            assertEquals(action.equals("CANCEL")?"CANCELLED":"WAITING_INPUT",json(owner.get("/tasks/"+source)).path("data").path("status").asText());
+        }
+        assertEquals(409,internal(source,"complete",Map.of("attemptId",initial.path("attemptId").asText(),"leaseToken",initial.path("leaseToken").asText(),"producerKey","late","resultType","CONVERSATION_ANSWERED","result",Map.of("content","迟到回答","evidenceIds",List.of()))).statusCode());
+    }
+
+    @Test
+    void newRequirementEndsTheOldWaitAndDoesNotInheritItsConditions() throws Exception {
+        BrowserApi owner=signedIn("natural-new");
+        String project=json(owner.post("/projects","{\"name\":\"另起需求\"}")).path("data").path("id").asText();
+        newChatAsset(java.util.UUID.fromString(project),"讲话.mp4");
+        String session=json(owner.post("/projects/"+project+"/conversations","{}","new-chat")).path("data").path("id").asText();
+        String source=json(owner.post("/conversations/"+session+"/turns","{\"content\":\"做一条竖屏短视频，主题未定\",\"context\":{\"naturalLanguage\":true}}","new-original")).path("data").path("taskId").asText();
+        JsonNode initial=json(internal(source,"claim",Map.of("executorId","new-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        var old=naturalAdmission(source,initial,"initial",Map.of("intent","CLARIFY","newRequirement",true,"fields",Map.of("profile",Map.of("value","PORTRAIT_720","basis","EXPLICIT"))));
+        assertEquals(200,old.statusCode(),old.body());
+        assertEquals(200,internal(source,"complete",Map.of("attemptId",initial.path("attemptId").asText(),"leaseToken",initial.path("leaseToken").asText(),"producerKey","waiting","resultType","CONVERSATION_WAITING","result",Map.of("question",Map.of("prompt","想做什么主题？","reason","主题未定","fields",List.of("topic"))))).statusCode());
+        String next=json(owner.post("/conversations/"+session+"/turns","{\"content\":\"先不做了，另做一条讲成本的短视频\",\"context\":{\"naturalLanguage\":true}}","new-message")).path("data").path("taskId").asText();
+        JsonNode claim=json(internal(next,"claim",Map.of("executorId","new-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        var response=naturalAdmission(next,claim,"new",Map.of("intent","GENERATE_SPEECH","newRequirement",true,"questionAction","NEW","fields",Map.of("topic",Map.of("value","成本","basis","EXPLICIT"))));
+        assertEquals(200,response.statusCode(),response.body());JsonNode fixed=json(response).path("data");
+        org.junit.jupiter.api.Assertions.assertNotEquals(json(old).path("data").path("requirementId"),fixed.path("requirementId"));
+        assertEquals("LANDSCAPE_720",fixed.path("editing").path("profile").asText());
+        assertEquals("DEFAULT",fixed.path("brief").path("fields").path("profile").path("basis").asText());
+        assertEquals("CANCELLED",json(owner.get("/tasks/"+source)).path("data").path("status").asText());
+        assertEquals("CANCELLED",json(owner.get("/conversations/"+session+"/snapshot")).path("data").path("questions").get(0).path("status").asText());
+    }
+
+    @Test
+    void waitingReleasesThePlanAndTheAnswerRestoresTheSamePlan() throws Exception {
+        BrowserApi owner=signedIn("natural-plan-resume"),outsider=signedIn("natural-plan-outsider");
+        String project=json(owner.post("/projects","{\"name\":\"恢复原方案\"}")).path("data").path("id").asText();
+        newChatAsset(java.util.UUID.fromString(project),"讲话.mp4");
+        String session=json(owner.post("/projects/"+project+"/conversations","{}","resume-plan-chat")).path("data").path("id").asText();
+        String source=json(owner.post("/conversations/"+session+"/turns","{\"content\":\"做一条讲成本的短视频\",\"context\":{\"naturalLanguage\":true}}","resume-original")).path("data").path("taskId").asText();
+        JsonNode initial=json(internal(source,"claim",Map.of("executorId","resume-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        var old=naturalAdmission(source,initial,"initial",Map.of("intent","GENERATE_SPEECH","newRequirement",true,"fields",Map.of("topic",Map.of("value","成本","basis","EXPLICIT"))));
+        assertEquals(200,old.statusCode(),old.body());String plan=json(old).path("data").path("editing").path("planId").asText();
+        assertEquals(200,internal(source,"complete",Map.of("attemptId",initial.path("attemptId").asText(),"leaseToken",initial.path("leaseToken").asText(),"producerKey","waiting","resultType","CONVERSATION_WAITING","result",Map.of("question",Map.of("prompt","素材不足30秒，改为7至11秒吗？","reason","硬时长无法满足","fields",List.of("duration"))))).statusCode());
+        org.junit.jupiter.api.Assertions.assertTrue(json(owner.get("/projects/"+project+"/plans")).path("data").path("items").get(0).path("editingTaskId").isNull());
+        assertEquals(404,outsider.post("/conversations/"+session+"/turns","{\"content\":\"改成7至11秒\",\"context\":{\"naturalLanguage\":true}}","outsider-answer").statusCode());
+        String next=json(owner.post("/conversations/"+session+"/turns","{\"content\":\"改成7至11秒\",\"context\":{\"naturalLanguage\":true}}","plan-answer")).path("data").path("taskId").asText();
+        JsonNode claim=json(internal(next,"claim",Map.of("executorId","resume-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        assertEquals(400,naturalAdmission(next,claim,"missing-duration",Map.of("intent","GENERATE_SPEECH","newRequirement",false,"questionAction","ANSWER","fields",Map.of())).statusCode());
+        var response=naturalAdmission(next,claim,"answer",Map.of("intent","GENERATE_SPEECH","newRequirement",false,"questionAction","ANSWER","fields",Map.of("duration",Map.of("value",Map.of("minMs",7000,"maxMs",11000),"basis","EXPLICIT"))));
+        assertEquals(200,response.statusCode(),response.body());
+        assertEquals(plan,json(response).path("data").path("editing").path("planId").asText());
+        assertEquals(next,json(owner.get("/projects/"+project+"/plans")).path("data").path("items").get(0).path("editingTaskId").asText());
+    }
+
+    @Test
+    void failedUnderstandingOfAnAnswerCanRetryWithoutLosingItsQuestion() throws Exception {
+        BrowserApi owner=signedIn("natural-answer-retry");
+        String project=json(owner.post("/projects","{\"name\":\"补答失败重试\"}")).path("data").path("id").asText();
+        newChatAsset(java.util.UUID.fromString(project),"讲话.mp4");
+        String session=json(owner.post("/projects/"+project+"/conversations","{}","reply-retry-chat")).path("data").path("id").asText();
+        String source=json(owner.post("/conversations/"+session+"/turns","{\"content\":\"做一条短视频，主题未定\",\"context\":{\"naturalLanguage\":true}}","reply-retry-original")).path("data").path("taskId").asText();
+        JsonNode initial=json(internal(source,"claim",Map.of("executorId","retry-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        assertEquals(200,naturalAdmission(source,initial,"initial",Map.of("intent","CLARIFY","newRequirement",true,"fields",Map.of())).statusCode());
+        assertEquals(200,internal(source,"complete",Map.of("attemptId",initial.path("attemptId").asText(),"leaseToken",initial.path("leaseToken").asText(),"producerKey","waiting","resultType","CONVERSATION_WAITING","result",Map.of("question",Map.of("prompt","想做什么主题？","reason","主题未定","fields",List.of("topic"))))).statusCode());
+        String next=json(owner.post("/conversations/"+session+"/turns","{\"content\":\"主题是成本\",\"context\":{\"naturalLanguage\":true}}","reply-to-retry")).path("data").path("taskId").asText();
+        JsonNode claim=json(internal(next,"claim",Map.of("executorId","retry-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        assertEquals(200,internal(next,"fail",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","understanding-failed","code","CONVERSATION_FAILED","message","理解暂时失败")).statusCode());
+        var retried=owner.post("/conversations/"+session+"/tasks/"+next+"/retry","{}","reply-retry");
+        assertEquals(202,retried.statusCode(),retried.body());
+        JsonNode retry=json(internal(json(retried).path("data").path("taskId").asText(),"claim",Map.of("executorId","retry-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        assertEquals(claim.path("input").path("pendingQuestion"),retry.path("input").path("pendingQuestion"));
+        assertEquals("WAITING_INPUT",json(owner.get("/tasks/"+source)).path("data").path("status").asText());
+    }
+
+    @Test
+    void answerRechecksTheOriginalAssetAndKeepsWaitingWhenItIsUnavailable() throws Exception {
+        BrowserApi owner=signedIn("natural-unavailable");
+        String project=json(owner.post("/projects","{\"name\":\"恢复重新核对素材\"}")).path("data").path("id").asText();
+        var asset=newChatAsset(java.util.UUID.fromString(project),"讲话.mp4");
+        String session=json(owner.post("/projects/"+project+"/conversations","{}","unavailable-chat")).path("data").path("id").asText();
+        String source=json(owner.post("/conversations/"+session+"/turns","{\"content\":\"做一条短视频，主题未定\",\"context\":{\"naturalLanguage\":true}}","unavailable-original")).path("data").path("taskId").asText();
+        JsonNode initial=json(internal(source,"claim",Map.of("executorId","unavailable-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        assertEquals(200,naturalAdmission(source,initial,"initial",Map.of("intent","CLARIFY","newRequirement",true,"fields",Map.of())).statusCode());
+        assertEquals(200,internal(source,"complete",Map.of("attemptId",initial.path("attemptId").asText(),"leaseToken",initial.path("leaseToken").asText(),"producerKey","waiting","resultType","CONVERSATION_WAITING","result",Map.of("question",Map.of("prompt","想做什么主题？","reason","主题未定","fields",List.of("topic"))))).statusCode());
+        String next=json(owner.post("/conversations/"+session+"/turns","{\"content\":\"主题是成本\",\"context\":{\"naturalLanguage\":true}}","unavailable-answer")).path("data").path("taskId").asText();
+        JsonNode claim=json(internal(next,"claim",Map.of("executorId","unavailable-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        fixtures.update("UPDATE assets SET validation_status='INVALID' WHERE id=?",asset);
+        var response=naturalAdmission(next,claim,"answer",Map.of("intent","GENERATE_SPEECH","newRequirement",false,"questionAction","ANSWER","fields",Map.of("topic",Map.of("value","成本","basis","EXPLICIT"))));
+        assertEquals(409,response.statusCode(),response.body());
+        assertEquals("WAITING_INPUT",json(owner.get("/tasks/"+source)).path("data").path("status").asText());
+        assertEquals("OPEN",json(owner.get("/conversations/"+session+"/snapshot")).path("data").path("questions").get(0).path("status").asText());
+        assertEquals(0,json(owner.get("/projects/"+project+"/plans")).path("data").path("items").size());
+    }
+
+    private HttpResponse<String> naturalAdmission(String task,JsonNode claim,String key,Map<String,Object> arguments) throws Exception {
+        return internal(task,"tool",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey",key,"name","submit_production_request","arguments",arguments));
+    }
+
     private java.util.UUID newChatAsset(java.util.UUID project,String filename) {
         var upload=java.util.UUID.randomUUID();var asset=java.util.UUID.randomUUID();
         fixtures.update("INSERT INTO upload_sessions(id,project_id,actor_user_id,idempotency_key,filename,declared_bytes,declared_sha256,part_size_bytes,expected_parts,object_key,writer_token) SELECT ?,id,owner_user_id,?,?,1,?,1,1,?,? FROM projects WHERE id=?",upload,upload.toString(),filename,"a".repeat(64),upload.toString(),java.util.UUID.randomUUID(),project);

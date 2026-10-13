@@ -29,6 +29,7 @@ public class ConversationQuestions {
         for(var field:fields)if(!java.util.Set.of("topic","count","duration","assetIds","forbiddenContent","forbiddenAssetIds","profile").contains(field.asText()))throw new ResponseStatusException(BAD_REQUEST,"澄清条件无效");
         UUID conversation=UUID.fromString(input.path("conversationId").asText()),id=UUID.randomUUID();
         database.queryForMap("SELECT id FROM conversations WHERE id=? FOR UPDATE",conversation);
+        if(input.path("context").path("naturalLanguage").asBoolean(false))briefs.defer(conversation,(UUID)task.get("id"),UUID.fromString(input.path("messageId").asText()),fields);
         database.update("INSERT INTO conversation_questions(id,conversation_id,task_id,turn_id,prompt,reason,fields_json) VALUES (?,?,?,?,?,?,?::jsonb)",id,conversation,task.get("id"),UUID.fromString(input.path("turnId").asText()),prompt,reason,fields.toString());
         return Map.of("questionId",id,"taskId",task.get("id"),"turnId",input.path("turnId").asText(),"status","WAITING_INPUT");
     }

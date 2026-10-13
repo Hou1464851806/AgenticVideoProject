@@ -74,6 +74,28 @@ public class ConversationBriefs {
         for(var asset:fields.has("assetIds")?fields.path("assetIds").path("value"):fixedScope)if(!forbidden.contains(asset.asText()))selected.add(asset);
         effective.set("assetIds",selected);effective.set("editing",editing);return effective;
     }
+    /** A condition being asked about is not a resolved choice from this message. */
+    public void defer(UUID conversation,UUID task,UUID message,JsonNode unresolved){
+        ObjectNode current=((JsonNode)snapshot(conversation).get("fields")).deepCopy();
+        var first=database.queryForList("SELECT revision_number,fields_json FROM conversation_brief_revisions WHERE conversation_id=? AND source_message_id=? ORDER BY revision_number LIMIT 1",conversation,message);
+        JsonNode before=json.createObjectNode();
+        if(!first.isEmpty()&&!decode(first.get(0).get("fields_json").toString()).isEmpty()){
+            var previous=database.queryForList("SELECT fields_json FROM conversation_brief_revisions WHERE conversation_id=? AND revision_number<? ORDER BY revision_number DESC LIMIT 1",conversation,first.get(0).get("revision_number"));
+            if(!previous.isEmpty())before=decode(previous.get(0).get("fields_json").toString());
+        }
+        boolean changed=false;
+        for(var field:unresolved){
+            String name=field.asText();
+            if(message.toString().equals(current.path(name).path("sourceMessageId").asText())){
+                if(before.has(name))current.set(name,before.path(name));else current.remove(name);
+                changed=true;
+            }
+        }
+        if(changed){
+            long revision=((Number)snapshot(conversation).get("revision")).longValue()+1;
+            database.update("INSERT INTO conversation_brief_revisions(id,conversation_id,source_task_id,source_message_id,revision_number,fields_json) VALUES (?,?,?,?,?,?::jsonb)",UUID.randomUUID(),conversation,task,message,revision,current.toString());
+        }
+    }
     public void start(UUID conversation,UUID task,UUID message){
         long revision=database.queryForObject("SELECT coalesce(max(revision_number),0)+1 FROM conversation_brief_revisions WHERE conversation_id=?",Long.class,conversation);
         database.update("INSERT INTO conversation_brief_revisions(id,conversation_id,source_task_id,source_message_id,revision_number,fields_json) VALUES (?,?,?,?,?,'{}'::jsonb)",UUID.randomUUID(),conversation,task,message,revision);

@@ -67,6 +67,7 @@ const editing = ref<Record<string,Settings>>({});
 const settings = computed(() => editing.value[selected.value]!);
 const session = computed(() => sessions.value.find(item => item.id === selected.value));
 const running = computed(() => ['PENDING','RUNNING','CANCEL_REQUESTED','WAITING_INPUT'].includes(latestTask.value?.status ?? ''));
+const blocksSending=computed(()=>running.value&&!(session.value?.naturalLanguage&&latestTask.value?.status==='WAITING_INPUT'));
 async function control(retry:boolean){
   const task=latestTask.value,id=selected.value;if(!task||controlling.value)return;
   controlling.value=true;error.value='';
@@ -160,7 +161,7 @@ function moveMontage(index:number,delta:number){
   const [asset]=order.splice(index,1);order.splice(target,0,asset!);
 }
 async function send() {
-  if (!selected.value || sending.value || running.value || !draft.value.trim()) return;
+  if (!selected.value || sending.value || blocksSending.value || !draft.value.trim()) return;
   const id = selected.value, content = draft.value;
   const condition = settings.value;
   const context: Record<string,unknown> = {};
@@ -237,16 +238,18 @@ onUnmounted(() => { alive = false; clearInterval(timer); });
       <section v-if="brief&&Object.keys(brief.fields).length" aria-label="制作需求简报">
         <h3>制作需求简报</h3>
         <dl><template v-for="(condition,name) in brief.fields" :key="name"><dt>{{briefLabels[name]??name}}</dt><dd>{{briefValue(name,condition.value)}} · {{condition.basis==='EXPLICIT'?'明确约束':'已说明默认值'}}<small>来源：{{messages.find(item=>item.id===condition.sourceMessageId)?.content??condition.sourceMessageId}}</small></dd></template></dl>
-        <p>选择“整理制作需求”，用新消息纠正指定条件；未提及条件保留。</p>
-        <button type="button" :disabled="running" @click="applyBrief('GENERATE_PLAN')">应用简报生成讲话方案</button><button type="button" :disabled="running" @click="applyBrief('MONTAGE')">应用简报生成混剪</button>
+        <p v-if="session.naturalLanguage">直接在下方聊天框补充或纠正需求；未提及的条件保留。</p><p v-else>选择“整理制作需求”，用新消息纠正指定条件；未提及条件保留。</p>
+        <button v-if="!session.naturalLanguage" type="button" :disabled="running" @click="applyBrief('GENERATE_PLAN')">应用简报生成讲话方案</button><button v-if="!session.naturalLanguage" type="button" :disabled="running" @click="applyBrief('MONTAGE')">应用简报生成混剪</button>
         <p v-if="appliedBrief[selected]">已应用简报 V{{appliedBrief[selected]}}；发送时会固定该版本条件。简报发生变化后请重新应用。</p>
         <details><summary>查看简报修订历史</summary><article v-for="revision in brief.history" :key="revision.revision"><strong>简报 V{{revision.revision}}</strong><p v-for="(condition,name) in revision.fields" :key="name">{{briefLabels[name]??name}}：{{briefValue(name,condition.value)}}</p></article></details>
       </section>
       <article v-for="question in openQuestions" :key="question.id" aria-label="待回答的澄清问题">
-        <h3>{{question.prompt}}</h3><p>{{question.reason}}</p><p>等待明确回答；执行与方案编辑占用已释放。普通新消息不会自动作为回答。</p>
+        <h3>{{question.prompt}}</h3><p>{{question.reason}}</p><p v-if="session.naturalLanguage">请直接在下方聊天框回答；也可以说“先不做了”或“另做一条”。</p><p v-else>等待明确回答；执行与方案编辑占用已释放。普通新消息不会自动作为回答。</p>
+        <template v-if="!session.naturalLanguage">
         <label v-if="question.editing" class="choice"><input v-model="useChangedBase[question.id]" type="checkbox" :disabled="!editingBase||editingBase.planId!==question.editing.planId">以当前查看版本恢复方案修改</label>
         <form @submit.prevent="resolveQuestion(question,false)"><label :for="`answer-${question.id}`">澄清回答</label><textarea :id="`answer-${question.id}`" v-model="answers[question.id]" maxlength="8000" required></textarea><button type="submit" :disabled="controlling||!answers[question.id]?.trim()">提交澄清回答</button></form>
         <button type="button" class="secondary" :disabled="controlling||!draft.trim()" @click="resolveQuestion(question,true)">开始新需求</button><p>在下方对话输入中填写新需求，再点击此按钮放弃原等待。</p>
+        </template>
       </article>
       <p class="scope">本会话固定包含 {{ session.assetIds.length }} 个素材，查询无需创建剪辑方案。</p>
       <p v-if="running && activity" role="status">{{ activity }}</p>
@@ -298,7 +301,7 @@ onUnmounted(() => { alive = false; clearInterval(timer); });
           <label v-for="asset in assets.filter(item => session?.assetIds.includes(item.id))" :key="asset.id" class="choice"><input v-model="references[selected]" type="checkbox" :value="asset.id" :aria-label="`引用素材 ${asset.filename}`">{{ asset.filename }}</label>
         </fieldset>
         <label for="conversation-input">对话输入</label><textarea id="conversation-input" v-model="draft" maxlength="8000" required placeholder="例如：素材里介绍了哪些制作步骤？"></textarea>
-        <button type="submit" :disabled="sending || running || !draft.trim()">发送需求</button>
+        <button type="submit" :disabled="sending || blocksSending || !draft.trim()">发送需求</button>
       </form>
     </template>
   </section>

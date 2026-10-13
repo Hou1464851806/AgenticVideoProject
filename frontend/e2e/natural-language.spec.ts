@@ -1,6 +1,83 @@
 import {test,expect} from '@playwright/test';
 import {renderSeed} from './fixtures/render-seed';
 
+test('real Agent asks a necessary question and resumes from the original chat input after refresh',async({page})=>{
+  test.setTimeout(240000);
+  const seed=await renderSeed(page);await page.goto(`/?project=${seed.projectId}`);
+  const created=page.waitForResponse(reply=>reply.request().method()==='POST'&&reply.url().endsWith('/conversations'));
+  await page.getByRole('button',{name:'新聊天',exact:true}).click();const session=(await(await created).json()).data;
+  const send=async(content:string)=>{
+    await page.getByLabel('对话输入',{exact:true}).fill(content);
+    const accepted=page.waitForResponse(reply=>reply.request().method()==='POST'&&reply.url().endsWith('/turns'));
+    await page.getByRole('button',{name:'发送需求',exact:true}).click({timeout:3000});
+    const response=await accepted;expect(response.status()).toBe(202);const receipt=(await response.json()).data;
+    await expect.poll(async()=>['SUCCEEDED','WAITING_INPUT','FAILED','CANCELLED'].includes((await(await page.request.get(`/api/v1/tasks/${receipt.taskId}`)).json()).data.status),{timeout:180000}).toBe(true);
+    return receipt;
+  };
+  const original=await send('只用 labelled-speech.mp4，做一条严格7至11秒的竖屏讲话短视频。主题我还没决定，请先问我主题。');
+  expect((await(await page.request.get(`/api/v1/tasks/${original.taskId}`)).json()).data.status).toBe('WAITING_INPUT');
+  const snapshot=async()=>(await(await page.request.get(`/api/v1/conversations/${session.id}/snapshot`)).json()).data;
+  const question=(await snapshot()).questions.find((item:{status:string})=>item.status==='OPEN');expect(question).toBeTruthy();
+  await page.reload();await expect(page.getByRole('article',{name:'待回答的澄清问题',exact:true})).toContainText(question.prompt);
+  await expect(page.getByLabel('澄清回答',{exact:true})).toHaveCount(0);
+  await page.getByLabel('对话输入',{exact:true}).fill('主题是视频制作步骤，请继续原来的需求。');
+  await expect(page.getByRole('button',{name:'发送需求',exact:true})).toBeEnabled();
+  const answered=await send('主题是视频制作步骤，请继续原来的需求。');
+  expect((await(await page.request.get(`/api/v1/tasks/${answered.taskId}`)).json()).data.status).toBe('SUCCEEDED');
+  const done=await snapshot(),resolved=done.questions.find((item:{id:string})=>item.id===question.id);
+  expect(resolved).toMatchObject({status:'ANSWERED',answerMessageId:answered.messageId});
+  expect(done.brief.fields.duration).toMatchObject({value:{minMs:7000,maxMs:11000},sourceMessageId:original.messageId});
+  expect(done.brief.fields.profile).toMatchObject({value:'PORTRAIT_720',sourceMessageId:original.messageId});
+  const revision=done.items.at(-1).references.find((item:{type:string})=>item.type==='PLAN_REVISION');expect(revision).toBeTruthy();
+  const output=(await(await page.request.get(`/api/v1/revisions/${revision.id}`)).json()).data.content.outputs[0];
+  expect(output.durationMs).toBeGreaterThanOrEqual(7000);expect(output.durationMs).toBeLessThanOrEqual(11000);expect(output.render.profile).toBe('PORTRAIT_720');
+});
+
+test('real Agent asks about conflicting hard durations instead of loosening them',async({page})=>{
+  test.setTimeout(180000);
+  const seed=await renderSeed(page);await page.goto(`/?project=${seed.projectId}`);
+  const created=page.waitForResponse(reply=>reply.request().method()==='POST'&&reply.url().endsWith('/conversations'));
+  await page.getByRole('button',{name:'新聊天',exact:true}).click();const session=(await(await created).json()).data;
+  await page.getByLabel('对话输入',{exact:true}).fill('做一条讲视频制作步骤的竖屏短视频，必须恰好8秒，同时不得超过6秒，这两个条件都严格执行。');
+  const accepted=page.waitForResponse(reply=>reply.request().method()==='POST'&&reply.url().endsWith('/turns'));
+  await page.getByRole('button',{name:'发送需求',exact:true}).click();const task=(await(await accepted).json()).data.taskId;
+  await expect.poll(async()=>['SUCCEEDED','WAITING_INPUT','FAILED'].includes((await(await page.request.get(`/api/v1/tasks/${task}`)).json()).data.status),{timeout:120000}).toBe(true);
+  expect((await(await page.request.get(`/api/v1/tasks/${task}`)).json()).data.status).toBe('WAITING_INPUT');
+  const snapshot=(await(await page.request.get(`/api/v1/conversations/${session.id}/snapshot`)).json()).data;
+  expect(snapshot.questions.find((item:{status:string})=>item.status==='OPEN').fields).toContain('duration');
+  expect(snapshot.brief.fields.duration).toBeUndefined();
+  expect(snapshot.items.some((item:{references:Array<{type:string}>})=>item.references.some(reference=>reference.type==='PLAN_REVISION'))).toBe(false);
+  await expect(page.getByRole('article',{name:'待回答的澄清问题',exact:true})).toContainText(/8|八/);
+  await expect(page.getByRole('article',{name:'待回答的澄清问题',exact:true})).toContainText(/6|六/);
+});
+
+test('real Agent keeps ambiguous answers pending, cancels, and starts a separate requirement',async({page})=>{
+  test.setTimeout(240000);
+  const seed=await renderSeed(page);await page.goto(`/?project=${seed.projectId}`);
+  const created=page.waitForResponse(reply=>reply.request().method()==='POST'&&reply.url().endsWith('/conversations'));
+  await page.getByRole('button',{name:'新聊天',exact:true}).click();const session=(await(await created).json()).data;
+  const snapshot=async()=>(await(await page.request.get(`/api/v1/conversations/${session.id}/snapshot`)).json()).data;
+  const send=async(content:string)=>{
+    await page.getByLabel('对话输入',{exact:true}).fill(content);
+    const accepted=page.waitForResponse(reply=>reply.request().method()==='POST'&&reply.url().endsWith('/turns'));
+    await page.getByRole('button',{name:'发送需求',exact:true}).click();const response=await accepted;expect(response.status()).toBe(202);
+    const receipt=(await response.json()).data;
+    await expect.poll(async()=>['SUCCEEDED','WAITING_INPUT','FAILED','CANCELLED'].includes((await(await page.request.get(`/api/v1/tasks/${receipt.taskId}`)).json()).data.status),{timeout:180000}).toBe(true);
+    expect((await(await page.request.get(`/api/v1/tasks/${receipt.taskId}`)).json()).data.status).not.toBe('FAILED');return receipt;
+  };
+  await send('做一条竖屏短视频，主题还没决定，请先问我主题。');
+  const first=(await snapshot()).questions.find((item:{status:string})=>item.status==='OPEN');expect(first).toBeTruthy();
+  await send('好的');expect((await snapshot()).questions.find((item:{id:string})=>item.id===first.id).status).toBe('OPEN');
+  await page.reload();await expect(page.getByLabel('澄清回答',{exact:true})).toHaveCount(0);
+  await send('先不做了');expect((await snapshot()).questions.find((item:{id:string})=>item.id===first.id).status).toBe('CANCELLED');
+  await send('做一条竖屏短视频，严格7至11秒，主题仍未定，请先问我主题。');
+  const second=(await snapshot()).questions.find((item:{status:string})=>item.status==='OPEN');expect(second).toBeTruthy();
+  await send('先不做这条了，另做一条介绍视频制作步骤的横屏讲话短视频，严格7至11秒，只用 labelled-speech.mp4，只生成方案。');
+  const done=await snapshot();expect(done.questions.find((item:{id:string})=>item.id===second.id).status).toBe('CANCELLED');
+  expect(done.brief.fields.profile.value).toBe('LANDSCAPE_720');
+  expect(done.items.at(-1).references.some((item:{type:string})=>item.type==='PLAN_REVISION')).toBe(true);
+});
+
 test('real Agent generates a speech plan directly and summarizes the saved version in chat',async({page})=>{
   test.setTimeout(240000);
   const seed=await renderSeed(page);

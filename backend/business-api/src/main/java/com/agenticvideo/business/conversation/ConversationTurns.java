@@ -13,6 +13,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ConversationTurns {
+    private final ConversationReplies replies;
     private final ConversationRequests requests;
     private final ConversationBriefs briefs;
     private final com.agenticvideo.business.search.EvidenceSearch evidenceSearch;
@@ -25,12 +26,12 @@ public class ConversationTurns {
     private final com.agenticvideo.business.analysis.SpeechTimings timings;
     private final com.agenticvideo.business.render.ProductionCommands production;
 
-    public ConversationTurns(ConversationRequests requests,ConversationBriefs briefs,com.agenticvideo.business.search.EvidenceSearch evidenceSearch,JdbcTemplate database, ObjectMapper json, PlatformTransactionManager manager,
+    public ConversationTurns(ConversationReplies replies,ConversationRequests requests,ConversationBriefs briefs,com.agenticvideo.business.search.EvidenceSearch evidenceSearch,JdbcTemplate database, ObjectMapper json, PlatformTransactionManager manager,
             com.agenticvideo.business.plan.EditPlans plans, com.agenticvideo.business.analysis.SpeechTimings timings, com.agenticvideo.business.render.ProductionCommands production,
             @org.springframework.beans.factory.annotation.Value("${conversation.model-record.request-max-bytes:16777216}") long requestMaxBytes,
             @org.springframework.beans.factory.annotation.Value("${conversation.model-record.response-max-bytes:4194304}") long responseMaxBytes) {
         if (requestMaxBytes < 1 || responseMaxBytes < 1) throw new IllegalArgumentException("模型记录字节上限必须为正数");
-        this.requests=requests;this.briefs=briefs;
+        this.replies=replies;this.requests=requests;this.briefs=briefs;
         this.evidenceSearch=evidenceSearch;
         this.requestMaxBytes = requestMaxBytes;
         this.responseMaxBytes = responseMaxBytes;
@@ -60,7 +61,8 @@ public class ConversationTurns {
                 if (!Boolean.TRUE.equals(turn.get("same_request"))) throw new ResponseStatusException(HttpStatus.CONFLICT, "同一发送幂等键不能用于不同需求");
                 return identities((UUID)turn.get("id"), (UUID)turn.get("message_id"), (UUID)turn.get("task_id"));
             }
-            if (database.queryForObject("SELECT count(*) FROM conversation_turns r JOIN tasks t ON t.id=r.task_id WHERE r.conversation_id=? AND t.status IN ('PENDING','RUNNING','CANCEL_REQUESTED','WAITING_INPUT')", Integer.class, sessionId) > 0)
+            var pendingQuestion=understandingIntent?replies.pending(sessionId):null;
+            if (database.queryForObject("SELECT count(*) FROM conversation_turns r JOIN tasks t ON t.id=r.task_id WHERE r.conversation_id=? AND (t.status IN ('PENDING','RUNNING','CANCEL_REQUESTED') OR (t.status='WAITING_INPUT' AND ?))", Integer.class, sessionId,pendingQuestion==null) > 0)
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "制作会话正在处理需求；可继续编辑草稿，完成或停止后再发送");
             var effectiveContext=request.context()!=null&&request.context().has("briefRevision")?briefs.apply(sessionId,request.context(),(com.fasterxml.jackson.databind.JsonNode)decode(session.get("asset_ids_json"))):request.context();
             var effectiveRequest=new ConversationController.Turn(request.content(),request.references(),effectiveContext);
@@ -85,6 +87,7 @@ public class ConversationTurns {
             if(startsNewRequirement){
                 fixedInput.put("startsNewRequirement",true);
             }
+            if(pendingQuestion!=null)fixedInput.put("pendingQuestion",pendingQuestion);
             if(effectiveContext!=null&&effectiveContext.path("naturalLanguage").asBoolean(false)) {
                 var view=new java.util.LinkedHashMap<String,Object>();
                 view.put("planId",session.get("view_plan_id"));view.put("revisionId",session.get("view_revision_id"));
@@ -220,7 +223,7 @@ public class ConversationTurns {
         String name = request.name();
         var arguments = request.arguments();
         var fields = switch (name) {
-            case "submit_production_request" -> java.util.Set.of("intent","newRequirement","fields");
+            case "submit_production_request" -> java.util.Set.of("intent","newRequirement","fields","questionAction");
             case "restrict_asset_scope" -> java.util.Set.of("assetIds");
             case "update_editing_brief" -> java.util.Set.of("fields");
             case "list_assets" -> java.util.Set.<String>of();

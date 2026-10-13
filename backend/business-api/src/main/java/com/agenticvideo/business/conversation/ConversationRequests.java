@@ -18,11 +18,12 @@ public class ConversationRequests {
     private final ObjectMapper json;
     private final ConversationBriefs briefs;
     private final EditPlans plans;
-    public ConversationRequests(JdbcTemplate database,ObjectMapper json,ConversationBriefs briefs,EditPlans plans){this.database=database;this.json=json;this.briefs=briefs;this.plans=plans;}
+    private final ConversationReplies replies;
+    public ConversationRequests(JdbcTemplate database,ObjectMapper json,ConversationBriefs briefs,EditPlans plans,ConversationReplies replies){this.database=database;this.json=json;this.briefs=briefs;this.plans=plans;this.replies=replies;}
 
     public void validate(JsonNode input,JsonNode request){
         if(!input.path("context").path("naturalLanguage").asBoolean(false))throw new ResponseStatusException(BAD_REQUEST,"本轮不是自然语言需求");
-        if(!java.util.Set.of("GENERATE_SPEECH","DISCUSS","QUERY").contains(request.path("intent").asText())||!request.path("newRequirement").isBoolean())throw new ResponseStatusException(BAD_REQUEST,"需求意图不受支持");
+        if(!java.util.Set.of("GENERATE_SPEECH","DISCUSS","QUERY","CLARIFY","CANCEL").contains(request.path("intent").asText())||!request.path("newRequirement").isBoolean())throw new ResponseStatusException(BAD_REQUEST,"需求意图不受支持");
         if(!request.path("fields").isObject())throw new ResponseStatusException(BAD_REQUEST,"需求条件须为对象");
         if(!request.path("fields").isEmpty())briefs.validate(input,request.path("fields"));
     }
@@ -36,6 +37,7 @@ public class ConversationRequests {
             return parse(previous.get(0).get("input_json"));
         }
         UUID conversation=UUID.fromString(input.path("conversationId").asText());
+        replies.answer(task,input,request);
         database.queryForMap("SELECT id FROM conversations WHERE id=? FOR UPDATE",conversation);
         UUID requirement;
         var prior=database.queryForList("SELECT requirement_id FROM conversation_execution_requests r JOIN conversation_turns t ON t.task_id=r.task_id WHERE t.conversation_id=? ORDER BY r.created_at DESC LIMIT 1",conversation);
@@ -58,6 +60,11 @@ public class ConversationRequests {
         }
         if(request.path("intent").asText().equals("GENERATE_SPEECH")){
             ObjectNode context=json.createObjectNode();context.put("briefRevision",((Number)briefs.snapshot(conversation).get("revision")).longValue());context.set("editing",json.createObjectNode());
+            if("ANSWER".equals(request.path("questionAction").asText())){
+                JsonNode original=input.path("pendingQuestion").path("originalRequest").path("editing");
+                ObjectNode target=(ObjectNode)context.path("editing");
+                for(String identity:java.util.List.of("planId","baseRevisionId"))if(original.has(identity))target.set(identity,original.path(identity));
+            }
             JsonNode applied=briefs.apply(conversation,context,input.path("assetIds"));
             fixed.set("assetIds",applied.path("assetIds"));
             // Persist the fixed request before entering editing; the surrounding transaction is atomic.

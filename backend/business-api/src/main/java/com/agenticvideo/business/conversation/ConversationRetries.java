@@ -51,10 +51,17 @@ public class ConversationRetries {
                 if("SUCCEEDED".equals(children.get(0).get("status")))return identities(children.get(0));
                 throw new ResponseStatusException(HttpStatus.CONFLICT,"原需求已有重试任务，请查看该任务；失败后从该失败任务重试");
             }
-            if(database.queryForObject("SELECT count(*) FROM conversation_turns r JOIN tasks t ON t.id=r.task_id WHERE r.conversation_id=? AND t.status IN ('PENDING','RUNNING','CANCEL_REQUESTED','WAITING_INPUT')",Integer.class,conversation)>0)
+            ObjectNode input=(ObjectNode)turns.executionInput(source,parse(original.get("input_json"))).deepCopy();
+            UUID waitingSource=null;
+            if(input.has("pendingQuestion")&&!input.has("intent")){
+                JsonNode pending=input.path("pendingQuestion");
+                waitingSource=UUID.fromString(pending.path("taskId").asText());
+                if(database.queryForObject("SELECT count(*) FROM conversation_questions q JOIN tasks t ON t.id=q.task_id WHERE q.id=? AND q.task_id=? AND q.conversation_id=? AND q.status='OPEN' AND t.status='WAITING_INPUT'",Integer.class,UUID.fromString(pending.path("questionId").asText()),waitingSource,conversation)!=1)
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,"原问题已结束，不能重试旧回答");
+            }
+            if(database.queryForObject("SELECT count(*) FROM conversation_turns r JOIN tasks t ON t.id=r.task_id WHERE r.conversation_id=? AND (t.status IN ('PENDING','RUNNING','CANCEL_REQUESTED') OR (t.status='WAITING_INPUT' AND (?::uuid IS NULL OR t.id<>?::uuid)))",Integer.class,conversation,waitingSource,waitingSource)>0)
                 throw new ResponseStatusException(HttpStatus.CONFLICT,"会话正在处理需求，请完成或停止后重试");
             if(unknownCost(source)&&!acknowledgeUnknownCost)throw new ResponseStatusException(HttpStatus.CONFLICT,"原模型调用回执未知，提供方不支持查询或停止；费用可能已产生。请明确接受未知费用后再重试");
-            ObjectNode input=(ObjectNode)turns.executionInput(source,parse(original.get("input_json"))).deepCopy();
             turns.validateRetry(session,input);
             UUID task=UUID.randomUUID(),turn=UUID.randomUUID(),event=UUID.randomUUID();
             input.put("turnId",turn.toString());
