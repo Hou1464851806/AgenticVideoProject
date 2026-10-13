@@ -25,8 +25,10 @@ public class ConversationController {
     private final ProjectRecovery recovery;
     private final AssistantDrafts drafts;
     private final ConversationRetries retries;
+    private final ConversationSessions sessions;
 
-    public ConversationController(ConversationQuestions questions,JdbcTemplate database, ProjectAccess access, ObjectMapper json, ConversationTurns turns, ProjectRecovery recovery, AssistantDrafts drafts,ConversationRetries retries) {
+    public ConversationController(ConversationQuestions questions,JdbcTemplate database, ProjectAccess access, ObjectMapper json, ConversationTurns turns, ProjectRecovery recovery, AssistantDrafts drafts,ConversationRetries retries,ConversationSessions sessions) {
+        this.sessions=sessions;
         this.questions=questions;
         this.retries=retries;
         this.drafts=drafts;
@@ -52,24 +54,17 @@ public class ConversationController {
     @PostMapping("/projects/{projectId}/conversations")
     @ResponseStatus(HttpStatus.CREATED)
     public Map<String, Object> create(@PathVariable UUID projectId,
+            @RequestHeader(value="Idempotency-Key",required=false) String key,
             @Valid @RequestBody CreateSession request, Authentication account) throws java.io.IOException {
         access.requireOwned(projectId, account);
-        UUID id = UUID.randomUUID();
-        List<UUID> scope = request.assetIds() == null ? List.of() : request.assetIds();
-        for (UUID asset : scope) {
-            if (database.queryForObject("SELECT count(*) FROM assets WHERE id=? AND project_id=? AND validation_status='VALID'", Integer.class, asset, projectId) != 1)
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "素材不存在或无权访问");
-        }
-        database.update("INSERT INTO conversations(id,project_id,title,asset_ids_json) VALUES (?,?,?,?::jsonb)",
-                id, projectId, request.title().strip(), json.writeValueAsString(scope));
-        return response(Map.of("id", id, "projectId", projectId, "title", request.title().strip(), "assetIds", scope));
+        return response(sessions.create(projectId,key,request));
     }
 
     @GetMapping("/projects/{projectId}/conversations")
     public Map<String, Object> list(@PathVariable UUID projectId, Authentication account) {
         access.requireOwned(projectId, account);
-        return response(Map.of("items", database.query("SELECT id,title,asset_ids_json FROM conversations WHERE project_id=? ORDER BY created_at,id",
-                (row, index) -> Map.of("id", row.getObject("id", UUID.class), "title", row.getString("title"), "assetIds", parse(row.getString("asset_ids_json"))), projectId)));
+        return response(Map.of("items", database.query("SELECT id,title,asset_ids_json,creation_key IS NOT NULL AND creation_request_json->>'title' IS NULL AS natural_language FROM conversations WHERE project_id=? ORDER BY created_at,id",
+                (row, index) -> Map.of("id", row.getObject("id", UUID.class), "title", row.getString("title"), "assetIds", parse(row.getString("asset_ids_json")),"naturalLanguage",row.getBoolean("natural_language")), projectId)));
     }
 
     @GetMapping("/conversations/{conversationId}/drafts")
@@ -129,7 +124,7 @@ public class ConversationController {
         return Map.of("data", data, "requestId", UUID.randomUUID());
     }
 
-    public record CreateSession(@NotBlank @Size(max = 120) String title, @Size(max = 100) List<UUID> assetIds) {}
+    public record CreateSession(@Size(max = 120) String title, @Size(max = 100) List<UUID> assetIds) {}
     public record Turn(@NotBlank @Size(max = 8000) String content,
             @Size(max = 100) List<com.fasterxml.jackson.databind.JsonNode> references,
             com.fasterxml.jackson.databind.JsonNode context) {}

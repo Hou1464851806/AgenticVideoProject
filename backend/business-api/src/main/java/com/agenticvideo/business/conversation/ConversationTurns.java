@@ -83,6 +83,11 @@ public class ConversationTurns {
             if(startsNewRequirement){
                 fixedInput.put("startsNewRequirement",true);
             }
+            if(effectiveContext!=null&&effectiveContext.path("naturalLanguage").asBoolean(false)) {
+                var view=new java.util.LinkedHashMap<String,Object>();
+                view.put("planId",session.get("view_plan_id"));view.put("revisionId",session.get("view_revision_id"));
+                fixedInput.put("view",view);
+            }
             if(effectiveContext!=null&&(effectiveContext.path("requirements").asBoolean(false)||effectiveContext.has("briefRevision")))fixedInput.put("brief",startsNewRequirement?Map.of("fields",Map.of()):briefs.snapshot(sessionId));
             if (effectiveContext != null && effectiveContext.has("editing"))
                 fixedInput.put("editing", plans.allocate((UUID)session.get("project_id"), task, effectiveContext.path("editing"), json.valueToTree(fixedInput.get("assetIds"))));
@@ -123,8 +128,9 @@ public class ConversationTurns {
         if (request.context() != null) {
             if (!request.context().isObject()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "查询上下文必须是对象");
             request.context().fieldNames().forEachRemaining(field -> {
-                if (!java.util.Set.of("assetIds", "editing", "requirements", "briefRevision").contains(field)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "查询上下文字段不受支持");
+                if (!java.util.Set.of("assetIds", "editing", "requirements", "briefRevision", "naturalLanguage").contains(field)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "查询上下文字段不受支持");
             });
+            if(request.context().has("naturalLanguage")&&!request.context().path("naturalLanguage").isBoolean())throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"自然语言入口标志必须为布尔值");
             if(request.context().has("requirements")&&!request.context().path("requirements").isBoolean())throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"需求简报标志必须为布尔值");
             if (request.context().has("assetIds")) {
                 var selected = request.context().path("assetIds");
@@ -150,6 +156,7 @@ public class ConversationTurns {
     /** Called inside the authoritative task completion transaction. */
     public Object publish(Map<String, Object> task, com.fasterxml.jackson.databind.JsonNode input,
             com.fasterxml.jackson.databind.JsonNode result) {
+        input=scopedInput(input);
         UUID sessionId = identifier(input.path("conversationId").asText());
         database.queryForMap("SELECT id FROM conversations WHERE id=? FOR UPDATE", sessionId);
         String content = result.path("content").asText();
@@ -209,6 +216,7 @@ public class ConversationTurns {
         String name = request.name();
         var arguments = request.arguments();
         var fields = switch (name) {
+            case "restrict_asset_scope" -> java.util.Set.of("assetIds");
             case "update_editing_brief" -> java.util.Set.of("fields");
             case "list_assets" -> java.util.Set.<String>of();
             case "search_evidence" -> java.util.Set.of("query","sourceKinds");
@@ -235,10 +243,18 @@ public class ConversationTurns {
     }
     public record ToolPreparation(String payload,Object cached) {}
     public Object executeTool(Map<String,Object> task,com.fasterxml.jackson.databind.JsonNode input,com.agenticvideo.business.task.TaskController.Tool request) {
+        input=scopedInput(input);
         String name=request.name();var arguments=request.arguments();
         String scope = input.path("assetIds").toString();
         Object result;
-        if("update_editing_brief".equals(name)){briefs.validate(input,arguments.path("fields"));result=arguments.path("fields");}
+        if("restrict_asset_scope".equals(name)) {
+            var selected=arguments.path("assetIds");
+            if(!selected.isArray()||selected.size()>100)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"素材范围必须为最多100项的列表");
+            var allowed=new java.util.HashSet<UUID>();for(var asset:input.path("assetIds"))allowed.add(identifier(asset.asText()));
+            for(var asset:selected)requireAsset(identifier(asset.asText()),task.get("project_id"),allowed);
+            result=Map.of("assetIds",selected);
+        }
+        else if("update_editing_brief".equals(name)){briefs.validate(input,arguments.path("fields"));result=arguments.path("fields");}
         else if ("list_assets".equals(name)) {
             var assets = database.queryForList("""
                     SELECT a.id AS "assetId",a.filename,a.duration_ms AS "durationMs",s.status AS "speechStatus"
@@ -299,6 +315,7 @@ public class ConversationTurns {
         return result;
     }
     public Object recordTool(Map<String,Object> task,com.fasterxml.jackson.databind.JsonNode input,com.agenticvideo.business.task.TaskController.Tool request,ToolPreparation preparation,Object result) {
+        input=scopedInput(input);
         var receipt=database.queryForMap("SELECT *,request_json=?::jsonb AS same_request FROM conversation_tool_receipts WHERE task_id=? AND producer_key=?",preparation.payload(),task.get("id"),request.producerKey());
         if(!Boolean.TRUE.equals(receipt.get("same_request")))throw new ResponseStatusException(HttpStatus.CONFLICT,"工具幂等键内容不同");
         if("SUCCEEDED".equals(receipt.get("status")))return decode(receipt.get("result_json"));
@@ -326,8 +343,22 @@ public class ConversationTurns {
         }
         boolean live=Boolean.TRUE.equals(database.queryForObject("SELECT EXISTS(SELECT 1 FROM tasks t JOIN task_attempts a ON a.id=t.current_attempt_id WHERE t.id=? AND t.status='RUNNING' AND a.lease_expires_at>clock_timestamp())",Boolean.class,task.get("id")));
         if(!live)throw new ResponseStatusException(HttpStatus.CONFLICT,"工具回执已经失去有效执行权");
+        if("restrict_asset_scope".equals(request.name())) {
+            String selected=value.path("assetIds").toString();
+            database.update("INSERT INTO conversation_message_scopes(message_id,asset_ids_json) VALUES (?,?::jsonb) ON CONFLICT(message_id) DO UPDATE SET asset_ids_json=excluded.asset_ids_json",identifier(input.path("messageId").asText()),selected);
+            database.update("UPDATE conversations SET asset_ids_json=?::jsonb WHERE id=?",selected,identifier(input.path("conversationId").asText()));
+        }
         database.update("UPDATE conversation_tool_receipts SET result_json=?::jsonb,status='SUCCEEDED' WHERE task_id=? AND producer_key=?",encode(result),task.get("id"),request.producerKey());
         return result;
+    }
+
+    com.fasterxml.jackson.databind.JsonNode scopedInput(com.fasterxml.jackson.databind.JsonNode input) {
+        if(!input.hasNonNull("messageId"))return input;
+        var scopes=database.queryForList("SELECT asset_ids_json FROM conversation_message_scopes WHERE message_id=?",identifier(input.path("messageId").asText()));
+        if(scopes.isEmpty())return input;
+        var fixed=(com.fasterxml.jackson.databind.node.ObjectNode)input.deepCopy();
+        fixed.set("assetIds",(com.fasterxml.jackson.databind.JsonNode)decode(scopes.get(0).get("asset_ids_json")));
+        return fixed;
     }
 
     public Object provider(Map<String, Object> task, UUID attempt, String action, com.fasterxml.jackson.databind.JsonNode data) {

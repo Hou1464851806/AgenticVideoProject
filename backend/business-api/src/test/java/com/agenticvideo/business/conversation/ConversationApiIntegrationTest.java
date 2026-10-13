@@ -37,6 +37,60 @@ class ConversationApiIntegrationTest {
     @org.springframework.beans.factory.annotation.Autowired org.springframework.jdbc.core.JdbcTemplate fixtures;
 
     @Test
+    void newChatHasDurableWelcomeAndDeduplicatesCreation() throws Exception {
+        BrowserApi owner=signedIn("new-chat-owner"),outsider=signedIn("new-chat-outsider");
+        String project=json(owner.post("/projects","{\"name\":\"直接开始聊天\"}")).path("data").path("id").asText();
+        String path="/projects/"+project+"/conversations";
+        var created=owner.post(path,"{}","new-chat-request");
+        assertEquals(201,created.statusCode(),created.body());
+        JsonNode session=json(created).path("data");
+        assertEquals(session,json(owner.post(path,"{}","new-chat-request")).path("data"));
+        assertEquals(1,json(owner.get(path)).path("data").path("items").size());
+        String conversation=session.path("id").asText();
+        JsonNode snapshot=json(owner.get("/conversations/"+conversation+"/snapshot")).path("data");
+        assertEquals(1,snapshot.path("items").size());
+        assertEquals("ASSISTANT",snapshot.path("items").get(0).path("role").asText());
+        org.junit.jupiter.api.Assertions.assertTrue(snapshot.path("items").get(0).path("content").asText().contains("你好"));
+        org.junit.jupiter.api.Assertions.assertTrue(snapshot.path("latestTask").isNull());
+        assertEquals(snapshot.path("items"),json(owner.get("/conversations/"+conversation+"/snapshot")).path("data").path("items"));
+        assertEquals(404,outsider.post(path,"{}","outsider-new-chat").statusCode());
+    }
+
+    @Test
+    void newChatScopeCanBeNarrowedWithoutChangingTheAcceptedInput() throws Exception {
+        BrowserApi owner=signedIn("new-chat-scope");
+        String project=json(owner.post("/projects","{\"name\":\"自然语言固定范围\"}")).path("data").path("id").asText();
+        java.util.UUID projectId=java.util.UUID.fromString(project);
+        var first=newChatAsset(projectId,"A.mp4");var second=newChatAsset(projectId,"B.mp4");
+        String session=json(owner.post("/projects/"+project+"/conversations","{}","scope-chat")).path("data").path("id").asText();
+        assertEquals(2,json(owner.get("/projects/"+project+"/conversations")).path("data").path("items").get(0).path("assetIds").size());
+        var accepted=owner.post("/conversations/"+session+"/turns","{\"content\":\"只用 A.mp4，查找讲话内容\",\"context\":{\"naturalLanguage\":true}}","scope-query");
+        assertEquals(202,accepted.statusCode(),accepted.body());
+        String task=json(accepted).path("data").path("taskId").asText();
+        var claimRequest=Map.of("executorId","natural-scope-test","claimRequestId",java.util.UUID.randomUUID());
+        JsonNode claim=json(internal(task,"claim",claimRequest)).path("data");
+        var restriction=Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","selected-scope","name","restrict_asset_scope","arguments",Map.of("assetIds",List.of(first)));
+        var selected=internal(task,"tool",restriction);assertEquals(200,selected.statusCode(),selected.body());
+        assertEquals(json(selected).path("data"),json(internal(task,"tool",restriction)).path("data"));
+        var assets=internal(task,"tool",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","limited-assets","name","list_assets","arguments",Map.of()));
+        assertEquals(200,assets.statusCode(),assets.body());
+        JsonNode visible=json(assets).path("data").path("assets");assertEquals(1,visible.size());assertEquals(first.toString(),visible.get(0).path("assetId").asText());
+        assertEquals(claim.path("input"),json(internal(task,"claim",claimRequest)).path("data").path("input"));
+        assertEquals(List.of(first.toString()),new ObjectMapper().convertValue(json(owner.get("/projects/"+project+"/conversations")).path("data").path("items").get(0).path("assetIds"),List.class));
+        newChatAsset(projectId,"C.mp4");
+        assertEquals(1,json(owner.get("/projects/"+project+"/conversations")).path("data").path("items").get(0).path("assetIds").size());
+        var outside=internal(task,"tool",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","cannot-expand","name","restrict_asset_scope","arguments",Map.of("assetIds",List.of(second))));
+        assertEquals(404,outside.statusCode(),outside.body());
+    }
+
+    private java.util.UUID newChatAsset(java.util.UUID project,String filename) {
+        var upload=java.util.UUID.randomUUID();var asset=java.util.UUID.randomUUID();
+        fixtures.update("INSERT INTO upload_sessions(id,project_id,actor_user_id,idempotency_key,filename,declared_bytes,declared_sha256,part_size_bytes,expected_parts,object_key,writer_token) SELECT ?,id,owner_user_id,?,?,1,?,1,1,?,? FROM projects WHERE id=?",upload,upload.toString(),filename,"a".repeat(64),upload.toString(),java.util.UUID.randomUUID(),project);
+        fixtures.update("INSERT INTO assets(id,project_id,upload_id,object_key,filename,byte_size,sha256,validation_status) VALUES (?,?,?,?,?,1,?,'VALID')",asset,project,upload,asset.toString(),filename,"a".repeat(64));
+        return asset;
+    }
+
+    @Test
     void editingBriefCorrectionsKeepConditionSourcesAndDeclaredDefaults() throws Exception {
         BrowserApi owner=signedIn("brief-corrections"),outsider=signedIn("brief-outsider");
         String project=json(owner.post("/projects","{\"name\":\"制作需求简报\"}")).path("data").path("id").asText();

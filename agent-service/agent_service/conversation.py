@@ -35,6 +35,7 @@ def function(name, description, properties, required):
 
 
 TOOLS = [
+    function("restrict_asset_scope", "仅当用户明确限定只用哪些素材时，先list_assets核对实际唯一素材ID，再收窄本次及后续会话范围；名称不唯一时询问，不猜测。只能选当前范围的子集。", {"assetIds":{"type":"array","maxItems":100,"items":{"type":"string"}}}, ["assetIds"]),
     function("list_assets", "查看本次固定范围内素材及语音分析状态。", {}, []),
     function("search_evidence", "检索固定素材范围内已发布的证据；sourceKinds选择SPEECH语音、VISUAL实际画面、VISIBLE_TEXT可见文字。语音提及不证明画面出现，帧观察时刻不证明持续区间；索引就绪时使用中文主题、近义表达及词项融合，保留姓名和数字。query为空可浏览原句。检查返回的semanticAvailable和coverage；未命中不证明视频不存在相关内容。",
              {"query": {"type": "string"}, "sourceKinds": {"type":"array","minItems":1,"maxItems":3,"items":{"type":"string","enum":["SPEECH","VISUAL","VISIBLE_TEXT"]}}}, ["query"]),
@@ -173,7 +174,7 @@ def run_conversation(execution, root):
                 answer = {"content": "本轮工具预算已用尽，未能完成核查。请缩小查询范围后再试。", "evidenceIds": []}
                 break
             used += 1
-            if name not in ({"list_assets", "search_evidence", "read_evidence_context", "update_editing_brief"} if requirements else {"list_assets", "search_evidence", "read_evidence_context"}) or not isinstance(arguments, dict):
+            if name not in ({"list_assets", "search_evidence", "read_evidence_context", "restrict_asset_scope", "update_editing_brief"} if requirements else {"list_assets", "search_evidence", "read_evidence_context", "restrict_asset_scope"}) or not isinstance(arguments, dict):
                 result = {"error": "工具或参数不受支持，请使用已声明的业务工具"}
             elif name == "search_evidence" and (not isinstance(arguments.get("query"), str) or len(arguments["query"]) > 256):
                 result = {"error": "search_evidence 需要 query 文本参数，最多 256 字符；请修正后重试"}

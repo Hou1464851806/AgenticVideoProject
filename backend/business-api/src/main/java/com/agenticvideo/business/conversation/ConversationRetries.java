@@ -54,7 +54,7 @@ public class ConversationRetries {
             if(database.queryForObject("SELECT count(*) FROM conversation_turns r JOIN tasks t ON t.id=r.task_id WHERE r.conversation_id=? AND t.status IN ('PENDING','RUNNING','CANCEL_REQUESTED','WAITING_INPUT')",Integer.class,conversation)>0)
                 throw new ResponseStatusException(HttpStatus.CONFLICT,"会话正在处理需求，请完成或停止后重试");
             if(unknownCost(source)&&!acknowledgeUnknownCost)throw new ResponseStatusException(HttpStatus.CONFLICT,"原模型调用回执未知，提供方不支持查询或停止；费用可能已产生。请明确接受未知费用后再重试");
-            ObjectNode input=(ObjectNode)parse(original.get("input_json"));
+            ObjectNode input=(ObjectNode)turns.scopedInput(parse(original.get("input_json")));
             turns.validateRetry(session,input);
             UUID task=UUID.randomUUID(),turn=UUID.randomUUID(),event=UUID.randomUUID();
             input.put("turnId",turn.toString());

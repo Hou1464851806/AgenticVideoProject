@@ -6,7 +6,7 @@ import type { Playback } from './AssetLibrary.vue';
 import type { PlanBase, PlanSelection } from './PlanPanel.vue';
 const props = defineProps<{ projectId: string; editingBase?: PlanBase | null }>();
 const emit = defineEmits<{ play: [value: Playback]; plan: [value: PlanSelection]; session: [value: string]; exported: [requestId:string] }>();
-type Session = { id: string; title: string; assetIds: string[] };
+type Session = { id: string; title: string; assetIds: string[]; naturalLanguage?:boolean };
 type Asset = { id: string; filename: string };
 type Citation = { type: string; id: string; assetId?: string; text?: string; startMs?: number; endMs?: number; observedAtMs?:number; sourceKind?:string; planId?: string; revisionNumber?: number };
 type Message = { id: string; role: string; content: string; references: Citation[] };
@@ -56,6 +56,7 @@ const earlierDrafts=ref<AssistantDraft[]>([]),draftCursor=ref<string|null>(null)
 const visibleDrafts=computed(()=>[...new Map([...assistantDrafts.value,...earlierDrafts.value].map(item=>[item.messageId,item])).values()]);
 const latestTask = ref<History['latestTask']>(null);
 const creating = ref(false);
+let creationKey:string|null=null;
 const sending = ref(false);
 const controlling=ref(false),acknowledgeUnknownCost=ref(false);
 const retryKeys=new Map<string,string>();
@@ -101,8 +102,9 @@ async function loadHistory(rethrow=false) {
   const id = selected.value;
   if (!id) return;
   try {
-    const history = await request<History & {cursor:string}>(`/conversations/${id}/snapshot`);
+    const history = await request<History & {cursor:string;assetIds:string[]}>(`/conversations/${id}/snapshot`);
     const sequence=BigInt(history.cursor.split(':')[1]!);
+    if(alive&&selected.value===id&&sequence>=(appliedCursors.get(id)??0n)&&session.value)session.value.assetIds=history.assetIds;
     if (alive && selected.value === id && sequence>=(appliedCursors.get(id)??0n)) { if(latestTask.value?.taskId!==history.latestTask?.taskId)acknowledgeUnknownCost.value=false; appliedCursors.set(id,sequence); messages.value = history.items; brief.value=history.brief??null;questions.value=history.questions??[];latestTask.value = history.latestTask; activity.value=phaseLabels[history.latestTask?.phase??'']??(history.latestTask?.status==='PENDING'?'正在排队':''); assistantDrafts.value=history.drafts??[]; if(!earlierDrafts.value.length)draftCursor.value=history.draftsNextCursor??null; }
   } catch (failure) { if (alive && selected.value === id) error.value = failure instanceof Error ? failure.message : '无法读取会话'; if(rethrow)throw failure; }
 }
@@ -116,7 +118,7 @@ async function loadEarlierDrafts(){
 }
 async function choose(id: string) {
   references.value[id] ??= [];
-  editing.value[id] ??= {mode:'QUERY',topic:'',minSeconds:10,maxSeconds:30,profile:'LANDSCAPE_720',useBase:false,orderedAssetIds:[]};
+  editing.value[id] ??= {mode:sessions.value.find(item=>item.id===id)?.naturalLanguage?'AUTO':'QUERY',topic:'',minSeconds:10,maxSeconds:30,profile:'LANDSCAPE_720',useBase:false,orderedAssetIds:[]};
   emit('session',id);
   selected.value = id;brief.value=null;questions.value=[];acknowledgeUnknownCost.value=false; messages.value = []; latestTask.value = null; assistantDrafts.value=[]; earlierDrafts.value=[]; draftCursor.value=null; activity.value=''; error.value = '';
   localStorage.setItem(`conversation:${props.projectId}`,id);
@@ -130,6 +132,16 @@ async function create() {
     await choose(created.id);
   } catch (failure) { error.value = failure instanceof Error ? failure.message : '无法创建制作会话'; }
   finally { creating.value = false; }
+}
+async function createChat(){
+  if(creating.value)return;
+  creationKey??=crypto.randomUUID();creating.value=true;error.value='';
+  try{
+    const created=await request<Session>(`/projects/${props.projectId}/conversations`,'POST',{}, {'Idempotency-Key':creationKey});
+    if(!sessions.value.some(item=>item.id===created.id))sessions.value.push(created);
+    creationKey=null;await choose(created.id);
+  }catch(failure){error.value=failure instanceof Error?failure.message:'新聊天创建未确认，请重试';}
+  finally{creating.value=false;}
 }
 function applyBrief(mode:string){
   if(!brief.value)return;
@@ -152,6 +164,7 @@ async function send() {
   const id = selected.value, content = draft.value;
   const condition = settings.value;
   const context: Record<string,unknown> = {};
+  if(condition.mode==='AUTO')context.naturalLanguage=true;
   if(condition.mode==='REQUIREMENTS')context.requirements=true;
   if (['GENERATE_PLAN','MONTAGE'].includes(condition.mode)) {
     if(appliedBrief.value[id])context.briefRevision=appliedBrief.value[id];
@@ -206,7 +219,8 @@ onUnmounted(() => { alive = false; clearInterval(timer); });
 
 <template>
   <section class="conversation-panel">
-    <form @submit.prevent="create">
+    <button type="button" :disabled="creating" @click="createChat">新聊天</button>
+    <form v-if="!session?.naturalLanguage" @submit.prevent="create">
       <label for="session-title">会话名称</label><input id="session-title" v-model="title" required maxlength="120" placeholder="例如：寻找开场原句">
       <fieldset v-if="assets.length"><legend>新会话的固定素材范围</legend>
         <label v-for="asset in assets" :key="asset.id" class="choice"><input v-model="scope" type="checkbox" :value="asset.id">{{ asset.filename }}</label>
@@ -263,7 +277,7 @@ onUnmounted(() => { alive = false; clearInterval(timer); });
         <button type="button" class="secondary" :disabled="controlling || (latestTask.externalEffects?.unknownCost && !acknowledgeUnknownCost)" @click="control(true)">重试原需求</button>
       </template>
       <form @submit.prevent="send">
-        <label for="intent-select">需求类型</label><select id="intent-select" v-model="settings.mode"><option value="QUERY">查询素材</option><option value="REQUIREMENTS">整理制作需求</option><option value="GENERATE_PLAN">生成讲话方案</option><option value="MONTAGE">生成跨素材混剪</option></select>
+        <template v-if="settings.mode!=='AUTO'"><label for="intent-select">需求类型</label><select id="intent-select" v-model="settings.mode"><option value="QUERY">查询素材</option><option value="REQUIREMENTS">整理制作需求</option><option value="GENERATE_PLAN">生成讲话方案</option><option value="MONTAGE">生成跨素材混剪</option></select></template>
         <fieldset v-if="['GENERATE_PLAN','MONTAGE'].includes(settings.mode)"><legend>本次明确制作条件</legend>
           <label for="plan-topic">方案主题</label><input id="plan-topic" v-model="settings.topic" required maxlength="120">
           <label for="minimum-duration">最短时长（秒）</label><input id="minimum-duration" v-model.number="settings.minSeconds" type="number" min="0.001" max="3600" step="0.001" required>
