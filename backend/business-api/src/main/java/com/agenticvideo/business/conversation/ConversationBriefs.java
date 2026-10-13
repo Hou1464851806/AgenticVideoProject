@@ -23,7 +23,7 @@ public class ConversationBriefs {
         if(!fields.isObject()||fields.isEmpty())throw new ResponseStatusException(BAD_REQUEST,"简报纠正须包含条件");
         fields.fields().forEachRemaining(entry->{
             String name=entry.getKey();JsonNode condition=entry.getValue(),value=condition.path("value");
-            if(!Set.of("topic","count","duration","assetIds","forbiddenContent","forbiddenAssetIds","profile").contains(name)
+            if(!Set.of("topic","count","duration","assetIds","forbiddenContent","forbiddenAssetIds","profile","orderedAssetIds").contains(name)
                     || !condition.isObject() || !Set.of("EXPLICIT","DEFAULT").contains(condition.path("basis").asText()))
                 throw new ResponseStatusException(BAD_REQUEST,"简报条件或来源类型无效");
             condition.fieldNames().forEachRemaining(key->{if(!Set.of("value","basis").contains(key))throw new ResponseStatusException(BAD_REQUEST,"简报来源由业务系统保存");});
@@ -35,7 +35,7 @@ public class ConversationBriefs {
                 default -> value.isArray()&&value.size()<=100;
             };
             if(!valid)throw new ResponseStatusException(BAD_REQUEST,"简报条件值不符合要求");
-            if(name.equals("assetIds")||name.equals("forbiddenAssetIds")){
+            if(name.equals("assetIds")||name.equals("forbiddenAssetIds")||name.equals("orderedAssetIds")){
                 var scope=new java.util.HashSet<String>();input.path("assetIds").forEach(asset->scope.add(asset.asText()));
                 var seen=new java.util.HashSet<String>();
                 for(var asset:value)if(!asset.isTextual()||!scope.contains(asset.asText())||!seen.add(asset.asText()))throw new ResponseStatusException(BAD_REQUEST,"简报素材必须属于本轮固定范围且不能重复");
@@ -68,6 +68,7 @@ public class ConversationBriefs {
         editing.set("minDurationMs",fields.path("duration").path("value").path("minMs"));
         editing.set("maxDurationMs",fields.path("duration").path("value").path("maxMs"));
         editing.put("profile",fields.path("profile").path("value").asText("LANDSCAPE_720"));
+        if("MONTAGE".equals(editing.path("kind").asText())&&fields.has("orderedAssetIds"))editing.set("orderedAssetIds",fields.path("orderedAssetIds").path("value"));
         editing.set("forbiddenContent",fields.has("forbiddenContent")?fields.path("forbiddenContent").path("value"):json.createArrayNode());
         var forbidden=new java.util.HashSet<String>();fields.path("forbiddenAssetIds").path("value").forEach(asset->forbidden.add(asset.asText()));
         var selected=json.createArrayNode();

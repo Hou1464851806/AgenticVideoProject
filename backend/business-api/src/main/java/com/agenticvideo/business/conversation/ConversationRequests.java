@@ -23,7 +23,7 @@ public class ConversationRequests {
 
     public void validate(JsonNode input,JsonNode request){
         if(!input.path("context").path("naturalLanguage").asBoolean(false))throw new ResponseStatusException(BAD_REQUEST,"本轮不是自然语言需求");
-        if(!java.util.Set.of("GENERATE_SPEECH","DISCUSS","QUERY","CLARIFY","CANCEL").contains(request.path("intent").asText())||!request.path("newRequirement").isBoolean())throw new ResponseStatusException(BAD_REQUEST,"需求意图不受支持");
+        if(!java.util.Set.of("GENERATE_SPEECH","GENERATE_MONTAGE","DISCUSS","QUERY","CLARIFY","CANCEL").contains(request.path("intent").asText())||!request.path("newRequirement").isBoolean())throw new ResponseStatusException(BAD_REQUEST,"需求意图不受支持");
         if(!request.path("fields").isObject())throw new ResponseStatusException(BAD_REQUEST,"需求条件须为对象");
         if(!request.path("fields").isEmpty())briefs.validate(input,request.path("fields"));
     }
@@ -46,7 +46,7 @@ public class ConversationRequests {
         if(fresh)briefs.start(conversation,(UUID)task.get("id"),UUID.fromString(input.path("messageId").asText()));
         ObjectNode fields=request.path("fields").deepCopy();
         JsonNode current=(JsonNode)briefs.snapshot(conversation).get("fields");
-        if(request.path("intent").asText().equals("GENERATE_SPEECH")){
+        if(java.util.Set.of("GENERATE_SPEECH","GENERATE_MONTAGE").contains(request.path("intent").asText())){
             defaults(fields,current,"duration",Map.of("minMs",30000,"maxMs",45000));
             defaults(fields,current,"count",1);defaults(fields,current,"profile","LANDSCAPE_720");
         }
@@ -59,8 +59,9 @@ public class ConversationRequests {
             database.update("INSERT INTO conversation_message_scopes(message_id,asset_ids_json) VALUES (?,?::jsonb) ON CONFLICT(message_id) DO UPDATE SET asset_ids_json=excluded.asset_ids_json",UUID.fromString(input.path("messageId").asText()),scope.toString());
             database.update("UPDATE conversations SET asset_ids_json=?::jsonb WHERE id=?",scope.toString(),conversation);
         }
-        if(request.path("intent").asText().equals("GENERATE_SPEECH")){
+        if(java.util.Set.of("GENERATE_SPEECH","GENERATE_MONTAGE").contains(request.path("intent").asText())){
             ObjectNode context=json.createObjectNode();context.put("briefRevision",((Number)briefs.snapshot(conversation).get("revision")).longValue());context.set("editing",json.createObjectNode());
+            if("GENERATE_MONTAGE".equals(request.path("intent").asText()))((ObjectNode)context.path("editing")).put("kind","MONTAGE");
             if("ANSWER".equals(request.path("questionAction").asText())){
                 JsonNode original=input.path("pendingQuestion").path("originalRequest").path("editing");
                 ObjectNode target=(ObjectNode)context.path("editing");

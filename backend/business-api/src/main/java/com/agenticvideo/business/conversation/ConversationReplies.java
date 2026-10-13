@@ -35,7 +35,7 @@ public class ConversationReplies {
         var waiting=lock(conversation,question);
         requireOpen(waiting);
         if(!source.equals(waiting.source().get("id"))||!task.get("project_id").equals(waiting.source().get("project_id")))throw new ResponseStatusException(NOT_FOUND,"原问题不属于本项目");
-        if("ANSWER".equals(action)&&"GENERATE_SPEECH".equals(request.path("intent").asText())){
+        if("ANSWER".equals(action)&&java.util.Set.of("GENERATE_SPEECH","GENERATE_MONTAGE").contains(request.path("intent").asText())){
             for(var field:pending.path("fields"))if(!request.path("fields").has(field.asText()))throw new ResponseStatusException(BAD_REQUEST,"待澄清条件尚未补齐，不能默认后继续制作");
         }
         if("AMBIGUOUS".equals(action))return;

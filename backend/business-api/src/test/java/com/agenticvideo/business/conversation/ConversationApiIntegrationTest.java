@@ -279,6 +279,43 @@ class ConversationApiIntegrationTest {
         assertEquals(List.of(allowed.toString()),new ObjectMapper().convertValue(retry.path("input").path("assetIds"),List.class));
     }
 
+    @Test
+    void naturalMontageBindsRequiredSourcesSeparatelyFromTheOptionalScope() throws Exception {
+        BrowserApi owner=signedIn("natural-montage");
+        String project=json(owner.post("/projects","{\"name\":\"自然语言跨素材编排\"}")).path("data").path("id").asText();
+        var a=newChatAsset(java.util.UUID.fromString(project),"A.mp4");var b=newChatAsset(java.util.UUID.fromString(project),"B.mp4");
+        String session=json(owner.post("/projects/"+project+"/conversations","{}","montage-chat")).path("data").path("id").asText();
+        String first=json(owner.post("/conversations/"+session+"/turns","{\"content\":\"只用A和B，从中选合适的讲话，做一条短视频\",\"context\":{\"naturalLanguage\":true}}","optional-montage-message")).path("data").path("taskId").asText();
+        JsonNode claim=json(internal(first,"claim",Map.of("executorId","montage-natural-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        var optional=naturalAdmission(first,claim,"optional",Map.of("intent","GENERATE_SPEECH","newRequirement",true,"fields",Map.of("topic",Map.of("value","成本","basis","EXPLICIT"),"assetIds",Map.of("value",List.of(a,b),"basis","EXPLICIT"))));
+        assertEquals(200,optional.statusCode(),optional.body());
+        assertEquals(false,json(optional).path("data").path("editing").has("orderedAssetIds"));
+        assertEquals(200,internal(first,"fail",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","next-example","code","CONVERSATION_FAILED","message","停止演示这条")).statusCode());
+        var nextResponse=owner.post("/conversations/"+session+"/turns","{\"content\":\"另做一条混剪，先B后A，两份都要用，竖屏，严格8至12秒\",\"context\":{\"naturalLanguage\":true}}","required-montage-message");
+        String next=json(nextResponse).path("data").path("taskId").asText();
+        JsonNode nextClaim=json(internal(next,"claim",Map.of("executorId","montage-natural-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        var arguments=Map.<String,Object>of("intent","GENERATE_MONTAGE","newRequirement",true,"fields",Map.of("topic",Map.of("value","成本混剪","basis","EXPLICIT"),"orderedAssetIds",Map.of("value",List.of(b,a),"basis","EXPLICIT"),"duration",Map.of("value",Map.of("minMs",8000,"maxMs",12000),"basis","EXPLICIT"),"profile",Map.of("value","PORTRAIT_720","basis","EXPLICIT")));
+        var admitted=naturalAdmission(next,nextClaim,"required",arguments);assertEquals(200,admitted.statusCode(),admitted.body());
+        JsonNode fixed=json(admitted).path("data");assertEquals("MONTAGE",fixed.path("editing").path("kind").asText());
+        assertEquals(List.of(b.toString(),a.toString()),new ObjectMapper().convertValue(fixed.path("editing").path("orderedAssetIds"),List.class));
+        assertEquals(8000,fixed.path("editing").path("minDurationMs").asLong());assertEquals("PORTRAIT_720",fixed.path("editing").path("profile").asText());
+        assertEquals(json(nextResponse).path("data").path("messageId"),fixed.path("brief").path("fields").path("orderedAssetIds").path("sourceMessageId"));
+        assertEquals(fixed,json(naturalAdmission(next,nextClaim,"required",arguments)).path("data"));
+        assertEquals(false,nextClaim.path("input").has("editing"));
+        assertEquals(200,internal(next,"fail",Map.of("attemptId",nextClaim.path("attemptId").asText(),"leaseToken",nextClaim.path("leaseToken").asText(),"producerKey","montage-failure","code","CONVERSATION_FAILED","message","暂时失败")).statusCode());
+        var retried=owner.post("/conversations/"+session+"/tasks/"+next+"/retry","{}","montage-retry");assertEquals(202,retried.statusCode(),retried.body());
+        String retryTask=json(retried).path("data").path("taskId").asText();
+        JsonNode retryClaim=json(internal(retryTask,"claim",Map.of("executorId","montage-natural-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        assertEquals(fixed.path("editing"),retryClaim.path("input").path("editing"));
+        assertEquals(200,internal(retryTask,"fail",Map.of("attemptId",retryClaim.path("attemptId").asText(),"leaseToken",retryClaim.path("leaseToken").asText(),"producerKey","next-example","code","CONVERSATION_FAILED","message","停止演示这条")).statusCode());
+        String conflict=json(owner.post("/conversations/"+session+"/turns","{\"content\":\"两份都必须参与，又禁止使用B\",\"context\":{\"naturalLanguage\":true}}","conflicting-montage")).path("data").path("taskId").asText();
+        JsonNode conflictClaim=json(internal(conflict,"claim",Map.of("executorId","montage-natural-test","claimRequestId",java.util.UUID.randomUUID()))).path("data");
+        var rejected=naturalAdmission(conflict,conflictClaim,"invalid-montage",Map.of("intent","GENERATE_MONTAGE","newRequirement",true,"fields",Map.of("topic",Map.of("value","矛盾混剪","basis","EXPLICIT"),"orderedAssetIds",Map.of("value",List.of(a,b),"basis","EXPLICIT"),"forbiddenAssetIds",Map.of("value",List.of(b),"basis","EXPLICIT"))));
+        assertEquals(400,rejected.statusCode(),rejected.body());
+        assertEquals(2,json(owner.get("/projects/"+project+"/plans")).path("data").path("items").size());
+
+    }
+
     private HttpResponse<String> naturalAdmission(String task,JsonNode claim,String key,Map<String,Object> arguments) throws Exception {
         return internal(task,"tool",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey",key,"name","submit_production_request","arguments",arguments));
     }

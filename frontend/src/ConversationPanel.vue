@@ -29,10 +29,10 @@ const useChangedBase=ref<Record<string,boolean>>({});
 const appliedBrief=ref<Record<string,number>>({});
 const questionKeys=new Map<string,{serialized:string;key:string}>();
 const openQuestions=computed(()=>questions.value.filter(item=>item.status==='OPEN'));
-const briefLabels:Record<string,string>={topic:'主题',count:'数量',duration:'硬时长',assetIds:'素材范围',forbiddenAssetIds:'禁用素材',forbiddenContent:'禁用内容',profile:'画幅'};
+const briefLabels:Record<string,string>={topic:'主题',count:'数量',duration:'硬时长',assetIds:'素材范围',orderedAssetIds:'必须参与的素材顺序',forbiddenAssetIds:'禁用素材',forbiddenContent:'禁用内容',profile:'画幅'};
 function briefValue(name:string,value:unknown):string{
   if(name==='duration'&&value&&typeof value==='object'&&'minMs' in value&&'maxMs' in value)return `${Number(value.minMs)/1000}–${Number(value.maxMs)/1000} 秒`;
-  if(Array.isArray(value))return value.map(item=>['assetIds','forbiddenAssetIds'].includes(name)?assets.value.find(asset=>asset.id===item)?.filename??String(item):String(item)).join('、')||'无';
+  if(Array.isArray(value))return value.map(item=>['assetIds','orderedAssetIds','forbiddenAssetIds'].includes(name)?assets.value.find(asset=>asset.id===item)?.filename??String(item):String(item)).join('、')||'无';
   if(name==='profile')return value==='LANDSCAPE_720'?'横屏 720p':'竖屏 720p';
   return String(value);
 }

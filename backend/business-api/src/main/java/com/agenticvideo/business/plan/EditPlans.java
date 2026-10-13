@@ -116,7 +116,7 @@ public class EditPlans {
             JsonNode output=json.valueToTree(validated.content()).path("outputs").get(0);
             var order=new java.util.ArrayList<String>();
             for(var clip:output.path("clips"))order.add(clip.path("reason").asText());
-            content="方案 V"+number+" 已保存："+input.path("editing").path("topic").asText()+"。内容顺序："+String.join(" → ",order)+"。实际时长 "+(output.path("durationMs").asLong()/1000.0)+" 秒，"+("PORTRAIT_720".equals(output.path("render").path("profile").asText())?"竖屏":"横屏")+"，保留原声并提供原文字幕。请展开方案核查片段和证据；原视频已有停顿可能随选段保留。";
+            content="方案 V"+number+" 已保存："+input.path("editing").path("topic").asText()+"。内容顺序："+String.join(" → ",order)+"。实际时长 "+(output.path("durationMs").asLong()/1000.0)+" 秒，"+("PORTRAIT_720".equals(output.path("render").path("profile").asText())?"竖屏":"横屏")+("MONTAGE".equals(input.path("editing").path("kind").asText())?"，有原声片段保留原声，无原声片段保持静音，字幕来自原语音。":"，保留原声并提供原文字幕。")+"请展开方案核查片段和证据；原视频已有停顿可能随选段保留。";
         }
         publication.put("content", content);
         publication.set("evidenceIds", json.valueToTree(validated.evidence()));

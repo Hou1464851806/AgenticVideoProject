@@ -26,8 +26,8 @@ public class ConversationQuestions {
     /** Runs inside the task completion transaction, after current attempt validation. */
     public Object publish(Map<String,Object> task,JsonNode input,JsonNode question){
         String prompt=question.path("prompt").asText(),reason=question.path("reason").asText();JsonNode fields=question.path("fields");
-        if(prompt.isBlank()||prompt.length()>2000||reason.isBlank()||reason.length()>500||!fields.isArray()||fields.isEmpty()||fields.size()>7)throw new ResponseStatusException(BAD_REQUEST,"澄清问题必须明确缺失或冲突条件");
-        for(var field:fields)if(!java.util.Set.of("topic","count","duration","assetIds","forbiddenContent","forbiddenAssetIds","profile").contains(field.asText()))throw new ResponseStatusException(BAD_REQUEST,"澄清条件无效");
+        if(prompt.isBlank()||prompt.length()>2000||reason.isBlank()||reason.length()>500||!fields.isArray()||fields.isEmpty()||fields.size()>8)throw new ResponseStatusException(BAD_REQUEST,"澄清问题必须明确缺失或冲突条件");
+        for(var field:fields)if(!java.util.Set.of("topic","count","duration","assetIds","forbiddenContent","forbiddenAssetIds","profile","orderedAssetIds").contains(field.asText()))throw new ResponseStatusException(BAD_REQUEST,"澄清条件无效");
         UUID conversation=UUID.fromString(input.path("conversationId").asText()),id=UUID.randomUUID();
         database.queryForMap("SELECT id FROM conversations WHERE id=? FOR UPDATE",conversation);
         if(input.path("context").path("naturalLanguage").asBoolean(false))briefs.defer(conversation,(UUID)task.get("id"),UUID.fromString(input.path("messageId").asText()),fields);
