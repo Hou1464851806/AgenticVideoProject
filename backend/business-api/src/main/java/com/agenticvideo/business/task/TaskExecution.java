@@ -207,6 +207,7 @@ public class TaskExecution {
                 return outcome;
             }
             if ("AGENT_TURN".equals(task.get("type"))) {
+                input=conversations.executionInput(id,input);
                 if("CONVERSATION_WAITING".equals(request.resultType())){
                     Object outcome=questions.publish(task,input,request.result().path("question"));
                     String receipt;try{receipt=json.writeValueAsString(outcome);}catch(java.io.IOException invalid){throw new IllegalStateException(invalid);}
@@ -431,7 +432,7 @@ public class TaskExecution {
             requireAttempt(task, request.attemptId(), request.leaseToken(), true);
             if (!"AGENT_TURN".equals(task.get("type")) || !"RUNNING".equals(task.get("status")))
                 throw new ResponseStatusException(CONFLICT, "任务没有当前方案校验资格");
-            try { return plans.validate(task, json.readTree(task.get("input_json").toString()), request.producerKey(), request.proposal()); }
+            try { return plans.validate(task, conversations.executionInput(id,json.readTree(task.get("input_json").toString())), request.producerKey(), request.proposal()); }
             catch (java.io.IOException invalid) { throw new IllegalStateException(invalid); }
         });
     }

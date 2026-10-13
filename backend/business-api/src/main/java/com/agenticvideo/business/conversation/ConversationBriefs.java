@@ -19,7 +19,7 @@ public class ConversationBriefs {
     private final ObjectMapper json;
     public ConversationBriefs(JdbcTemplate database,ObjectMapper json){this.database=database;this.json=json;}
     public void validate(JsonNode input,JsonNode fields){
-        if(!input.path("context").path("requirements").asBoolean(false))throw new ResponseStatusException(BAD_REQUEST,"本轮不是需求简报整理");
+        if(!input.path("context").path("requirements").asBoolean(false)&&!input.path("context").path("naturalLanguage").asBoolean(false))throw new ResponseStatusException(BAD_REQUEST,"本轮不是需求简报整理");
         if(!fields.isObject()||fields.isEmpty())throw new ResponseStatusException(BAD_REQUEST,"简报纠正须包含条件");
         fields.fields().forEachRemaining(entry->{
             String name=entry.getKey();JsonNode condition=entry.getValue(),value=condition.path("value");

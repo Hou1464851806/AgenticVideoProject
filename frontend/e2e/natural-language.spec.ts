@@ -1,6 +1,48 @@
 import {test,expect} from '@playwright/test';
 import {renderSeed} from './fixtures/render-seed';
 
+test('real Agent generates a speech plan directly and summarizes the saved version in chat',async({page})=>{
+  test.setTimeout(240000);
+  const seed=await renderSeed(page);
+  await page.goto(`/?project=${seed.projectId}`);
+  const created=page.waitForResponse(reply=>reply.request().method()==='POST'&&reply.url().endsWith('/conversations'));
+  await page.getByRole('button',{name:'新聊天',exact:true}).click();
+  const session=(await(await created).json()).data;
+  await page.getByLabel('对话输入',{exact:true}).fill('只用 labelled-speech.mp4，制作一条介绍视频制作步骤的竖屏讲话短视频，严格7至11秒，只生成方案。');
+  const accepted=page.waitForResponse(reply=>reply.request().method()==='POST'&&reply.url().endsWith('/turns'));
+  await page.getByRole('button',{name:'发送需求',exact:true}).click();
+  const task=(await(await accepted).json()).data.taskId;
+  await expect.poll(async()=>['SUCCEEDED','FAILED','CANCELLED','WAITING_INPUT'].includes((await(await page.request.get(`/api/v1/tasks/${task}`)).json()).data.status),{timeout:180000}).toBe(true);
+  expect((await(await page.request.get(`/api/v1/tasks/${task}`)).json()).data.status).toBe('SUCCEEDED');
+  const snapshot=(await(await page.request.get(`/api/v1/conversations/${session.id}/snapshot`)).json()).data;
+  const reply=snapshot.items.at(-1),reference=reply.references.find((item:{type:string})=>item.type==='PLAN_REVISION');
+  expect(reference).toBeTruthy();
+  const version=(await(await page.request.get(`/api/v1/revisions/${reference.id}`)).json()).data;
+  const output=version.content.outputs[0];
+  expect(output.durationMs).toBeGreaterThanOrEqual(7000);expect(output.durationMs).toBeLessThanOrEqual(11000);
+  expect(output.render.profile).toBe('PORTRAIT_720');expect(output.subtitles.enabled).toBe(true);
+  expect(reply.content).toContain(`V${reference.revisionNumber}`);
+  expect(reply.content).toContain(`${output.durationMs/1000}`);expect(reply.content).toContain('竖屏');expect(reply.content).toContain('字幕');
+  for(const clip of output.clips)expect(reply.content).toContain(clip.reason);
+  await expect(page.getByRole('article',{name:'助手答复',exact:true}).last()).toContainText(reply.content);
+  await page.reload();await expect(page.getByRole('article',{name:'助手答复',exact:true}).last()).toContainText(reply.content);
+  const send=async(content:string)=>{
+    await page.getByLabel('对话输入',{exact:true}).fill(content);
+    const accepted=page.waitForResponse(reply=>reply.request().method()==='POST'&&reply.url().endsWith('/turns'));
+    await page.getByRole('button',{name:'发送需求',exact:true}).click();
+    const task=(await(await accepted).json()).data.taskId;
+    await expect.poll(async()=>['SUCCEEDED','FAILED','CANCELLED','WAITING_INPUT'].includes((await(await page.request.get(`/api/v1/tasks/${task}`)).json()).data.status),{timeout:180000}).toBe(true);
+  expect((await(await page.request.get(`/api/v1/tasks/${task}`)).json()).data.status).toBe('SUCCEEDED');
+    return (await(await page.request.get(`/api/v1/conversations/${session.id}/snapshot`)).json()).data;
+  };
+  const discussion=await send('只聊聊剪辑思路，先不要生成方案或修改条件。');
+  expect(discussion.items.at(-1).references.some((item:{type:string})=>item.type==='PLAN_REVISION')).toBe(false);
+  const fresh=await send('另做一条介绍第三步导出的短视频，不继承上一条条件。');
+  expect(fresh.brief.fields.duration).toMatchObject({value:{minMs:30000,maxMs:45000},basis:'DEFAULT'});
+  expect(fresh.brief.fields.profile).toMatchObject({value:'LANDSCAPE_720',basis:'DEFAULT'});
+  expect(fresh.items.at(-1).references.some((item:{type:string})=>item.type==='PLAN_REVISION')).toBe(false);
+});
+
 test('new chat welcomes the user before the first message and survives reopening',async({page})=>{
   const post=async(path:string,data:unknown,key=crypto.randomUUID())=>{
     const csrf=(await(await page.request.get('/api/v1/auth/csrf')).json()).data.csrfToken;
@@ -40,7 +82,8 @@ test('real Agent chooses speech evidence and narrows a new chat through natural 
   const response=await accepted;expect(response.status()).toBe(202);
   expect(response.request().postDataJSON().context).toEqual({naturalLanguage:true});
   const task=(await response.json()).data.taskId;
-  await expect.poll(async()=>(await(await page.request.get(`/api/v1/tasks/${task}`)).json()).data.status,{timeout:180000}).toBe('SUCCEEDED');
+  await expect.poll(async()=>['SUCCEEDED','FAILED','CANCELLED','WAITING_INPUT'].includes((await(await page.request.get(`/api/v1/tasks/${task}`)).json()).data.status),{timeout:180000}).toBe(true);
+  expect((await(await page.request.get(`/api/v1/tasks/${task}`)).json()).data.status).toBe('SUCCEEDED');
   const answer=page.getByRole('article',{name:'助手答复',exact:true}).last();
   await expect(answer).toContainText('张明');
   await expect(answer.getByRole('button',{name:'核查引用原视频',exact:true}).first()).toBeVisible();

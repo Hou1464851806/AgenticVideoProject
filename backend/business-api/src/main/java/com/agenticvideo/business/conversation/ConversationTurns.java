@@ -13,6 +13,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ConversationTurns {
+    private final ConversationRequests requests;
     private final ConversationBriefs briefs;
     private final com.agenticvideo.business.search.EvidenceSearch evidenceSearch;
     private final long requestMaxBytes;
@@ -24,12 +25,12 @@ public class ConversationTurns {
     private final com.agenticvideo.business.analysis.SpeechTimings timings;
     private final com.agenticvideo.business.render.ProductionCommands production;
 
-    public ConversationTurns(ConversationBriefs briefs,com.agenticvideo.business.search.EvidenceSearch evidenceSearch,JdbcTemplate database, ObjectMapper json, PlatformTransactionManager manager,
+    public ConversationTurns(ConversationRequests requests,ConversationBriefs briefs,com.agenticvideo.business.search.EvidenceSearch evidenceSearch,JdbcTemplate database, ObjectMapper json, PlatformTransactionManager manager,
             com.agenticvideo.business.plan.EditPlans plans, com.agenticvideo.business.analysis.SpeechTimings timings, com.agenticvideo.business.render.ProductionCommands production,
             @org.springframework.beans.factory.annotation.Value("${conversation.model-record.request-max-bytes:16777216}") long requestMaxBytes,
             @org.springframework.beans.factory.annotation.Value("${conversation.model-record.response-max-bytes:4194304}") long responseMaxBytes) {
         if (requestMaxBytes < 1 || responseMaxBytes < 1) throw new IllegalArgumentException("模型记录字节上限必须为正数");
-        this.briefs=briefs;
+        this.requests=requests;this.briefs=briefs;
         this.evidenceSearch=evidenceSearch;
         this.requestMaxBytes = requestMaxBytes;
         this.responseMaxBytes = responseMaxBytes;
@@ -46,7 +47,8 @@ public class ConversationTurns {
         if (key.isBlank() || key.length() > 120) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "发送幂等键不符合要求");
         boolean replayExists=database.queryForObject("SELECT count(*) FROM conversation_turns WHERE conversation_id=? AND request_key=?",Integer.class,sessionId,key)>0;
         boolean editingIntent=request.context()!=null&&request.context().has("editing");
-        var preparation=replayExists||editingIntent||(request.context()!=null&&request.context().path("requirements").asBoolean(false))?null:production.prepare(sessionId,request.content());
+        boolean understandingIntent=request.context()!=null&&request.context().path("naturalLanguage").asBoolean(false)&&!production.direct(request.content());
+        var preparation=replayExists||editingIntent||understandingIntent||(request.context()!=null&&request.context().path("requirements").asBoolean(false))?null:production.prepare(sessionId,request.content());
         return transactions.execute(tx -> {
             var session = database.queryForMap("SELECT * FROM conversations WHERE id=? FOR UPDATE", sessionId);
             String payload = encode(Map.of("content", request.content(),
@@ -67,7 +69,7 @@ public class ConversationTurns {
             long sequence = database.queryForObject("SELECT coalesce(max(message_seq),0)+1 FROM conversation_messages WHERE conversation_id=?", Long.class, sessionId);
             database.update("INSERT INTO conversation_messages(id,conversation_id,message_seq,role,content,references_json) VALUES (?,?,?,'USER',?,?::jsonb)",
                     message, sessionId, sequence, request.content(), encode(request.references() == null ? List.of() : request.references()));
-            var command=editingIntent||(request.context()!=null&&request.context().path("requirements").asBoolean(false))?null:production.route(session,message,request.content(),preparation);
+            var command=editingIntent||understandingIntent||(request.context()!=null&&request.context().path("requirements").asBoolean(false))?null:production.route(session,message,request.content(),preparation);
             if(command!=null){
                 database.update("INSERT INTO tasks(id,project_id,type,status,input_json) VALUES (?,?,'PRODUCTION_COMMAND','SUCCEEDED',?::jsonb)",task,session.get("project_id"),encode(Map.of("messageId",message,"conversationId",sessionId)));
                 database.update("INSERT INTO conversation_turns(id,conversation_id,message_id,task_id,request_key,request_json) VALUES (?,?,?,?,?,?::jsonb)",turn,sessionId,message,task,key,payload);
@@ -87,6 +89,8 @@ public class ConversationTurns {
                 var view=new java.util.LinkedHashMap<String,Object>();
                 view.put("planId",session.get("view_plan_id"));view.put("revisionId",session.get("view_revision_id"));
                 fixedInput.put("view",view);
+                fixedInput.put("assets",database.queryForList("SELECT id AS \"assetId\",filename,duration_ms AS \"durationMs\" FROM assets WHERE project_id=? AND validation_status='VALID' AND id IN (SELECT value::uuid FROM jsonb_array_elements_text(?::jsonb)) ORDER BY id",session.get("project_id"),encode(fixedInput.get("assetIds"))));
+                fixedInput.put("brief",briefs.snapshot(sessionId));
             }
             if(effectiveContext!=null&&(effectiveContext.path("requirements").asBoolean(false)||effectiveContext.has("briefRevision")))fixedInput.put("brief",startsNewRequirement?Map.of("fields",Map.of()):briefs.snapshot(sessionId));
             if (effectiveContext != null && effectiveContext.has("editing"))
@@ -216,6 +220,7 @@ public class ConversationTurns {
         String name = request.name();
         var arguments = request.arguments();
         var fields = switch (name) {
+            case "submit_production_request" -> java.util.Set.of("intent","newRequirement","fields");
             case "restrict_asset_scope" -> java.util.Set.of("assetIds");
             case "update_editing_brief" -> java.util.Set.of("fields");
             case "list_assets" -> java.util.Set.<String>of();
@@ -243,11 +248,12 @@ public class ConversationTurns {
     }
     public record ToolPreparation(String payload,Object cached) {}
     public Object executeTool(Map<String,Object> task,com.fasterxml.jackson.databind.JsonNode input,com.agenticvideo.business.task.TaskController.Tool request) {
-        input=scopedInput(input);
+        input=executionInput((UUID)task.get("id"),input);
         String name=request.name();var arguments=request.arguments();
         String scope = input.path("assetIds").toString();
         Object result;
-        if("restrict_asset_scope".equals(name)) {
+        if("submit_production_request".equals(name)){requests.validate(input,arguments);result=arguments;}
+        else if("restrict_asset_scope".equals(name)) {
             var selected=arguments.path("assetIds");
             if(!selected.isArray()||selected.size()>100)throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"素材范围必须为最多100项的列表");
             var allowed=new java.util.HashSet<UUID>();for(var asset:input.path("assetIds"))allowed.add(identifier(asset.asText()));
@@ -343,6 +349,7 @@ public class ConversationTurns {
         }
         boolean live=Boolean.TRUE.equals(database.queryForObject("SELECT EXISTS(SELECT 1 FROM tasks t JOIN task_attempts a ON a.id=t.current_attempt_id WHERE t.id=? AND t.status='RUNNING' AND a.lease_expires_at>clock_timestamp())",Boolean.class,task.get("id")));
         if(!live)throw new ResponseStatusException(HttpStatus.CONFLICT,"工具回执已经失去有效执行权");
+        if("submit_production_request".equals(request.name()))result=requests.admit(task,input,json.valueToTree(result));
         if("restrict_asset_scope".equals(request.name())) {
             String selected=value.path("assetIds").toString();
             database.update("INSERT INTO conversation_message_scopes(message_id,asset_ids_json) VALUES (?,?::jsonb) ON CONFLICT(message_id) DO UPDATE SET asset_ids_json=excluded.asset_ids_json",identifier(input.path("messageId").asText()),selected);
@@ -351,6 +358,8 @@ public class ConversationTurns {
         database.update("UPDATE conversation_tool_receipts SET result_json=?::jsonb,status='SUCCEEDED' WHERE task_id=? AND producer_key=?",encode(result),task.get("id"),request.producerKey());
         return result;
     }
+
+    public com.fasterxml.jackson.databind.JsonNode executionInput(UUID task,com.fasterxml.jackson.databind.JsonNode input){return scopedInput(requests.execution(task,input));}
 
     com.fasterxml.jackson.databind.JsonNode scopedInput(com.fasterxml.jackson.databind.JsonNode input) {
         if(!input.hasNonNull("messageId"))return input;

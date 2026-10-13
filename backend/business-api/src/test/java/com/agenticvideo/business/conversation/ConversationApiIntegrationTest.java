@@ -83,6 +83,35 @@ class ConversationApiIntegrationTest {
         assertEquals(404,outside.statusCode(),outside.body());
     }
 
+    @Test
+    void naturalProductionIsAdmittedAfterUnderstandingAndKeepsOriginalInput() throws Exception {
+        BrowserApi owner=signedIn("natural-production");
+        String project=json(owner.post("/projects","{\"name\":\"一句话制作\"}")).path("data").path("id").asText();
+        newChatAsset(java.util.UUID.fromString(project),"讲话.mp4");
+        String session=json(owner.post("/projects/"+project+"/conversations","{}","production-chat")).path("data").path("id").asText();
+        String task=json(owner.post("/conversations/"+session+"/turns","{\"content\":\"做一条讲成本的竖屏短视频\",\"context\":{\"naturalLanguage\":true}}","production-message")).path("data").path("taskId").asText();
+        var claimRequest=Map.of("executorId","natural-production-test","claimRequestId",java.util.UUID.randomUUID());
+        JsonNode claim=json(internal(task,"claim",claimRequest)).path("data");
+        assertEquals(false,claim.path("input").has("editing"));
+        var request=Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","understood-request","name","submit_production_request","arguments",Map.of("intent","GENERATE_SPEECH","newRequirement",true,"fields",Map.of("topic",Map.of("value","成本","basis","EXPLICIT"),"profile",Map.of("value","PORTRAIT_720","basis","EXPLICIT"))));
+        var response=internal(task,"tool",request);assertEquals(200,response.statusCode(),response.body());
+        JsonNode execution=json(response).path("data");
+        assertEquals(30000,execution.path("editing").path("minDurationMs").asInt());
+        assertEquals(45000,execution.path("editing").path("maxDurationMs").asInt());
+        org.junit.jupiter.api.Assertions.assertFalse(execution.path("requirementId").asText().isBlank());
+        assertEquals(execution,json(internal(task,"tool",request)).path("data"));
+        assertEquals(claim.path("input"),json(internal(task,"claim",claimRequest)).path("data").path("input"));
+        JsonNode brief=json(owner.get("/conversations/"+session+"/snapshot")).path("data").path("brief").path("fields");
+        assertEquals("DEFAULT",brief.path("duration").path("basis").asText());
+        assertEquals("EXPLICIT",brief.path("profile").path("basis").asText());
+        assertEquals(200,internal(task,"fail",Map.of("attemptId",claim.path("attemptId").asText(),"leaseToken",claim.path("leaseToken").asText(),"producerKey","after-understanding-failed","code","CONVERSATION_FAILED","message","理解后暂时失败")).statusCode());
+        var retry=owner.post("/conversations/"+session+"/tasks/"+task+"/retry","{}","production-retry");
+        assertEquals(202,retry.statusCode(),retry.body());
+        JsonNode retried=json(internal(json(retry).path("data").path("taskId").asText(),"claim",Map.of("executorId","production-retry-test","claimRequestId",java.util.UUID.randomUUID()))).path("data").path("input");
+        assertEquals(execution.path("requirementId"),retried.path("requirementId"));
+        assertEquals(execution.path("editing"),retried.path("editing"));
+    }
+
     private java.util.UUID newChatAsset(java.util.UUID project,String filename) {
         var upload=java.util.UUID.randomUUID();var asset=java.util.UUID.randomUUID();
         fixtures.update("INSERT INTO upload_sessions(id,project_id,actor_user_id,idempotency_key,filename,declared_bytes,declared_sha256,part_size_bytes,expected_parts,object_key,writer_token) SELECT ?,id,owner_user_id,?,?,1,?,1,1,?,? FROM projects WHERE id=?",upload,upload.toString(),filename,"a".repeat(64),upload.toString(),java.util.UUID.randomUUID(),project);

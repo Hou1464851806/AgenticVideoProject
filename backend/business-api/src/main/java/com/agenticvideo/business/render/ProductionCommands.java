@@ -21,6 +21,7 @@ public class ProductionCommands {
     public record Reply(String content,List<Object> references) {}
     private Reply clarify(String reason){return new Reply(reason+" 请明确发送“确认当前版本”，再另行发送“导出当前版本 720p”或“导出当前版本 1080p”。",List.of());}
     private String normalized(String text){return text.replaceAll("\\s+","").replaceFirst("[。！!]$","");}
+    public boolean direct(String text){String value=normalized(text);return CONFIRM.matcher(value).matches()||EXPORT.matcher(value).matches();}
     private UUID selectedRevision(Map<String,Object> session,String number) {
         if(session.get("view_revision_id")==null)return null;
         if(number==null)return (UUID)session.get("view_revision_id");

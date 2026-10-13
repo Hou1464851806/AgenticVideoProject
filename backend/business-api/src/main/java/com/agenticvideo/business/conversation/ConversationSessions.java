@@ -50,7 +50,7 @@ public class ConversationSessions {
         String title=newChat?"新聊天 "+(database.queryForObject("SELECT count(*) FROM conversations WHERE project_id=?",Integer.class,projectId)+1):request.title().strip();
         database.update("INSERT INTO conversations(id,project_id,title,asset_ids_json,creation_key,creation_request_json) VALUES (?,?,?,?::jsonb,?,?::jsonb)",id,projectId,title,json.writeValueAsString(scope),key,payload);
         if(newChat) {
-            String welcome="你好，我是你的视频助手。可以直接告诉我想查找什么内容。默认使用当前项目已验证的 "+scope.size()+" 份素材；也可以说‘只用 A 和 B’来限定范围。尚未分析的内容需要进一步核查。";
+            String welcome="你好，我是你的视频助手。可以直接告诉我想查找什么内容，或想制作哪种讲话短视频。默认使用当前项目已验证的 "+scope.size()+" 份素材；也可以说‘只用 A 和 B’来限定范围。尚未分析的内容需要进一步核查。";
             database.update("INSERT INTO conversation_messages(id,conversation_id,message_seq,role,content) VALUES (?,?,1,'ASSISTANT',?)",UUID.randomUUID(),id,welcome);
         }
         return Map.of("id",id,"projectId",projectId,"title",title,"assetIds",scope,"naturalLanguage",newChat);
