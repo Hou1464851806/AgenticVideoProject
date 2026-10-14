@@ -2,6 +2,7 @@ import asyncio
 
 from langgraph.runtime import Runtime
 
+from ...tools.evidence import valid_evidence
 from ...tools.contracts import ToolRequest, ToolResult
 from ..policy import LimitReached, TemporaryToolError, await_operation, encoded, fingerprint
 from ..state import Context, State
@@ -44,12 +45,14 @@ def observe_tool(state: State, runtime: Runtime[Context]):
         return {"waiting": {"kind": "TOOL_RESULT", "wait_id": fingerprint(request.model_dump()), "call_id": request.call_id,
                             "dependency": result.dependency}, "next_node": "await_input"}
     if result.status == "ERROR":
+        if not ctx.mock and result.error.get("category") != "MODEL_REPAIRABLE":
+            return {"stop_reason": "真实读取停止：" + encoded(result.error), "pending_tool": None, "next_node": "check_result"}
         return {**repair(state, ctx, result.error.get("code", "TOOL_ERROR"), encoded(result.error)), "pending_tool": None}
     observations = dict(state["observations"])
     added = 0
     for record in result.records:
         asset = ctx.assets.get(record.get("asset_id"))
-        if not asset or record.get("analysis_version") != asset["analysis_version"] or not (0 <= record["start_ms"] < record["end_ms"] <= asset["duration_ms"]):
+        if not valid_evidence(record, asset, mock=ctx.mock):
             raise RuntimeError("Tool returned invalid evidence identity or range")
         if record["id"] in observations and observations[record["id"]] != record:
             raise RuntimeError("Immutable evidence ID changed content")
@@ -65,6 +68,7 @@ def observe_tool(state: State, runtime: Runtime[Context]):
         entry["pages"] = list(entry["pages"])
         entry["entries_by_page"] = dict(entry.get("entries_by_page", {}))
         entry["analysis_version"] = version
+        entry["source_coverage"] = result.coverage
         coverage[asset_id] = entry
         progress |= cursor not in entry["pages"]
         if cursor not in entry["pages"]:
@@ -77,7 +81,12 @@ def observe_tool(state: State, runtime: Runtime[Context]):
         signature = fingerprint(result.data.get("assets"))
         progress = coverage.get("_asset_list") != signature
         coverage["_asset_list"] = signature
-        coverage["_assets"] = result.data.get("assets", [])
+        pages = dict(coverage.get("_asset_pages", {}))
+        pages[str(request.arguments.get("cursor", 0))] = result.data.get("assets", [])
+        coverage["_asset_pages"] = pages
+        coverage["_assets"] = list({a["id"]: a for page in pages.values() for a in page}.values())
+        coverage["_assets_next_cursor"] = result.data.get("next_cursor")
+    coverage["_last_read"] = result.coverage
     usage = {**state["usage"], "no_progress": 0 if progress else state["usage"]["no_progress"]+1}
     updates = {"observations": observations, "coverage": coverage, "pending_tool": None, "usage": usage, "next_node": "decide_next"}
     if request.tool_name == "validate_edit_draft":

@@ -1,5 +1,10 @@
 # 实施状态
 
+## 2026-10-14 Java 工具 M1 重构
+
+已授权开始实施，第一阶段单应用、媒体执行、MQ 与已有预览/导出已落地；2026-10-15 继续第二阶段，Java 百炼 ASR/VLM/Embedding、分来源证据及 Qdrant 索引已接入。四个固定视频的真实付费模型验收通过，详见 [第二阶段记录](verification/java-tools-m1-stage2.md)。网络恢复后已补齐新版镜像构建、Compose 启动、现有数据库 V49 迁移和两项浏览器冒烟验证。真实基础设施检查及未完成范围见 [阶段记录](verification/java-tools-m1-stage1.md)，当前运行方式见 [后端 README](../backend/README.md)。2026-10-15 第三阶段问答范围快照、四读取工具、回执、稳定分页和通道降级已实现，验证见 [第三阶段记录](verification/java-tools-m1-stage3.md)；2026-10-15 第四阶段 Python JavaToolExecutor、真实模式与点证据引用已接入；真实 DeepSeek 问答、跨进程补答和恢复验证见 [第四阶段记录](verification/java-tools-m1-stage4.md)。2026-10-15 第五阶段运行真实新上传到四工具/DeepSeek问答、保留语义集、SIGKILL恢复、MQ故障和媒体回归；清理旧Python分析路径与Compose服务，具体结果和未验证边界见[第五阶段记录](verification/java-tools-m1-stage5.md)。最终提交前完成双轴收尾审查，修复多检索分组累计突破通道候选上限的问题；最新验证与未验证边界见[收尾审查](verification/java-tools-m1-closeout.md)。本文件以下条目是历史交付记录，不能替代重构后的 M1 验收。
+
+
 本轮按 ready-for-agent 的 32 张子任务实施；#1 为汇总需求。实施起点为 `63efde7`，在当前 main 分支逐票提交。
 
 11 张 P0 任务均已实现、验证并逐票本地提交。P1 #7、#8、#11、#12、#13、#14、#16、#17、#18、#31、#27 已完成。继续按优先级和依赖推进其他 P1 / P2。当前功能见 [功能清单](current-features.md)，实现原理与代码入口见 [项目讲解](project-walkthrough.md)。

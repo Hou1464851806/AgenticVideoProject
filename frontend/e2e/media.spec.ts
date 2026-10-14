@@ -12,7 +12,7 @@ async function signIn(page: Page, username: string) {
   await expect(page.getByText(`已登录：${username}`, { exact: true })).toBeVisible();
 }
 
-test('independent media worker validates an uploaded video before authenticated playback', async ({ page, browser }) => {
+test('local MQ consumer validates an uploaded video before authenticated playback', async ({ page, browser }) => {
   await signIn(page, `media-browser-${Date.now()}`);
   await page.getByLabel('项目名称', { exact: true }).fill('媒体验证与播放');
   await page.getByRole('button', { name: '创建项目', exact: true }).click();

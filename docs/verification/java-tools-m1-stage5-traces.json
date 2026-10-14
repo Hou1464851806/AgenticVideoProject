@@ -1,0 +1,80 @@
+[
+  {
+    "result_file": "agent-service/.local/stage5/human-speech.mp4.result.json",
+    "status": "ANSWER",
+    "trace_id": "691c8384cfdce01d6928a34cdf75fa1a",
+    "execution_id": "8dca29ac-d048-4cc1-b939-c89830ccbe6a",
+    "observations": {
+      "CHAIN": 77,
+      "GENERATION": 5,
+      "TOOL": 2,
+      "AGENT": 1
+    },
+    "generation_tokens": 20622,
+    "reused_responses": 0,
+    "tools": [
+      "read_video_range",
+      "get_video_overview"
+    ],
+    "credentials_absent": true,
+    "url": "http://localhost:3035/project/agent-mvp-project/traces?peek=74f304dd2c394a4a&traceId=691c8384cfdce01d6928a34cdf75fa1a"
+  },
+  {
+    "result_file": "agent-service/.local/stage5/labelled-speech.mp4.result.json",
+    "status": "ANSWER",
+    "trace_id": "c540a924ec61b4c96908ca4db97bcf3a",
+    "execution_id": "2093627a-26bf-49e4-aaf7-c905485b803d",
+    "observations": {
+      "CHAIN": 74,
+      "GENERATION": 5,
+      "TOOL": 2,
+      "AGENT": 1
+    },
+    "generation_tokens": 24345,
+    "reused_responses": 0,
+    "tools": [
+      "read_video_range",
+      "get_video_overview"
+    ],
+    "credentials_absent": true,
+    "url": "http://localhost:3035/project/agent-mvp-project/traces?peek=01311d4aac67b308&traceId=c540a924ec61b4c96908ca4db97bcf3a"
+  },
+  {
+    "result_file": "agent-service/.local/stage5/labelled-vision-vfr.mp4.result.json",
+    "status": "ANSWER",
+    "trace_id": "6c8b3ee751682820b0804b1d8b7a67ff",
+    "execution_id": "9620dac1-a8a5-48ee-a618-74f8f835ff25",
+    "observations": {
+      "CHAIN": 60,
+      "GENERATION": 4,
+      "TOOL": 1,
+      "AGENT": 1
+    },
+    "generation_tokens": 14544,
+    "reused_responses": 0,
+    "tools": [
+      "search_evidence"
+    ],
+    "credentials_absent": true,
+    "url": "http://localhost:3035/project/agent-mvp-project/traces?peek=bf5d03bd6d253505&traceId=6c8b3ee751682820b0804b1d8b7a67ff"
+  },
+  {
+    "result_file": "agent-service/.local/stage5/speech-mention-only.mp4.result.json",
+    "status": "ANSWER",
+    "trace_id": "ae7b7e9d9971b61236ffeed67dc80764",
+    "execution_id": "e4d858fd-0d56-4f68-9bb2-158703c9ad38",
+    "observations": {
+      "CHAIN": 60,
+      "GENERATION": 4,
+      "TOOL": 1,
+      "AGENT": 1
+    },
+    "generation_tokens": 15190,
+    "reused_responses": 0,
+    "tools": [
+      "search_evidence"
+    ],
+    "credentials_absent": true,
+    "url": "http://localhost:3035/project/agent-mvp-project/traces?peek=00efb0f4d590f060&traceId=ae7b7e9d9971b61236ffeed67dc80764"
+  }
+]

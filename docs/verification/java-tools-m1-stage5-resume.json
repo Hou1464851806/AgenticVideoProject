@@ -1,0 +1,1345 @@
+{
+  "date": "2026-10-15",
+  "clarification": {
+    "first": {
+      "thread_id": "a9e6f45d-55ea-414d-9a64-c418fd0a17c0",
+      "identity": {
+        "session_id": "e8a9faa1-d71f-48e4-a6da-e537fd1353b1",
+        "requirement_id": "a9e6f45d-55ea-414d-9a64-c418fd0a17c0",
+        "execution_id": "bdde1c51-dc35-4edb-a9b8-5cad525a28d8",
+        "turn_id": "6a2b17ff-638d-4ec4-abfb-76e7aacead8f"
+      },
+      "status": "WAITING",
+      "waiting": {
+        "kind": "USER_INPUT",
+        "wait_id": "23d2d3da50997faafdea6dedf87b6fbaf6cef1d1333fef41df6fddc5ba566a50",
+        "question": "要查哪些内容？"
+      },
+      "outcome": null,
+      "question_scope": {
+        "scope_id": "1f78ce93-3145-48a8-8826-c59f25e2a7ab",
+        "assets": [
+          {
+            "id": "d212ba2e-cca1-4787-9655-cbe53fac1ba0",
+            "filename": "human-speech.mp4",
+            "source_sha256": "d23fbd05ef147aa5ecbb297c045fec49f77a644f0172a172107330f5c1680a52",
+            "validation_status": "VALID",
+            "duration_ms": 11000,
+            "analysis_version": "ba70edac-c88d-4422-9b26-98c34ca34a33",
+            "index_generation": "7cfb038c-0792-4e96-9a04-c7cf6f787e5b",
+            "sources": {
+              "SPEECH": "SUCCEEDED",
+              "VISUAL": "SUCCEEDED",
+              "VISIBLE_TEXT": "SUCCEEDED"
+            },
+            "source_kinds": [
+              "SPEECH",
+              "VISUAL",
+              "VISIBLE_TEXT"
+            ],
+            "coverage": {
+              "speech_processed_ranges": [
+                {
+                  "start_ms": 0,
+                  "end_ms": 10380
+                }
+              ],
+              "sampling": {
+                "kind": "SPARSE_FRAMES",
+                "rule": "real-pts-window-v1",
+                "endMs": 11000,
+                "startMs": 0,
+                "complete": false,
+                "maxFrames": 25,
+                "intervalMs": 2000
+              },
+              "visual_complete": false,
+              "sampled_at_ms": [
+                0,
+                2000,
+                4000,
+                6000,
+                8000,
+                10000
+              ]
+            }
+          }
+        ],
+        "mock": false,
+        "project_id": "71516826-c977-44c5-b682-668a7483a0ac"
+      },
+      "requirements": {
+        "mode": "QUERY",
+        "topic": "",
+        "duration_min_ms": null,
+        "duration_max_ms": null,
+        "output_count": 1,
+        "asset_ids": null,
+        "forbidden_content": [],
+        "sources": {}
+      },
+      "pending_tool": null,
+      "usage": {
+        "tools": 0,
+        "repairs": 0,
+        "no_progress": 0,
+        "decisions": 0,
+        "model_calls": 1,
+        "active_seconds": 0.029299875008291565,
+        "status": "WAITING"
+      }
+    },
+    "second": {
+      "thread_id": "a9e6f45d-55ea-414d-9a64-c418fd0a17c0",
+      "identity": {
+        "session_id": "e8a9faa1-d71f-48e4-a6da-e537fd1353b1",
+        "requirement_id": "a9e6f45d-55ea-414d-9a64-c418fd0a17c0",
+        "execution_id": "bdde1c51-dc35-4edb-a9b8-5cad525a28d8",
+        "turn_id": "6a2b17ff-638d-4ec4-abfb-76e7aacead8f"
+      },
+      "status": "ANSWER",
+      "waiting": null,
+      "outcome": {
+        "status": "ANSWER",
+        "content": "姓名张明，三个步骤为上传素材、核查原文、导出。",
+        "evidence_ids": [
+          "65f762a4-a222-42bd-9ca9-4a6536160e5a"
+        ],
+        "sources": [
+          {
+            "id": "65f762a4-a222-42bd-9ca9-4a6536160e5a",
+            "asset_id": "d212ba2e-cca1-4787-9655-cbe53fac1ba0",
+            "analysis_version": "ba70edac-c88d-4422-9b26-98c34ca34a33",
+            "source_kind": "SPEECH",
+            "text": "这并不是告别，这是一个篇章的结束，也是新篇章的开始。",
+            "time_kind": "INTERVAL",
+            "start_ms": 1900,
+            "end_ms": 7340,
+            "audio_start_ms": 1900,
+            "audio_end_ms": 7340,
+            "temporal_precision": "MODEL_TIMESTAMPS",
+            "observation": {
+              "text": "这并不是告别，这是一个篇章的结束，也是新篇章的开始。",
+              "words": [
+                {
+                  "text": "这",
+                  "end_time": 2060,
+                  "begin_time": 1900,
+                  "punctuation": ""
+                },
+                {
+                  "text": "并",
+                  "end_time": 2300,
+                  "begin_time": 2060,
+                  "punctuation": ""
+                },
+                {
+                  "text": "不",
+                  "end_time": 2460,
+                  "begin_time": 2300,
+                  "punctuation": ""
+                },
+                {
+                  "text": "是",
+                  "end_time": 2620,
+                  "begin_time": 2460,
+                  "punctuation": ""
+                },
+                {
+                  "text": "告",
+                  "end_time": 2860,
+                  "begin_time": 2620,
+                  "punctuation": ""
+                },
+                {
+                  "text": "别",
+                  "end_time": 3260,
+                  "begin_time": 2860,
+                  "punctuation": "，"
+                },
+                {
+                  "text": "这",
+                  "end_time": 4140,
+                  "begin_time": 3980,
+                  "punctuation": ""
+                },
+                {
+                  "text": "是",
+                  "end_time": 4380,
+                  "begin_time": 4140,
+                  "punctuation": ""
+                },
+                {
+                  "text": "一",
+                  "end_time": 4380,
+                  "begin_time": 4380,
+                  "punctuation": ""
+                },
+                {
+                  "text": "个",
+                  "end_time": 4620,
+                  "begin_time": 4380,
+                  "punctuation": ""
+                },
+                {
+                  "text": "篇",
+                  "end_time": 4860,
+                  "begin_time": 4620,
+                  "punctuation": ""
+                },
+                {
+                  "text": "章",
+                  "end_time": 5020,
+                  "begin_time": 4860,
+                  "punctuation": ""
+                },
+                {
+                  "text": "的",
+                  "end_time": 5100,
+                  "begin_time": 5020,
+                  "punctuation": ""
+                },
+                {
+                  "text": "结",
+                  "end_time": 5340,
+                  "begin_time": 5100,
+                  "punctuation": ""
+                },
+                {
+                  "text": "束",
+                  "end_time": 5660,
+                  "begin_time": 5340,
+                  "punctuation": "，"
+                },
+                {
+                  "text": "也",
+                  "end_time": 5980,
+                  "begin_time": 5820,
+                  "punctuation": ""
+                },
+                {
+                  "text": "是",
+                  "end_time": 6140,
+                  "begin_time": 5980,
+                  "punctuation": ""
+                },
+                {
+                  "text": "新",
+                  "end_time": 6380,
+                  "begin_time": 6140,
+                  "punctuation": ""
+                },
+                {
+                  "text": "篇",
+                  "end_time": 6620,
+                  "begin_time": 6380,
+                  "punctuation": ""
+                },
+                {
+                  "text": "章",
+                  "end_time": 6780,
+                  "begin_time": 6620,
+                  "punctuation": ""
+                },
+                {
+                  "text": "的",
+                  "end_time": 6860,
+                  "begin_time": 6780,
+                  "punctuation": ""
+                },
+                {
+                  "text": "开",
+                  "end_time": 7100,
+                  "begin_time": 6860,
+                  "punctuation": ""
+                },
+                {
+                  "text": "始",
+                  "end_time": 7340,
+                  "begin_time": 7100,
+                  "punctuation": "。"
+                }
+              ],
+              "emotion": "neutral",
+              "end_time": 7340,
+              "language": "zh",
+              "begin_time": 1900,
+              "sentence_id": 0
+            }
+          }
+        ],
+        "mock": false
+      },
+      "question_scope": {
+        "scope_id": "1f78ce93-3145-48a8-8826-c59f25e2a7ab",
+        "assets": [
+          {
+            "id": "d212ba2e-cca1-4787-9655-cbe53fac1ba0",
+            "filename": "human-speech.mp4",
+            "source_sha256": "d23fbd05ef147aa5ecbb297c045fec49f77a644f0172a172107330f5c1680a52",
+            "validation_status": "VALID",
+            "duration_ms": 11000,
+            "analysis_version": "ba70edac-c88d-4422-9b26-98c34ca34a33",
+            "index_generation": "7cfb038c-0792-4e96-9a04-c7cf6f787e5b",
+            "sources": {
+              "SPEECH": "SUCCEEDED",
+              "VISUAL": "SUCCEEDED",
+              "VISIBLE_TEXT": "SUCCEEDED"
+            },
+            "source_kinds": [
+              "SPEECH",
+              "VISUAL",
+              "VISIBLE_TEXT"
+            ],
+            "coverage": {
+              "speech_processed_ranges": [
+                {
+                  "start_ms": 0,
+                  "end_ms": 10380
+                }
+              ],
+              "sampling": {
+                "kind": "SPARSE_FRAMES",
+                "rule": "real-pts-window-v1",
+                "endMs": 11000,
+                "startMs": 0,
+                "complete": false,
+                "maxFrames": 25,
+                "intervalMs": 2000
+              },
+              "visual_complete": false,
+              "sampled_at_ms": [
+                0,
+                2000,
+                4000,
+                6000,
+                8000,
+                10000
+              ]
+            }
+          }
+        ],
+        "mock": false,
+        "project_id": "71516826-c977-44c5-b682-668a7483a0ac"
+      },
+      "requirements": {
+        "mode": "QUERY",
+        "topic": "",
+        "duration_min_ms": null,
+        "duration_max_ms": null,
+        "output_count": 1,
+        "asset_ids": null,
+        "forbidden_content": [],
+        "sources": {}
+      },
+      "pending_tool": null,
+      "usage": {
+        "tools": 1,
+        "repairs": 0,
+        "no_progress": 0,
+        "decisions": 2,
+        "model_calls": 4,
+        "active_seconds": 0.19348937501490582,
+        "status": "ANSWER"
+      }
+    }
+  },
+  "recovery": {
+    "crashed": {
+      "thread_id": "stage4-recovery",
+      "identity": {
+        "session_id": "405bbe52-e8e1-43c8-bd1c-3ca0e69d67f7",
+        "requirement_id": "stage4-recovery",
+        "execution_id": "e9b96f7c-4c0b-422a-94fd-aed947f25245",
+        "turn_id": "52779a1e-07c7-439c-9096-7aef03d498d2"
+      },
+      "status": "FAILED",
+      "waiting": null,
+      "outcome": null,
+      "question_scope": {
+        "scope_id": "1af2a6e0-079f-45a6-8a22-fe3a53a0eed2",
+        "assets": [
+          {
+            "id": "d212ba2e-cca1-4787-9655-cbe53fac1ba0",
+            "filename": "human-speech.mp4",
+            "source_sha256": "d23fbd05ef147aa5ecbb297c045fec49f77a644f0172a172107330f5c1680a52",
+            "validation_status": "VALID",
+            "duration_ms": 11000,
+            "analysis_version": "ba70edac-c88d-4422-9b26-98c34ca34a33",
+            "index_generation": "7cfb038c-0792-4e96-9a04-c7cf6f787e5b",
+            "sources": {
+              "SPEECH": "SUCCEEDED",
+              "VISUAL": "SUCCEEDED",
+              "VISIBLE_TEXT": "SUCCEEDED"
+            },
+            "source_kinds": [
+              "SPEECH",
+              "VISUAL",
+              "VISIBLE_TEXT"
+            ],
+            "coverage": {
+              "speech_processed_ranges": [
+                {
+                  "start_ms": 0,
+                  "end_ms": 10380
+                }
+              ],
+              "sampling": {
+                "kind": "SPARSE_FRAMES",
+                "rule": "real-pts-window-v1",
+                "endMs": 11000,
+                "startMs": 0,
+                "complete": false,
+                "maxFrames": 25,
+                "intervalMs": 2000
+              },
+              "visual_complete": false,
+              "sampled_at_ms": [
+                0,
+                2000,
+                4000,
+                6000,
+                8000,
+                10000
+              ]
+            }
+          }
+        ],
+        "mock": false,
+        "project_id": "71516826-c977-44c5-b682-668a7483a0ac"
+      },
+      "requirements": {
+        "mode": "QUERY",
+        "topic": "",
+        "duration_min_ms": null,
+        "duration_max_ms": null,
+        "output_count": 1,
+        "asset_ids": null,
+        "forbidden_content": [],
+        "sources": {}
+      },
+      "pending_tool": {
+        "call_id": "e9b96f7c-4c0b-422a-94fd-aed947f25245:tool:0",
+        "tool_name": "read_video_range",
+        "arguments": {
+          "cursor": 0,
+          "asset_id": "d212ba2e-cca1-4787-9655-cbe53fac1ba0",
+          "start_ms": 0,
+          "end_ms": 11000
+        },
+        "request_hash": "f34d9e8e337190fd01206d8f671b62943d36972d11908f4ee5b0bc6ad6ba8e1f"
+      },
+      "usage": {
+        "tools": 1,
+        "repairs": 0,
+        "no_progress": 0,
+        "decisions": 1,
+        "model_calls": 2,
+        "active_seconds": 0.09211283399781678,
+        "status": "FAILED"
+      }
+    },
+    "resumed": {
+      "thread_id": "stage4-recovery",
+      "identity": {
+        "session_id": "405bbe52-e8e1-43c8-bd1c-3ca0e69d67f7",
+        "requirement_id": "stage4-recovery",
+        "execution_id": "e9b96f7c-4c0b-422a-94fd-aed947f25245",
+        "turn_id": "52779a1e-07c7-439c-9096-7aef03d498d2"
+      },
+      "status": "ANSWER",
+      "waiting": null,
+      "outcome": {
+        "status": "ANSWER",
+        "content": "姓名张明，三个步骤为上传素材、核查原文、导出。",
+        "evidence_ids": [
+          "65f762a4-a222-42bd-9ca9-4a6536160e5a"
+        ],
+        "sources": [
+          {
+            "id": "65f762a4-a222-42bd-9ca9-4a6536160e5a",
+            "text": "这并不是告别，这是一个篇章的结束，也是新篇章的开始。",
+            "end_ms": 7340,
+            "asset_id": "d212ba2e-cca1-4787-9655-cbe53fac1ba0",
+            "start_ms": 1900,
+            "time_kind": "INTERVAL",
+            "observation": {
+              "text": "这并不是告别，这是一个篇章的结束，也是新篇章的开始。",
+              "words": [
+                {
+                  "text": "这",
+                  "end_time": 2060,
+                  "begin_time": 1900,
+                  "punctuation": ""
+                },
+                {
+                  "text": "并",
+                  "end_time": 2300,
+                  "begin_time": 2060,
+                  "punctuation": ""
+                },
+                {
+                  "text": "不",
+                  "end_time": 2460,
+                  "begin_time": 2300,
+                  "punctuation": ""
+                },
+                {
+                  "text": "是",
+                  "end_time": 2620,
+                  "begin_time": 2460,
+                  "punctuation": ""
+                },
+                {
+                  "text": "告",
+                  "end_time": 2860,
+                  "begin_time": 2620,
+                  "punctuation": ""
+                },
+                {
+                  "text": "别",
+                  "end_time": 3260,
+                  "begin_time": 2860,
+                  "punctuation": "，"
+                },
+                {
+                  "text": "这",
+                  "end_time": 4140,
+                  "begin_time": 3980,
+                  "punctuation": ""
+                },
+                {
+                  "text": "是",
+                  "end_time": 4380,
+                  "begin_time": 4140,
+                  "punctuation": ""
+                },
+                {
+                  "text": "一",
+                  "end_time": 4380,
+                  "begin_time": 4380,
+                  "punctuation": ""
+                },
+                {
+                  "text": "个",
+                  "end_time": 4620,
+                  "begin_time": 4380,
+                  "punctuation": ""
+                },
+                {
+                  "text": "篇",
+                  "end_time": 4860,
+                  "begin_time": 4620,
+                  "punctuation": ""
+                },
+                {
+                  "text": "章",
+                  "end_time": 5020,
+                  "begin_time": 4860,
+                  "punctuation": ""
+                },
+                {
+                  "text": "的",
+                  "end_time": 5100,
+                  "begin_time": 5020,
+                  "punctuation": ""
+                },
+                {
+                  "text": "结",
+                  "end_time": 5340,
+                  "begin_time": 5100,
+                  "punctuation": ""
+                },
+                {
+                  "text": "束",
+                  "end_time": 5660,
+                  "begin_time": 5340,
+                  "punctuation": "，"
+                },
+                {
+                  "text": "也",
+                  "end_time": 5980,
+                  "begin_time": 5820,
+                  "punctuation": ""
+                },
+                {
+                  "text": "是",
+                  "end_time": 6140,
+                  "begin_time": 5980,
+                  "punctuation": ""
+                },
+                {
+                  "text": "新",
+                  "end_time": 6380,
+                  "begin_time": 6140,
+                  "punctuation": ""
+                },
+                {
+                  "text": "篇",
+                  "end_time": 6620,
+                  "begin_time": 6380,
+                  "punctuation": ""
+                },
+                {
+                  "text": "章",
+                  "end_time": 6780,
+                  "begin_time": 6620,
+                  "punctuation": ""
+                },
+                {
+                  "text": "的",
+                  "end_time": 6860,
+                  "begin_time": 6780,
+                  "punctuation": ""
+                },
+                {
+                  "text": "开",
+                  "end_time": 7100,
+                  "begin_time": 6860,
+                  "punctuation": ""
+                },
+                {
+                  "text": "始",
+                  "end_time": 7340,
+                  "begin_time": 7100,
+                  "punctuation": "。"
+                }
+              ],
+              "emotion": "neutral",
+              "end_time": 7340,
+              "language": "zh",
+              "begin_time": 1900,
+              "sentence_id": 0
+            },
+            "source_kind": "SPEECH",
+            "audio_end_ms": 7340,
+            "audio_start_ms": 1900,
+            "analysis_version": "ba70edac-c88d-4422-9b26-98c34ca34a33",
+            "temporal_precision": "MODEL_TIMESTAMPS"
+          }
+        ],
+        "mock": false
+      },
+      "question_scope": {
+        "scope_id": "1af2a6e0-079f-45a6-8a22-fe3a53a0eed2",
+        "assets": [
+          {
+            "id": "d212ba2e-cca1-4787-9655-cbe53fac1ba0",
+            "filename": "human-speech.mp4",
+            "source_sha256": "d23fbd05ef147aa5ecbb297c045fec49f77a644f0172a172107330f5c1680a52",
+            "validation_status": "VALID",
+            "duration_ms": 11000,
+            "analysis_version": "ba70edac-c88d-4422-9b26-98c34ca34a33",
+            "index_generation": "7cfb038c-0792-4e96-9a04-c7cf6f787e5b",
+            "sources": {
+              "SPEECH": "SUCCEEDED",
+              "VISUAL": "SUCCEEDED",
+              "VISIBLE_TEXT": "SUCCEEDED"
+            },
+            "source_kinds": [
+              "SPEECH",
+              "VISUAL",
+              "VISIBLE_TEXT"
+            ],
+            "coverage": {
+              "speech_processed_ranges": [
+                {
+                  "start_ms": 0,
+                  "end_ms": 10380
+                }
+              ],
+              "sampling": {
+                "kind": "SPARSE_FRAMES",
+                "rule": "real-pts-window-v1",
+                "endMs": 11000,
+                "startMs": 0,
+                "complete": false,
+                "maxFrames": 25,
+                "intervalMs": 2000
+              },
+              "visual_complete": false,
+              "sampled_at_ms": [
+                0,
+                2000,
+                4000,
+                6000,
+                8000,
+                10000
+              ]
+            }
+          }
+        ],
+        "mock": false,
+        "project_id": "71516826-c977-44c5-b682-668a7483a0ac"
+      },
+      "requirements": {
+        "mode": "QUERY",
+        "topic": "",
+        "duration_min_ms": null,
+        "duration_max_ms": null,
+        "output_count": 1,
+        "asset_ids": null,
+        "forbidden_content": [],
+        "sources": {}
+      },
+      "pending_tool": null,
+      "usage": {
+        "tools": 1,
+        "repairs": 0,
+        "no_progress": 0,
+        "decisions": 2,
+        "model_calls": 3,
+        "active_seconds": 0.1540165420010453,
+        "status": "ANSWER"
+      }
+    },
+    "java_receipt_before_crash": {
+      "request": {
+        "call_id": "e9b96f7c-4c0b-422a-94fd-aed947f25245:tool:0",
+        "tool_name": "read_video_range",
+        "arguments": {
+          "cursor": 0,
+          "asset_id": "d212ba2e-cca1-4787-9655-cbe53fac1ba0",
+          "start_ms": 0,
+          "end_ms": 11000
+        },
+        "request_hash": "f34d9e8e337190fd01206d8f671b62943d36972d11908f4ee5b0bc6ad6ba8e1f"
+      },
+      "result": {
+        "call_id": "e9b96f7c-4c0b-422a-94fd-aed947f25245:tool:0",
+        "tool_name": "read_video_range",
+        "request_hash": "f34d9e8e337190fd01206d8f671b62943d36972d11908f4ee5b0bc6ad6ba8e1f",
+        "status": "READY",
+        "data": {
+          "next_cursor": null
+        },
+        "coverage": {
+          "scope_id": "1af2a6e0-079f-45a6-8a22-fe3a53a0eed2",
+          "asset": {
+            "id": "d212ba2e-cca1-4787-9655-cbe53fac1ba0",
+            "sources": {
+              "SPEECH": "SUCCEEDED",
+              "VISUAL": "SUCCEEDED",
+              "VISIBLE_TEXT": "SUCCEEDED"
+            },
+            "coverage": {
+              "sampling": {
+                "kind": "SPARSE_FRAMES",
+                "rule": "real-pts-window-v1",
+                "endMs": 11000,
+                "startMs": 0,
+                "complete": false,
+                "maxFrames": 25,
+                "intervalMs": 2000
+              },
+              "sampled_at_ms": [
+                0,
+                2000,
+                4000,
+                6000,
+                8000,
+                10000
+              ],
+              "visual_complete": false,
+              "speech_processed_ranges": [
+                {
+                  "end_ms": 10380,
+                  "start_ms": 0
+                }
+              ]
+            },
+            "filename": "human-speech.mp4",
+            "duration_ms": 11000,
+            "source_kinds": [
+              "SPEECH",
+              "VISUAL",
+              "VISIBLE_TEXT"
+            ],
+            "source_sha256": "d23fbd05ef147aa5ecbb297c045fec49f77a644f0172a172107330f5c1680a52",
+            "analysis_version": "ba70edac-c88d-4422-9b26-98c34ca34a33",
+            "index_generation": "7cfb038c-0792-4e96-9a04-c7cf6f787e5b",
+            "validation_status": "VALID"
+          },
+          "start_ms": 0,
+          "end_ms": 11000,
+          "cursor": 0,
+          "page_complete": true
+        },
+        "records": [
+          {
+            "id": "77702150-cec1-47aa-9b55-7c914c6a5124",
+            "asset_id": "d212ba2e-cca1-4787-9655-cbe53fac1ba0",
+            "analysis_version": "ba70edac-c88d-4422-9b26-98c34ca34a33",
+            "source_kind": "VISUAL",
+            "text": "纯蓝色背景，无任何物体或图案。",
+            "time_kind": "POINT",
+            "observed_at_ms": 0,
+            "temporal_precision": "FRAME_OBSERVATION",
+            "frame_id": "ebfa9db3-8011-47a7-bb9d-b87a58198962",
+            "observation": {
+              "description": "纯蓝色背景，无任何物体或图案。",
+              "visibleText": []
+            }
+          },
+          {
+            "id": "65f762a4-a222-42bd-9ca9-4a6536160e5a",
+            "asset_id": "d212ba2e-cca1-4787-9655-cbe53fac1ba0",
+            "analysis_version": "ba70edac-c88d-4422-9b26-98c34ca34a33",
+            "source_kind": "SPEECH",
+            "text": "这并不是告别，这是一个篇章的结束，也是新篇章的开始。",
+            "time_kind": "INTERVAL",
+            "start_ms": 1900,
+            "end_ms": 7340,
+            "audio_start_ms": 1900,
+            "audio_end_ms": 7340,
+            "temporal_precision": "MODEL_TIMESTAMPS",
+            "observation": {
+              "text": "这并不是告别，这是一个篇章的结束，也是新篇章的开始。",
+              "words": [
+                {
+                  "text": "这",
+                  "end_time": 2060,
+                  "begin_time": 1900,
+                  "punctuation": ""
+                },
+                {
+                  "text": "并",
+                  "end_time": 2300,
+                  "begin_time": 2060,
+                  "punctuation": ""
+                },
+                {
+                  "text": "不",
+                  "end_time": 2460,
+                  "begin_time": 2300,
+                  "punctuation": ""
+                },
+                {
+                  "text": "是",
+                  "end_time": 2620,
+                  "begin_time": 2460,
+                  "punctuation": ""
+                },
+                {
+                  "text": "告",
+                  "end_time": 2860,
+                  "begin_time": 2620,
+                  "punctuation": ""
+                },
+                {
+                  "text": "别",
+                  "end_time": 3260,
+                  "begin_time": 2860,
+                  "punctuation": "，"
+                },
+                {
+                  "text": "这",
+                  "end_time": 4140,
+                  "begin_time": 3980,
+                  "punctuation": ""
+                },
+                {
+                  "text": "是",
+                  "end_time": 4380,
+                  "begin_time": 4140,
+                  "punctuation": ""
+                },
+                {
+                  "text": "一",
+                  "end_time": 4380,
+                  "begin_time": 4380,
+                  "punctuation": ""
+                },
+                {
+                  "text": "个",
+                  "end_time": 4620,
+                  "begin_time": 4380,
+                  "punctuation": ""
+                },
+                {
+                  "text": "篇",
+                  "end_time": 4860,
+                  "begin_time": 4620,
+                  "punctuation": ""
+                },
+                {
+                  "text": "章",
+                  "end_time": 5020,
+                  "begin_time": 4860,
+                  "punctuation": ""
+                },
+                {
+                  "text": "的",
+                  "end_time": 5100,
+                  "begin_time": 5020,
+                  "punctuation": ""
+                },
+                {
+                  "text": "结",
+                  "end_time": 5340,
+                  "begin_time": 5100,
+                  "punctuation": ""
+                },
+                {
+                  "text": "束",
+                  "end_time": 5660,
+                  "begin_time": 5340,
+                  "punctuation": "，"
+                },
+                {
+                  "text": "也",
+                  "end_time": 5980,
+                  "begin_time": 5820,
+                  "punctuation": ""
+                },
+                {
+                  "text": "是",
+                  "end_time": 6140,
+                  "begin_time": 5980,
+                  "punctuation": ""
+                },
+                {
+                  "text": "新",
+                  "end_time": 6380,
+                  "begin_time": 6140,
+                  "punctuation": ""
+                },
+                {
+                  "text": "篇",
+                  "end_time": 6620,
+                  "begin_time": 6380,
+                  "punctuation": ""
+                },
+                {
+                  "text": "章",
+                  "end_time": 6780,
+                  "begin_time": 6620,
+                  "punctuation": ""
+                },
+                {
+                  "text": "的",
+                  "end_time": 6860,
+                  "begin_time": 6780,
+                  "punctuation": ""
+                },
+                {
+                  "text": "开",
+                  "end_time": 7100,
+                  "begin_time": 6860,
+                  "punctuation": ""
+                },
+                {
+                  "text": "始",
+                  "end_time": 7340,
+                  "begin_time": 7100,
+                  "punctuation": "。"
+                }
+              ],
+              "emotion": "neutral",
+              "end_time": 7340,
+              "language": "zh",
+              "begin_time": 1900,
+              "sentence_id": 0
+            }
+          },
+          {
+            "id": "a2ecf285-e9e9-4aaa-b6eb-5243581c687e",
+            "asset_id": "d212ba2e-cca1-4787-9655-cbe53fac1ba0",
+            "analysis_version": "ba70edac-c88d-4422-9b26-98c34ca34a33",
+            "source_kind": "VISUAL",
+            "text": "纯蓝色背景，无任何物体或图案。",
+            "time_kind": "POINT",
+            "observed_at_ms": 2000,
+            "temporal_precision": "FRAME_OBSERVATION",
+            "frame_id": "9d4aeaa4-5e88-4689-9823-1b9eb9f128cc",
+            "observation": {
+              "description": "纯蓝色背景，无任何物体或图案。",
+              "visibleText": []
+            }
+          },
+          {
+            "id": "3390b71d-4a5e-4ad5-a921-56076b31e4e1",
+            "asset_id": "d212ba2e-cca1-4787-9655-cbe53fac1ba0",
+            "analysis_version": "ba70edac-c88d-4422-9b26-98c34ca34a33",
+            "source_kind": "VISUAL",
+            "text": "纯蓝色背景，无任何物体或图案。",
+            "time_kind": "POINT",
+            "observed_at_ms": 4000,
+            "temporal_precision": "FRAME_OBSERVATION",
+            "frame_id": "615ebfd7-a83f-47c0-a7e4-92ebc1503418",
+            "observation": {
+              "description": "纯蓝色背景，无任何物体或图案。",
+              "visibleText": []
+            }
+          },
+          {
+            "id": "11eef944-d41d-4700-b1d5-280b3f193b99",
+            "asset_id": "d212ba2e-cca1-4787-9655-cbe53fac1ba0",
+            "analysis_version": "ba70edac-c88d-4422-9b26-98c34ca34a33",
+            "source_kind": "VISUAL",
+            "text": "纯蓝色背景，无任何物体或图案。",
+            "time_kind": "POINT",
+            "observed_at_ms": 6000,
+            "temporal_precision": "FRAME_OBSERVATION",
+            "frame_id": "f21c6690-0cfb-473b-a3dc-ab90ac5a02ac",
+            "observation": {
+              "description": "纯蓝色背景，无任何物体或图案。",
+              "visibleText": []
+            }
+          },
+          {
+            "id": "c3f1cf79-b0d6-4de5-81b3-12d132e3578a",
+            "asset_id": "d212ba2e-cca1-4787-9655-cbe53fac1ba0",
+            "analysis_version": "ba70edac-c88d-4422-9b26-98c34ca34a33",
+            "source_kind": "VISUAL",
+            "text": "纯蓝色背景，无任何物体或图案。",
+            "time_kind": "POINT",
+            "observed_at_ms": 8000,
+            "temporal_precision": "FRAME_OBSERVATION",
+            "frame_id": "44dae46c-3025-468f-9c9c-9ecb41b4ea48",
+            "observation": {
+              "description": "纯蓝色背景，无任何物体或图案。",
+              "visibleText": []
+            }
+          },
+          {
+            "id": "e8d5295a-406a-44e2-87c2-682e2ba8474b",
+            "asset_id": "d212ba2e-cca1-4787-9655-cbe53fac1ba0",
+            "analysis_version": "ba70edac-c88d-4422-9b26-98c34ca34a33",
+            "source_kind": "VISUAL",
+            "text": "纯蓝色背景，无任何物体或图案。",
+            "time_kind": "POINT",
+            "observed_at_ms": 10000,
+            "temporal_precision": "FRAME_OBSERVATION",
+            "frame_id": "7fcd67da-6dc7-4b49-a21b-a7c4afb517ce",
+            "observation": {
+              "description": "纯蓝色背景，无任何物体或图案。",
+              "visibleText": []
+            }
+          }
+        ],
+        "dependency": null,
+        "error": null,
+        "mock": false
+      },
+      "scope_id": "1af2a6e0-079f-45a6-8a22-fe3a53a0eed2"
+    },
+    "replayed_receipt": {
+      "call_id": "e9b96f7c-4c0b-422a-94fd-aed947f25245:tool:0",
+      "tool_name": "read_video_range",
+      "request_hash": "f34d9e8e337190fd01206d8f671b62943d36972d11908f4ee5b0bc6ad6ba8e1f",
+      "status": "READY",
+      "data": {
+        "next_cursor": null
+      },
+      "coverage": {
+        "asset": {
+          "id": "d212ba2e-cca1-4787-9655-cbe53fac1ba0",
+          "sources": {
+            "SPEECH": "SUCCEEDED",
+            "VISUAL": "SUCCEEDED",
+            "VISIBLE_TEXT": "SUCCEEDED"
+          },
+          "coverage": {
+            "sampling": {
+              "kind": "SPARSE_FRAMES",
+              "rule": "real-pts-window-v1",
+              "endMs": 11000,
+              "startMs": 0,
+              "complete": false,
+              "maxFrames": 25,
+              "intervalMs": 2000
+            },
+            "sampled_at_ms": [
+              0,
+              2000,
+              4000,
+              6000,
+              8000,
+              10000
+            ],
+            "visual_complete": false,
+            "speech_processed_ranges": [
+              {
+                "end_ms": 10380,
+                "start_ms": 0
+              }
+            ]
+          },
+          "filename": "human-speech.mp4",
+          "duration_ms": 11000,
+          "source_kinds": [
+            "SPEECH",
+            "VISUAL",
+            "VISIBLE_TEXT"
+          ],
+          "source_sha256": "d23fbd05ef147aa5ecbb297c045fec49f77a644f0172a172107330f5c1680a52",
+          "analysis_version": "ba70edac-c88d-4422-9b26-98c34ca34a33",
+          "index_generation": "7cfb038c-0792-4e96-9a04-c7cf6f787e5b",
+          "validation_status": "VALID"
+        },
+        "cursor": 0,
+        "end_ms": 11000,
+        "scope_id": "1af2a6e0-079f-45a6-8a22-fe3a53a0eed2",
+        "start_ms": 0,
+        "page_complete": true
+      },
+      "records": [
+        {
+          "id": "77702150-cec1-47aa-9b55-7c914c6a5124",
+          "text": "纯蓝色背景，无任何物体或图案。",
+          "asset_id": "d212ba2e-cca1-4787-9655-cbe53fac1ba0",
+          "frame_id": "ebfa9db3-8011-47a7-bb9d-b87a58198962",
+          "time_kind": "POINT",
+          "observation": {
+            "description": "纯蓝色背景，无任何物体或图案。",
+            "visibleText": []
+          },
+          "source_kind": "VISUAL",
+          "observed_at_ms": 0,
+          "analysis_version": "ba70edac-c88d-4422-9b26-98c34ca34a33",
+          "temporal_precision": "FRAME_OBSERVATION"
+        },
+        {
+          "id": "65f762a4-a222-42bd-9ca9-4a6536160e5a",
+          "text": "这并不是告别，这是一个篇章的结束，也是新篇章的开始。",
+          "end_ms": 7340,
+          "asset_id": "d212ba2e-cca1-4787-9655-cbe53fac1ba0",
+          "start_ms": 1900,
+          "time_kind": "INTERVAL",
+          "observation": {
+            "text": "这并不是告别，这是一个篇章的结束，也是新篇章的开始。",
+            "words": [
+              {
+                "text": "这",
+                "end_time": 2060,
+                "begin_time": 1900,
+                "punctuation": ""
+              },
+              {
+                "text": "并",
+                "end_time": 2300,
+                "begin_time": 2060,
+                "punctuation": ""
+              },
+              {
+                "text": "不",
+                "end_time": 2460,
+                "begin_time": 2300,
+                "punctuation": ""
+              },
+              {
+                "text": "是",
+                "end_time": 2620,
+                "begin_time": 2460,
+                "punctuation": ""
+              },
+              {
+                "text": "告",
+                "end_time": 2860,
+                "begin_time": 2620,
+                "punctuation": ""
+              },
+              {
+                "text": "别",
+                "end_time": 3260,
+                "begin_time": 2860,
+                "punctuation": "，"
+              },
+              {
+                "text": "这",
+                "end_time": 4140,
+                "begin_time": 3980,
+                "punctuation": ""
+              },
+              {
+                "text": "是",
+                "end_time": 4380,
+                "begin_time": 4140,
+                "punctuation": ""
+              },
+              {
+                "text": "一",
+                "end_time": 4380,
+                "begin_time": 4380,
+                "punctuation": ""
+              },
+              {
+                "text": "个",
+                "end_time": 4620,
+                "begin_time": 4380,
+                "punctuation": ""
+              },
+              {
+                "text": "篇",
+                "end_time": 4860,
+                "begin_time": 4620,
+                "punctuation": ""
+              },
+              {
+                "text": "章",
+                "end_time": 5020,
+                "begin_time": 4860,
+                "punctuation": ""
+              },
+              {
+                "text": "的",
+                "end_time": 5100,
+                "begin_time": 5020,
+                "punctuation": ""
+              },
+              {
+                "text": "结",
+                "end_time": 5340,
+                "begin_time": 5100,
+                "punctuation": ""
+              },
+              {
+                "text": "束",
+                "end_time": 5660,
+                "begin_time": 5340,
+                "punctuation": "，"
+              },
+              {
+                "text": "也",
+                "end_time": 5980,
+                "begin_time": 5820,
+                "punctuation": ""
+              },
+              {
+                "text": "是",
+                "end_time": 6140,
+                "begin_time": 5980,
+                "punctuation": ""
+              },
+              {
+                "text": "新",
+                "end_time": 6380,
+                "begin_time": 6140,
+                "punctuation": ""
+              },
+              {
+                "text": "篇",
+                "end_time": 6620,
+                "begin_time": 6380,
+                "punctuation": ""
+              },
+              {
+                "text": "章",
+                "end_time": 6780,
+                "begin_time": 6620,
+                "punctuation": ""
+              },
+              {
+                "text": "的",
+                "end_time": 6860,
+                "begin_time": 6780,
+                "punctuation": ""
+              },
+              {
+                "text": "开",
+                "end_time": 7100,
+                "begin_time": 6860,
+                "punctuation": ""
+              },
+              {
+                "text": "始",
+                "end_time": 7340,
+                "begin_time": 7100,
+                "punctuation": "。"
+              }
+            ],
+            "emotion": "neutral",
+            "end_time": 7340,
+            "language": "zh",
+            "begin_time": 1900,
+            "sentence_id": 0
+          },
+          "source_kind": "SPEECH",
+          "audio_end_ms": 7340,
+          "audio_start_ms": 1900,
+          "analysis_version": "ba70edac-c88d-4422-9b26-98c34ca34a33",
+          "temporal_precision": "MODEL_TIMESTAMPS"
+        },
+        {
+          "id": "a2ecf285-e9e9-4aaa-b6eb-5243581c687e",
+          "text": "纯蓝色背景，无任何物体或图案。",
+          "asset_id": "d212ba2e-cca1-4787-9655-cbe53fac1ba0",
+          "frame_id": "9d4aeaa4-5e88-4689-9823-1b9eb9f128cc",
+          "time_kind": "POINT",
+          "observation": {
+            "description": "纯蓝色背景，无任何物体或图案。",
+            "visibleText": []
+          },
+          "source_kind": "VISUAL",
+          "observed_at_ms": 2000,
+          "analysis_version": "ba70edac-c88d-4422-9b26-98c34ca34a33",
+          "temporal_precision": "FRAME_OBSERVATION"
+        },
+        {
+          "id": "3390b71d-4a5e-4ad5-a921-56076b31e4e1",
+          "text": "纯蓝色背景，无任何物体或图案。",
+          "asset_id": "d212ba2e-cca1-4787-9655-cbe53fac1ba0",
+          "frame_id": "615ebfd7-a83f-47c0-a7e4-92ebc1503418",
+          "time_kind": "POINT",
+          "observation": {
+            "description": "纯蓝色背景，无任何物体或图案。",
+            "visibleText": []
+          },
+          "source_kind": "VISUAL",
+          "observed_at_ms": 4000,
+          "analysis_version": "ba70edac-c88d-4422-9b26-98c34ca34a33",
+          "temporal_precision": "FRAME_OBSERVATION"
+        },
+        {
+          "id": "11eef944-d41d-4700-b1d5-280b3f193b99",
+          "text": "纯蓝色背景，无任何物体或图案。",
+          "asset_id": "d212ba2e-cca1-4787-9655-cbe53fac1ba0",
+          "frame_id": "f21c6690-0cfb-473b-a3dc-ab90ac5a02ac",
+          "time_kind": "POINT",
+          "observation": {
+            "description": "纯蓝色背景，无任何物体或图案。",
+            "visibleText": []
+          },
+          "source_kind": "VISUAL",
+          "observed_at_ms": 6000,
+          "analysis_version": "ba70edac-c88d-4422-9b26-98c34ca34a33",
+          "temporal_precision": "FRAME_OBSERVATION"
+        },
+        {
+          "id": "c3f1cf79-b0d6-4de5-81b3-12d132e3578a",
+          "text": "纯蓝色背景，无任何物体或图案。",
+          "asset_id": "d212ba2e-cca1-4787-9655-cbe53fac1ba0",
+          "frame_id": "44dae46c-3025-468f-9c9c-9ecb41b4ea48",
+          "time_kind": "POINT",
+          "observation": {
+            "description": "纯蓝色背景，无任何物体或图案。",
+            "visibleText": []
+          },
+          "source_kind": "VISUAL",
+          "observed_at_ms": 8000,
+          "analysis_version": "ba70edac-c88d-4422-9b26-98c34ca34a33",
+          "temporal_precision": "FRAME_OBSERVATION"
+        },
+        {
+          "id": "e8d5295a-406a-44e2-87c2-682e2ba8474b",
+          "text": "纯蓝色背景，无任何物体或图案。",
+          "asset_id": "d212ba2e-cca1-4787-9655-cbe53fac1ba0",
+          "frame_id": "7fcd67da-6dc7-4b49-a21b-a7c4afb517ce",
+          "time_kind": "POINT",
+          "observation": {
+            "description": "纯蓝色背景，无任何物体或图案。",
+            "visibleText": []
+          },
+          "source_kind": "VISUAL",
+          "observed_at_ms": 10000,
+          "analysis_version": "ba70edac-c88d-4422-9b26-98c34ca34a33",
+          "temporal_precision": "FRAME_OBSERVATION"
+        }
+      ],
+      "dependency": null,
+      "error": null,
+      "mock": false
+    }
+  }
+}

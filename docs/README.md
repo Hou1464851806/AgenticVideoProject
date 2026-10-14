@@ -1,6 +1,6 @@
 # 设计文档入口
 
-Q58 已确认首期 MVP 整体设计；2026-10-12 补充确认统一自然语言视频工作流程。已有实现和验证进度见 [实施状态](implementation-status.md)，当前可用能力见 [功能清单](current-features.md)；新增对话设计待实施。
+Q58 已确认首期 MVP 整体设计；2026-10-12 补充确认统一自然语言视频工作流程。已有实现和验证进度见 [实施状态](implementation-status.md)，当前可用能力见 [功能清单](current-features.md)。当前运行形态以 M1 说明和第五阶段验收为准，旧对话交付作为历史记录保留。
 
 完整需求已发布为 [GitHub 总 Issue #1](https://github.com/Hou1464851806/AgenticVideoProject/issues/1)，标记 `ready-for-agent`。
 
@@ -14,7 +14,7 @@ Q58 已确认首期 MVP 整体设计；2026-10-12 补充确认统一自然语言
 | Agent自治、工具与智能验收 | [Agent设计](agent-design.md) |
 | LangGraph 节点、状态、错误恢复、共享预算与事件等待的具体设计 | [Agent 运行设计](langgraph-agent-runtime-design.md)、[官方运行语义核对](research/langgraph-runtime-semantics.md) |
 | Python Agent 独立重写的最终设计、边界与 MVP 验收标准 | [Agent MVP 设计](agent-mvp-design.md) |
-| Java 单体基础分析、四个真实读取工具、Python 接入与验收计划（已确认，暂缓实施） | [Java 工具 M1 设计](java-tools-m1-design.md) |
+| Java 单体基础分析、四个真实读取工具、Python 接入与验收记录（已确认，M1 已验收） | [Java 工具 M1 设计](java-tools-m1-design.md) |
 | Java 后端结构、模型与运行说明（随 M1 实施维护） | [后端 README](../backend/README.md) |
 | 独立 Agent CLI、重启恢复、真实 DeepSeek 与本机 Langfuse 的验收证据 | [运行说明](../agent-service/README.md)、[MVP 验收记录](verification/agent-mvp.md) |
 | DeepSeek Flash 模型名称、OpenAI 兼容请求与 LangChain 客户端核对 | [Flash 适配核验](research/deepseek-flash-adapter-verification.md) |
@@ -35,3 +35,9 @@ Q58 已确认首期 MVP 整体设计；2026-10-12 补充确认统一自然语言
 | 功能、故障与本机测试 | [实施与验收](implementation-plan.md) |
 
 已确认的产品／架构边界与默认实现字段分别标识；数值参数和第三方能力以实际联调结果固定，不能把文档生成或格式检查当作运行验证。
+
+- [Java 工具 M1 第二阶段实施与验证](verification/java-tools-m1-stage2.md)
+- [Java 工具 M1 第三阶段实施与验证](verification/java-tools-m1-stage3.md)
+- [Java 工具 M1 第四阶段 Python 接入与验证](verification/java-tools-m1-stage4.md)
+- [Java 工具 M1 第五阶段综合验收与故障验证](verification/java-tools-m1-stage5.md)
+- [Java 工具 M1 完整收尾审查](verification/java-tools-m1-closeout.md)

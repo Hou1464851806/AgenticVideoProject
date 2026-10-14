@@ -1,23 +1,8 @@
 # Java 后端
 
-Java 后端负责素材、基础视频分析、证据检索、真实工具治理及媒体执行；Python Agent 负责目标理解、工具决策、补答和运行恢复。
+M1 已落地单体媒体执行、Java 百炼基础分析与索引，以及第三阶段问答快照、四个真实读取工具、稳定分页和独立通道降级。Python `JavaToolExecutor` 已在第四阶段接入；真实上传到问答、故障与媒体回归见[第五阶段综合记录](../docs/verification/java-tools-m1-stage5.md)，未运行项目单独列明。完整范围见 [最终设计](../docs/java-tools-m1-design.md)，媒体阶段验证见 [记录](../docs/verification/java-tools-m1-stage1.md)，分析阶段见 [记录](../docs/verification/java-tools-m1-stage2.md)，工具阶段见 [记录](../docs/verification/java-tools-m1-stage3.md)。
 
-M1 最终设计已获用户确认；按用户要求暂不开始实现，应用尚未迁入目标结构。完整方案及验收计划见 [Java 工具 M1 设计](../docs/java-tools-m1-design.md)，架构决定见 [ADR-0017](../docs/adr/0017-move-baseline-analysis-and-reading-tools-into-java.md)。
-
-## 当前结构
-
-```text
-backend/
-├── README.md
-├── business-api/   # Spring Boot 业务入口、持久数据及现有任务协议
-└── media-worker/   # 独立媒体执行应用：探测、提取、抽帧及渲染
-```
-
-当前 Maven 聚合入口在仓库根 `pom.xml`。旧 Python 分析 Worker 已停止接入，独立 Agent 默认使用 Mock；当前启动旧业务栈不代表真实 ASR、视觉和 Agent 工具链路已经恢复。既有事实与重构缺口详见 M1 设计记录。
-
-## M1 目标结构
-
-将两个 Java 应用收敛为一个 Spring Boot 模块化单体，使用标准 Maven 目录：
+## 结构与职责
 
 ```text
 backend/
@@ -25,81 +10,145 @@ backend/
 ├── pom.xml
 ├── Dockerfile
 └── src/
-    ├── main/
-    │   ├── java/
-    │   └── resources/
-    └── test/
-        ├── java/
-        └── resources/
+    ├── main/java/com/agenticvideo/business/
+    │   ├── bailian/    # 三个具体模型协议客户端与有界 HTTP 传输
+    │   ├── analysis/   # 基础分析步骤、回执和原始观察发布
+    │   ├── search/     # 派生单元、Embedding、索引与固定范围的权威证据读取/混合排名
+    │   ├── tools/      # 可信问答快照、四工具参数/回执/分页与内部 HTTP 入口
+    │   ├── media/      # FFmpeg、探测、音频、稀疏帧、渲染、临时目录与媒体存储
+    │   ├── messaging/  # durable 队列、确认发布、消费与 ACK
+    │   ├── task/       # 原子占用、执行代次、取消、结果与重启恢复
+    │   └── ...        # 上传、认证、项目、证据、方案与产物等既有业务
+    ├── main/resources/ # 应用配置与 Flyway 数据库定义
+    └── test/java/      # 真实基础设施集成验证
 ```
 
-Java package 按素材/上传、媒体、分析、百炼适配、证据/检索、工具、任务及方案/渲染组织；认证、项目、存储等现有职责继续保留。模块直接调用少量业务入口，事务不跨外部模型请求或 FFmpeg 执行。
+根 Maven 聚合入口仅包含 `backend`，不再有 `business-api/` 和 `media-worker/` 子工程。Compose 保留服务名 `business-api` 以复用前端地址和已有脚本，该容器运行整个 Java 后端。独立媒体容器及媒体 HTTP 客户端、控制端点、线程池和 Worker 心跳已删除。
 
-## 基础处理与模型
+`MediaProcessing.execute` 负责受控媒体操作、对象读写与临时目录；不理解 RabbitMQ 或任务状态。`LocalTaskRunner` 在消费线程执行阶段，`TaskExecution` 原子接纳并验证当前代次后发布业务结果。渲染沿用冻结版本、原素材、确认、产物身份及播放规则。
 
-上传完成后自动进行媒体探测、音频提取及稀疏抽帧。ASR、VLM、Embedding 均由 Java 通过阿里云百炼 API 调用：
+## 构建与运行
 
-- ASR 处理完整音轨，保存语音区间和词级时间；无音轨明确记为不适用。
-- VLM 处理有上限的代表帧，保存画面及可见文字的实际观察时刻，明确稀疏覆盖。
-- Embedding 用于文档索引及查询向量；PostgreSQL 保存权威证据，Qdrant 保存可重建索引。
-
-三个模型适配分别保留输入/输出和同步/异步协议，共享必要的 HTTP 与认证配置。基础处理分来源开放，索引失败复用已经生成的证据，不重新执行成功的模型分析。
-
-本机基础设施沿用 PostgreSQL、Silo、Qdrant 和 RabbitMQ，模型凭据采用现有 `DASHSCOPE_API_KEY` 等配置；具体模型、区域、地址和运行配置在迁写时核对，并在实现后补全此处配置表。凭据不写入文档、日志或模型提示词。
-
-## RabbitMQ 与后台任务
-
-M1 保留并重构 RabbitMQ：Java 是模块化单体，任务生产者和消费者在同一 Spring Boot 应用，MQ 承担后台异步投递和积压。
-
-```text
-业务接纳事务：任务 + Outbox
-→ 确认发布到 RabbitMQ
-→ 有界消费者原子占用任务
-→ 阶段结果/下一步意图落盘
-→ ACK
-```
-
-媒体和分析使用两类工作队列，消息只携带任务等身份。数据库保存权威状态和回执；同一任务重复投递复用结果，安全临时失败有限重试，最终失败进入死信并保留数据库原因。付费提交不确定时停止自动重付。异步 ASR 保存提供方任务 ID，再经 MQ 派发到期查询步骤。
-
-合并时移除旧跨进程 HTTP 领取/回报、Worker 租约和心跳，保留库内原子占用、执行代次和取消检查。四个 Agent 读取工具继续 HTTP 调用，Python 不直接消费 MQ。后续按需细读及制作可以复用这条后台任务路径。
-
-实际重构后的确认、重复投递、有限重试、死信、broker 故障恢复和并发控制需要真实验证；本 README 当前记录目标方案，尚不代表新链路已经通过验收。
-
-## 工具与 Python 接入
-
-M1 真实模式通过 Python CLI 的 `JavaToolExecutor` 调用四个读取工具：
-
-| 工具 | 职责 |
-| --- | --- |
-| list_assets | 固定范围内的素材及处理状态 |
-| get_video_overview | 预生成时间导航目录及覆盖情况 |
-| search_evidence | 混合召回并返回权威证据 |
-| read_video_range | 按时间范围读取原始证据 |
-
-同一次问答固定范围快照，补答和恢复沿用；来源未就绪说明缺口，不自动等待。检索通道独立降级，同一工具调用重放复用回执，付费提交不确定时不自动重付。未接入能力明确不可用，真实模式不回退 Mock。
-
-按需细读、真实草稿校验和 Agent 制作接入属于后续里程碑。现有预览/导出规则及 FFmpeg 能力在合并单体时保留。
-
-## 构建、启动与验证
-
-以下命令适用于当前仓库结构，在**仓库根目录**执行：
+在仓库根目录执行；JDK 17、Maven 与 Docker 必须可用。新媒体集成测试在宿主机运行 FFmpeg/ffprobe，需安装它们。
 
 ```sh
 mvn -B -ntp verify
 ./scripts/start.sh
 ```
 
-Java 集成测试需要 Docker，部分媒体测试需要对应执行环境。当前启动脚本的配置及基础设施说明见 [仓库 README](../README.md)。
+单独运行本阶段集成验证：
 
-实现后将核对并补充：新单体的构建/启动命令、FFmpeg 与字体依赖、工作目录、数据库与对象存储配置、百炼模型配置、真实工具 CLI 命令及可复现验证入口。此处规划中的结构和能力尚未运行验收。
+```sh
+mvn -B -ntp -pl backend -am test \
+  -Dtest=LocalMediaIntegrationTest \
+  -Dsurefire.failIfNoSpecifiedTests=false
+```
 
-真实验收使用仓库已有的带标签视频，检查语音、画面、文字、时间偏移、来源区分及语义召回，并验证重放、恢复、取消、检索降级和既有渲染。自动化测试与真实模型运行分别报告，缺凭据或跳过测试不能记为通过。
+Compose 使用 `backend/Dockerfile` 构建前端和后端，运行镜像包含固定 FFmpeg 与 Noto CJK 字体。媒体工作目录为可写 `/work`，继续使用 `worker_work` 卷；空间核算读取该同一目录。数据库、Silo、RabbitMQ 和 Qdrant 持久卷保留，启动脚本不会删除旧数据。
 
-## 相关说明
+## 任务与 RabbitMQ
 
-- [M1 最终设计与实施计划](../docs/java-tools-m1-design.md)
-- [Python Agent 运行说明](../agent-service/README.md)
-- [后端分析与检索设计背景](../docs/video-understanding-retrieval.md)
+```text
+业务事务保存任务 + Outbox
+→ mandatory 持久消息 + publisher confirm + 无退回
+→ media.v1 / analysis.v1 有界消费者原子占用数据库任务
+→ 直接执行阶段，保存结果或下一次重试意图
+→ ACK；终态失败 Reject 到对应 media.dead.v1 / analysis.dead.v1
+```
+
+媒体消费者固定并发 1、prefetch 1，消费线程直接执行，不先 ACK 再移交线程池。消息重复投递由任务状态和原子占用挡住；终态重放复用已保存结果。安全媒体临时失败最多三次，重试意图经 Outbox/MQ 派发，任务的下次执行时间挡住旧消息提前启动重试。数据库仍保存失败原因。
+
+Outbox 发布失败按 2–60 秒有界退避保留意图，只有确认路由成功并获得发布确认才标记 `PUBLISHED`。RabbitMQ 不可用不会丢弃数据库任务。消费者 ACK 与 publisher confirm 是不同确认，详见 [RabbitMQ 官方说明](https://www.rabbitmq.com/docs/confirms)。
+
+单实例用进程内活跃集合识别执行者；数据库保存执行代次和取消状态。本机尝试不使用 Worker token、租约或心跳。周期核对不再活跃的运行代次，将安全媒体阶段重新接纳到 Outbox，拒绝废弃代次的迟到结果；取消后的 FFmpeg 在退出后才结束任务。临时目录在执行结束清理，残留目录在启动时回收。此机制仅用于单实例。
+
+## 当前配置与能力边界
+
+| 配置 | 当前作用 |
+| --- | --- |
+| `TASKS_DISPATCH_ENABLED` | 开启 Outbox 派发及恢复，Compose 为 true |
+| `TASKS_CONSUME_ENABLED` | 开启本机媒体/分析消费者，默认跟随派发开关 |
+| `ANALYSIS_CONSUMER_CONCURRENCY` | 分析消费者并发，初始 2；prefetch 1 |
+| `ASR_QUERY_SECONDS` | 异步查询间隔，默认 5 秒 |
+| `DASHSCOPE_API_KEY`、`DASHSCOPE_BASE_URL` | 百炼凭据与 DashScope API v1 地址，默认北京公共域名 |
+| `MEDIA_WORK_DIRECTORY` | 本机媒体工作目录；Compose 为 /work |
+| `DATABASE_*`、`STORAGE_*`、`RABBITMQ_*` | 沿用数据库、Silo 与 RabbitMQ 配置 |
+| `LEGACY_WORKER_ENABLED` | 默认 false；旧 HTTP Worker 协议返回 410 |
+| `LEGACY_AGENT_ENABLED` | 默认 false；旧浏览器 Agent 任务入口不可用 |
+| `LEGACY_INSPECTION_ENABLED` | 默认 false；按需细读尚未接入 |
+| `ANALYSIS_EXECUTION_ENABLED` | 单独启动默认 false，Compose 默认 true；上传后自动基础分析 |
+
+上传完成后经媒体队列保存探测、全音轨和稀疏帧，再自动接纳语音和基础视觉任务。无音轨 ASR 为 `NOT_APPLICABLE`；帧提取失败只影响视觉。默认模型为 `qwen3-asr-flash-filetrans`、`qwen3-vl-plus` 和 `text-embedding-v4`（1024维）。ASR 使用私有临时上传地址，VLM 只接收校验过的 JPEG，Embedding 分批至多10条。
+
+`AnalysisProcessing` 执行三个具体分析流程，不包含 MQ 或权限规则；调用 `TaskExecution` 的短事务入口登记和保存回执。模型和 Qdrant 请求均在事务外。`SearchIndexBuilder` 只写可重建索引，`SearchIndexes` 从 Qdrant 回读核对单元、向量及可查询性后才发布代次。
+
+ASR 等待保存远端任务身份、结束当前步骤并 ACK，下次查询经 Outbox/MQ 派发；正常等待不计入三次失败上限，30分钟后停止自动查询并保留远端身份。安全读取或索引写入临时失败最多三次。提交结果未知时停止自动重付；模型完整响应先持久化再解析，解析失败保留响应和用量。重复消息、重启或重建复用成功模型结果及向量。语音区间保留原音轨偏移；视觉证据保存真实观察点，稀疏覆盖始终 `complete=false`。
+
+分析失败终态保存数据库原因并 Reject 到 `analysis.dead.v1`。单实例恢复核对废弃代次：已有远端身份继续查询，已保存响应继续解析，没有响应的 `SUBMITTING` 调用转为 `UNCERTAIN` 并停止重付。取消后仍可保存已发生请求的回执，但不能发布证据或提交新动作。
+旧任务 HTTP 请求类型与部分业务实现暂留，用于明确开启 legacy 配置的历史契约回归；新媒体执行不经过这些 HTTP 路径。Python 旧分析适配器和旧服务已删除；这些 Java 夹具仅保留尚未重做的历史业务规则回归。Legacy 开关不是受支持的运行模式。
+
+## 问答快照与真实读取工具
+
+本机 CLI 使用 `INTERNAL_WORKER_TOKEN` 对 `/internal/v1/questions/**` 发起 Bearer 请求；复用内部安全链，不要求开启 legacy Worker。该凭据只在传输层使用。浏览器会话无法创建内部范围，模型参数不能携带项目、范围或认证字段。
+
+| 入口 | 请求/结果 |
+| --- | --- |
+| `POST /internal/v1/questions/scopes` | `{ "project_id": "UUID", "asset_ids": ["UUID"] }`；素材列表可省略，返回201及 `scope_id/project_id/assets/mock=false` |
+| `GET /internal/v1/questions/scopes/{scope_id}` | 读取原快照并核对必要依赖；恢复时使用此入口，不能重新读取最新 heads |
+| `POST /internal/v1/questions/scopes/{scope_id}/tools` | 接收 `call_id/tool_name/arguments/request_hash`；直接返回 Python `ToolResult` 字段，无浏览器 data 外层包装 |
+
+快照在 PostgreSQL 的 repeatable-read 短事务中保存素材元数据、分析版本、就绪来源、实际采样与语音覆盖、索引代次及可见证据/单元身份。晚发布的证据不会进入原快照；新普通消息重新创建快照，补答/重启沿用原身份。素材哈希、有效性、原分析/已发布索引或证据依赖失效返回明确错误，不切换当前 heads。未探测素材可以列出，其时长和来源保留未就绪状态。
+
+| 工具 | 参数（`cursor` 均为可选非负整数，默认0） |
+| --- | --- |
+| `list_assets` | `cursor` |
+| `get_video_overview` | `asset_id, cursor`；返回 `data.entries`，仅用于导航 |
+| `search_evidence` | `query, source_kinds, asset_ids, cursor`；来源默认 SPEECH，素材默认快照全部范围 |
+| `read_video_range` | `asset_id, start_ms, end_ms, cursor`；按半开区间读取快照原始证据，不调用向量服务 |
+
+请求哈希与 Python 一致：对 `{ "tool": tool_name, "args": arguments }` 使用键排序、紧凑 JSON 和 UTF-8 SHA256；哈希包含请求原样参数（含 cursor），不能先补默认字段后核验。检索排名的条件身份单独规范化素材/来源排序和默认值，并排除 cursor。相同范围与调用身份内容不同返回 `CALL_ID_CONFLICT`；完成重放复用持久反馈；未完成回执返回 `CALL_UNCONFIRMED`，不自动重执行。没有旧每任务12次工具限制，Python 沿用现有模型／工具预算。
+
+工具反馈最大32768 UTF-8字节，`data.next_cursor=null` 表示页尾；调用方需累积前页。`coverage.page_complete` / `navigation_complete` 表示到达当前集合末尾，只有消费全部页面才可视为目录读完，不能据此判断分析完整。单条记录及元数据过大明确报错，不截断原文。语音保留原区间、音轨时间与字词观察；视觉返回 `observed_at_ms/time_kind=POINT`，不制造正长度区间。覆盖中的稀疏视觉始终不完整。
+
+检索各通道独立执行，Qdrant 在召回前按快照索引代次及各素材已就绪来源过滤，再从 PostgreSQL 回查快照证据。每通道至多50个候选，融合排名至多100个单元；`candidates_truncated/channel_limit/candidate_limit` 与实际来源缺口分别返回。`data.channels` 报告 DENSE/BM25/LITERAL 状态，Embedding 或 Qdrant 失败时仍返回可用通道依据。排名、查询提交身份、响应、向量及用量持久保存；翻页和同条件新调用复用排名，不重复付费。同模型/维度一次提交失败后，该查询其他分组也不再次提交。付费结果不确定标为 UNCERTAIN，不能通过重放恢复付费。
+
+未就绪返回 `ERROR/SOURCE_NOT_READY` 并保留来源状态；部分来源就绪则 `READY` 返回已有依据和缺口。四读取工具不启动分析、不返回需自动等待的 PENDING。权限、快照失效、身份冲突、未核对执行或费用不确定都不属于参数修复；调用方应结束本次尝试或说明缺口。空匹配只表示当前快照和有界召回未命中。
+
+第三阶段受控契约验证：
+
+```sh
+mvn -B -ntp -pl backend -am test \
+  -Dtest=ReadToolsIntegrationTest,ToolJsonTest -Dsurefire.failIfNoSpecifiedTests=false
+cd agent-service
+.venv/bin/python -m pytest tests/test_java_read_tool_contract.py tests/test_tool_contracts.py -q
+```
+
+## 验证入口与记录
+
+最终设计到实现的逐项核对、审查修复与提交前回归见[收尾审查](../docs/verification/java-tools-m1-closeout.md)。
+
+Python `JavaToolExecutor`、真实模式能力目录、点证据语义及补答/恢复已接入，CLI 命令见 [Python README](../agent-service/README.md)，本阶段验证见 [第四阶段记录](../docs/verification/java-tools-m1-stage4.md)。
+
+第二阶段固定四样本的百炼真实验收已通过，具体边界见阶段记录。第三阶段四工具验证见工具阶段记录；Python 问答、补答及恢复已完成第四阶段验证；综合验收和未验证边界见[第五阶段记录](../docs/verification/java-tools-m1-stage5.md)。历史 Python 模型脚本和依赖独立 Worker 的浏览器故障脚本不能充当 M1 验收；阶段记录分别报告真实基础设施运行与未运行项目。
+
+- [M1 最终设计](../docs/java-tools-m1-design.md)
+- [ADR-0017](../docs/adr/0017-move-baseline-analysis-and-reading-tools-into-java.md)
+- [Python Agent 说明](../agent-service/README.md)
 - [方案与渲染契约](../docs/edit-plan-contract.md)
 
-以上背景文档包含历史执行形态；M1 的新职责与范围以 M1 设计及 ADR-0017 为准。实施后在本 README 维护真实运行方式，并链接新的验收记录。
+真实分析与工具验证入口（仓库根目录）：
+
+```sh
+mvn -B -ntp -pl backend -am test -Dtest=LocalAnalysisIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false
+node scripts/test-models.mjs
+```
+
+后一个命令明确执行付费模型和四工具 HTTP 验收，读取环境或根 `.env` 中的百炼凭据，用临时真实基础设施上传四个固定视频。缺少凭据或测试被跳过返回 `UNVERIFIED` / 退出码2，不报告成功。普通 Maven 回归不调用付费模型。
+
+从全新上传贯通 Python 四工具和 DeepSeek 的付费验收：
+
+```sh
+agent-service/.venv/bin/python agent-service/scripts/verify_java_m1.py --output agent-service/.local/stage5-new
+```
+
+另需 `DEEPSEEK_API_KEY` 与本机 Python 虚拟环境。该脚本保存新素材范围、百炼回执、语义查询、四工具反馈、DeepSeek回答与 trace；它与只运行 Java 的 `test-models.mjs` 分别报告。实际SIGKILL恢复及单体媒体浏览器回归入口见第五阶段记录；服务重启后浏览器须重新登录。

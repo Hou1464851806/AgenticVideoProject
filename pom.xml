@@ -17,8 +17,7 @@
     <packaging>pom</packaging>
 
     <modules>
-        <module>backend/business-api</module>
-        <module>backend/media-worker</module>
+        <module>backend</module>
     </modules>
 
     <properties>

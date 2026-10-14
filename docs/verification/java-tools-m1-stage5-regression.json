@@ -1,0 +1,253 @@
+{
+  "maven_full": [
+    {
+      "name": "com.agenticvideo.business.auth.AuthenticationApiIntegrationTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "8.259"
+    },
+    {
+      "name": "com.agenticvideo.business.usage.ProjectUsageApiIntegrationTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "14.334"
+    },
+    {
+      "name": "com.agenticvideo.business.upload.UploadApiIntegrationTest",
+      "tests": "14",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "171.783"
+    },
+    {
+      "name": "com.agenticvideo.business.conversation.ModelRecordLimitApiIntegrationTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "3.825"
+    },
+    {
+      "name": "com.agenticvideo.business.tools.ReadToolsIntegrationTest",
+      "tests": "9",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "19.277"
+    },
+    {
+      "name": "com.agenticvideo.business.auth.AuthenticationRateLimitIntegrationTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "7.842"
+    },
+    {
+      "name": "com.agenticvideo.business.upload.UploadSpaceRecheckIntegrationTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "6.741"
+    },
+    {
+      "name": "com.agenticvideo.business.conversation.ConversationRecoveryApiIntegrationTest",
+      "tests": "9",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "53.516"
+    },
+    {
+      "name": "com.agenticvideo.business.search.SearchIndexApiIntegrationTest",
+      "tests": "9",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "26.437"
+    },
+    {
+      "name": "com.agenticvideo.business.upload.UploadExpiryIntegrationTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "22.579"
+    },
+    {
+      "name": "com.agenticvideo.business.plan.EditPlanApiIntegrationTest",
+      "tests": "16",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "24.366"
+    },
+    {
+      "name": "com.agenticvideo.business.tools.ToolJsonTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.008"
+    },
+    {
+      "name": "com.agenticvideo.business.project.ProjectApiIntegrationTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "13.992"
+    },
+    {
+      "name": "com.agenticvideo.business.conversation.ConversationApiIntegrationTest",
+      "tests": "30",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "35.491"
+    },
+    {
+      "name": "com.agenticvideo.business.analysis.VisualApiIntegrationTest",
+      "tests": "9",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "18.089"
+    },
+    {
+      "name": "com.agenticvideo.business.task.JavaAnalysisLiveTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "4",
+      "time": "0.0"
+    },
+    {
+      "name": "com.agenticvideo.business.upload.UploadGlobalCapacityIntegrationTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "11.376"
+    },
+    {
+      "name": "com.agenticvideo.business.task.OutboxPublishingIntegrationTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "14.77"
+    },
+    {
+      "name": "com.agenticvideo.business.render.PreviewApiIntegrationTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "14.164"
+    },
+    {
+      "name": "com.agenticvideo.business.task.LocalMediaIntegrationTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "79.993"
+    },
+    {
+      "name": "com.agenticvideo.business.upload.UploadQuotaIntegrationTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "12.733"
+    },
+    {
+      "name": "com.agenticvideo.business.render.RenderCapacityIntegrationTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "11.846"
+    },
+    {
+      "name": "com.agenticvideo.business.task.LocalAnalysisIntegrationTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "55.678"
+    },
+    {
+      "name": "com.agenticvideo.business.render.ExportApiIntegrationTest",
+      "tests": "9",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "30.655"
+    },
+    {
+      "name": "com.agenticvideo.business.upload.UploadLowSpaceIntegrationTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "7.171"
+    },
+    {
+      "name": "com.agenticvideo.business.task.TaskApiIntegrationTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "12.823"
+    }
+  ],
+  "python": {
+    "passed": 67,
+    "skipped": 0
+  },
+  "media_browser": {
+    "passed": 5
+  },
+  "frontend_build": "passed",
+  "start_script": "passed",
+  "maven_final_focused": [
+    {
+      "name": "com.agenticvideo.business.task.LocalAnalysisIntegrationTest",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "79.392"
+    },
+    {
+      "name": "com.agenticvideo.business.task.LocalMediaIntegrationTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "78.022"
+    }
+  ],
+  "render_browser_initial": {
+    "passed": 4,
+    "failed": 2,
+    "reason": "Fixtures: login required after Java restart; wait for stored conversation view before selecting test revision"
+  },
+  "render_browser_final_subset": {
+    "passed": 2,
+    "failed": 0,
+    "tests": [
+      "refresh restores button-created exports and an older successful file remains accessible after a later failure",
+      "confirmed version exports actual 720p and 1080p MP4 without requiring a preview"
+    ]
+  },
+  "verified_unique_browser_tests": 11
+}

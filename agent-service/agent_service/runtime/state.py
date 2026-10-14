@@ -88,6 +88,7 @@ class State(TypedDict, total=False):
     next_node: str
     stop_reason: str | None
     scenario: str
+    question_scope: dict | None
 
 
 @dataclass
@@ -100,6 +101,7 @@ class Context:
     stop: Any
     progress: Any
     assets: dict
+    mock: bool = True
 
 
 def merge_requirements(current: dict, parsed: Understanding, message_id: str) -> dict:

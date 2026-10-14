@@ -31,14 +31,36 @@ for path in args.results:
             break
     assert observations, 'No actual observations found'
     serialized = json.dumps([o.model_dump() for o in observations], default=str)
-    for key in ('DEEPSEEK_API_KEY','LANGFUSE_SECRET_KEY'):
+    for key in ('DEEPSEEK_API_KEY','LANGFUSE_SECRET_KEY','INTERNAL_WORKER_TOKEN'):
         assert not os.environ.get(key) or os.environ[key] not in serialized, 'Credential found in trace'
     generations = [o for o in observations if o.type == 'GENERATION']
     tools = [o for o in observations if o.type == 'TOOL']
     roots = [o for o in observations if o.type == 'AGENT']
     assert roots and roots[0].metadata['execution_id'] == result['identity']['execution_id']
     assert all(o.model == 'deepseek-flash' and o.usage_details for o in generations)
-    assert all(o.metadata.get('mock') is True for o in tools)
+    mock = result.get('outcome', {}).get('mock', True)
+    assert all(str(o.metadata.get('mock')).lower() == str(mock).lower() for o in tools)
+    if not mock:
+        assert all(o.metadata.get('call_id') and o.metadata.get('request_hash') for o in tools)
+        assert all((json.loads(o.output) if isinstance(o.output, str) else o.output).get('mock') is False for o in tools)
+        assert str(roots[0].metadata.get('mock')).lower() == 'false'
+        assert all(o.metadata.get('question_scope_id') == result['question_scope']['scope_id'] for o in generations)
+        def check_real(value):
+            if isinstance(value, dict):
+                assert value.get('mock') is not True, 'Mock marker found in real trace payload'
+                for item in value.values():
+                    check_real(item)
+            elif isinstance(value, list):
+                for item in value:
+                    check_real(item)
+        for observation in observations:
+            for payload in (observation.input, observation.output):
+                if isinstance(payload, str):
+                    try:
+                        payload = json.loads(payload)
+                    except ValueError:
+                        continue
+                check_real(payload)
     report.append({'result_file':str(path), 'status':result['status'], 'trace_id':result['trace_id'],
                    'execution_id':result['identity']['execution_id'], 'observations':dict(Counter(o.type for o in observations)),
                    'generation_tokens':sum(o.usage_details.get('total',0) for o in generations),

@@ -1,0 +1,1895 @@
+{
+  "date": "2026-10-15",
+  "clarification": {
+    "first": {
+      "thread_id": "5238996e-c7a8-45bb-9a47-7bd44f339d8a",
+      "identity": {
+        "session_id": "bce78b7e-9854-45a4-b172-6a95d94a7944",
+        "requirement_id": "5238996e-c7a8-45bb-9a47-7bd44f339d8a",
+        "execution_id": "9e2974dd-9d76-4341-b565-a16759386490",
+        "turn_id": "a27011bc-4f59-4601-a5bd-2cd59d213766"
+      },
+      "status": "WAITING",
+      "waiting": {
+        "kind": "USER_INPUT",
+        "wait_id": "6ffcad720425ef34dbd6a24274201adc2afc8e94b817a027ce95161f078131d1",
+        "question": "要查哪些内容？"
+      },
+      "outcome": null,
+      "question_scope": {
+        "scope_id": "265d9396-674f-4e9c-b914-5284ed0922b1",
+        "assets": [
+          {
+            "id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+            "filename": "labelled-speech.mp4",
+            "source_sha256": "1eef2b3ae2095123326816ebb3cf1955071639d6a4fec18f8dc86b5339416a9f",
+            "validation_status": "VALID",
+            "duration_ms": 14044,
+            "analysis_version": "d21627c5-99b6-4641-b793-da215bebf0ed",
+            "index_generation": "99071edc-4b02-4b13-82af-189a18337693",
+            "sources": {
+              "SPEECH": "SUCCEEDED",
+              "VISUAL": "NOT_STARTED",
+              "VISIBLE_TEXT": "NOT_STARTED"
+            },
+            "source_kinds": [
+              "SPEECH"
+            ],
+            "coverage": {
+              "speech_processed_ranges": [
+                {
+                  "start_ms": 1436,
+                  "end_ms": 14044
+                }
+              ],
+              "sampling": {
+                "kind": "SPARSE_FRAMES",
+                "rule": "real-pts-window-v1",
+                "endMs": 14044,
+                "startMs": 0,
+                "complete": false,
+                "maxFrames": 25,
+                "intervalMs": 2000
+              },
+              "visual_complete": false,
+              "sampled_at_ms": [
+                0,
+                2000,
+                4000,
+                6000,
+                8000,
+                10000,
+                12000
+              ]
+            }
+          }
+        ],
+        "mock": false,
+        "project_id": "6196cf6f-5640-466e-95e6-6c6ac8ddc7a1"
+      },
+      "requirements": {
+        "mode": "QUERY",
+        "topic": "",
+        "duration_min_ms": null,
+        "duration_max_ms": null,
+        "output_count": 1,
+        "asset_ids": null,
+        "forbidden_content": [],
+        "sources": {}
+      },
+      "pending_tool": null,
+      "usage": {
+        "tools": 0,
+        "repairs": 0,
+        "no_progress": 0,
+        "decisions": 0,
+        "model_calls": 1,
+        "active_seconds": 0.008150459005264565,
+        "status": "WAITING"
+      }
+    },
+    "second": {
+      "thread_id": "5238996e-c7a8-45bb-9a47-7bd44f339d8a",
+      "identity": {
+        "session_id": "bce78b7e-9854-45a4-b172-6a95d94a7944",
+        "requirement_id": "5238996e-c7a8-45bb-9a47-7bd44f339d8a",
+        "execution_id": "9e2974dd-9d76-4341-b565-a16759386490",
+        "turn_id": "a27011bc-4f59-4601-a5bd-2cd59d213766"
+      },
+      "status": "ANSWER",
+      "waiting": null,
+      "outcome": {
+        "status": "ANSWER",
+        "content": "姓名张明，三个步骤为上传素材、核查原文、导出。",
+        "evidence_ids": [
+          "dd3fe7cb-e244-4933-9b82-a237974cf844",
+          "d2b00579-6f3e-41da-95d9-1ad6052936ff",
+          "b7bee65a-5061-4d81-a8ea-d1653e04b4bd",
+          "a3d03189-6aec-4f41-8d9f-7308455d3ae3",
+          "af8f4450-216b-45a4-9894-557b08438689"
+        ],
+        "sources": [
+          {
+            "id": "dd3fe7cb-e244-4933-9b82-a237974cf844",
+            "asset_id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+            "analysis_version": "d21627c5-99b6-4641-b793-da215bebf0ed",
+            "source_kind": "SPEECH",
+            "text": "第二步，核查原文。",
+            "time_kind": "INTERVAL",
+            "start_ms": 9916,
+            "end_ms": 11836,
+            "audio_start_ms": 8480,
+            "audio_end_ms": 10400,
+            "temporal_precision": "MODEL_TIMESTAMPS",
+            "observation": {
+              "text": "第二步，核查原文。",
+              "words": [
+                {
+                  "text": "第",
+                  "end_time": 8640,
+                  "begin_time": 8480,
+                  "punctuation": ""
+                },
+                {
+                  "text": "二",
+                  "end_time": 8800,
+                  "begin_time": 8640,
+                  "punctuation": ""
+                },
+                {
+                  "text": "步",
+                  "end_time": 9120,
+                  "begin_time": 8800,
+                  "punctuation": "，"
+                },
+                {
+                  "text": "核",
+                  "end_time": 9600,
+                  "begin_time": 9440,
+                  "punctuation": ""
+                },
+                {
+                  "text": "查",
+                  "end_time": 9840,
+                  "begin_time": 9600,
+                  "punctuation": ""
+                },
+                {
+                  "text": "原",
+                  "end_time": 10080,
+                  "begin_time": 9840,
+                  "punctuation": ""
+                },
+                {
+                  "text": "文",
+                  "end_time": 10400,
+                  "begin_time": 10080,
+                  "punctuation": "。"
+                }
+              ],
+              "emotion": "neutral",
+              "end_time": 10400,
+              "language": "zh",
+              "begin_time": 8480,
+              "sentence_id": 3
+            }
+          },
+          {
+            "id": "d2b00579-6f3e-41da-95d9-1ad6052936ff",
+            "asset_id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+            "analysis_version": "d21627c5-99b6-4641-b793-da215bebf0ed",
+            "source_kind": "SPEECH",
+            "text": "第一步，上传素材。",
+            "time_kind": "INTERVAL",
+            "start_ms": 7276,
+            "end_ms": 9356,
+            "audio_start_ms": 5840,
+            "audio_end_ms": 7920,
+            "temporal_precision": "MODEL_TIMESTAMPS",
+            "observation": {
+              "text": "第一步，上传素材。",
+              "words": [
+                {
+                  "text": "第",
+                  "end_time": 6080,
+                  "begin_time": 5840,
+                  "punctuation": ""
+                },
+                {
+                  "text": "一",
+                  "end_time": 6160,
+                  "begin_time": 6080,
+                  "punctuation": ""
+                },
+                {
+                  "text": "步",
+                  "end_time": 6400,
+                  "begin_time": 6160,
+                  "punctuation": "，"
+                },
+                {
+                  "text": "上",
+                  "end_time": 6960,
+                  "begin_time": 6720,
+                  "punctuation": ""
+                },
+                {
+                  "text": "传",
+                  "end_time": 7360,
+                  "begin_time": 7040,
+                  "punctuation": ""
+                },
+                {
+                  "text": "素",
+                  "end_time": 7520,
+                  "begin_time": 7360,
+                  "punctuation": ""
+                },
+                {
+                  "text": "材",
+                  "end_time": 7920,
+                  "begin_time": 7600,
+                  "punctuation": "。"
+                }
+              ],
+              "emotion": "neutral",
+              "end_time": 7920,
+              "language": "zh",
+              "begin_time": 5840,
+              "sentence_id": 2
+            }
+          },
+          {
+            "id": "b7bee65a-5061-4d81-a8ea-d1653e04b4bd",
+            "asset_id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+            "analysis_version": "d21627c5-99b6-4641-b793-da215bebf0ed",
+            "source_kind": "SPEECH",
+            "text": "第三步，导出。",
+            "time_kind": "INTERVAL",
+            "start_ms": 12476,
+            "end_ms": 13916,
+            "audio_start_ms": 11040,
+            "audio_end_ms": 12480,
+            "temporal_precision": "MODEL_TIMESTAMPS",
+            "observation": {
+              "text": "第三步，导出。",
+              "words": [
+                {
+                  "text": "第",
+                  "end_time": 11200,
+                  "begin_time": 11040,
+                  "punctuation": ""
+                },
+                {
+                  "text": "三",
+                  "end_time": 11440,
+                  "begin_time": 11200,
+                  "punctuation": ""
+                },
+                {
+                  "text": "步",
+                  "end_time": 11760,
+                  "begin_time": 11520,
+                  "punctuation": "，"
+                },
+                {
+                  "text": "导",
+                  "end_time": 12240,
+                  "begin_time": 12080,
+                  "punctuation": ""
+                },
+                {
+                  "text": "出",
+                  "end_time": 12480,
+                  "begin_time": 12240,
+                  "punctuation": "。"
+                }
+              ],
+              "emotion": "neutral",
+              "end_time": 12480,
+              "language": "zh",
+              "begin_time": 11040,
+              "sentence_id": 4
+            }
+          },
+          {
+            "id": "a3d03189-6aec-4f41-8d9f-7308455d3ae3",
+            "asset_id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+            "analysis_version": "d21627c5-99b6-4641-b793-da215bebf0ed",
+            "source_kind": "SPEECH",
+            "text": "今天介绍三个视频制作步骤。",
+            "time_kind": "INTERVAL",
+            "start_ms": 3996,
+            "end_ms": 6716,
+            "audio_start_ms": 2560,
+            "audio_end_ms": 5280,
+            "temporal_precision": "MODEL_TIMESTAMPS",
+            "observation": {
+              "text": "今天介绍三个视频制作步骤。",
+              "words": [
+                {
+                  "text": "今",
+                  "end_time": 2800,
+                  "begin_time": 2560,
+                  "punctuation": ""
+                },
+                {
+                  "text": "天",
+                  "end_time": 3120,
+                  "begin_time": 2800,
+                  "punctuation": ""
+                },
+                {
+                  "text": "介",
+                  "end_time": 3280,
+                  "begin_time": 3120,
+                  "punctuation": ""
+                },
+                {
+                  "text": "绍",
+                  "end_time": 3520,
+                  "begin_time": 3280,
+                  "punctuation": ""
+                },
+                {
+                  "text": "三",
+                  "end_time": 3760,
+                  "begin_time": 3520,
+                  "punctuation": ""
+                },
+                {
+                  "text": "个",
+                  "end_time": 4000,
+                  "begin_time": 3840,
+                  "punctuation": ""
+                },
+                {
+                  "text": "视",
+                  "end_time": 4160,
+                  "begin_time": 4000,
+                  "punctuation": ""
+                },
+                {
+                  "text": "频",
+                  "end_time": 4480,
+                  "begin_time": 4160,
+                  "punctuation": ""
+                },
+                {
+                  "text": "制",
+                  "end_time": 4640,
+                  "begin_time": 4480,
+                  "punctuation": ""
+                },
+                {
+                  "text": "作",
+                  "end_time": 4800,
+                  "begin_time": 4640,
+                  "punctuation": ""
+                },
+                {
+                  "text": "步",
+                  "end_time": 4960,
+                  "begin_time": 4800,
+                  "punctuation": ""
+                },
+                {
+                  "text": "骤",
+                  "end_time": 5280,
+                  "begin_time": 5040,
+                  "punctuation": "。"
+                }
+              ],
+              "emotion": "neutral",
+              "end_time": 5280,
+              "language": "zh",
+              "begin_time": 2560,
+              "sentence_id": 1
+            }
+          },
+          {
+            "id": "af8f4450-216b-45a4-9894-557b08438689",
+            "asset_id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+            "analysis_version": "d21627c5-99b6-4641-b793-da215bebf0ed",
+            "source_kind": "SPEECH",
+            "text": "大家好，我叫张明。",
+            "time_kind": "INTERVAL",
+            "start_ms": 1436,
+            "end_ms": 3436,
+            "audio_start_ms": 0,
+            "audio_end_ms": 2000,
+            "temporal_precision": "MODEL_TIMESTAMPS",
+            "observation": {
+              "text": "大家好，我叫张明。",
+              "words": [
+                {
+                  "text": "大",
+                  "end_time": 160,
+                  "begin_time": 0,
+                  "punctuation": ""
+                },
+                {
+                  "text": "家",
+                  "end_time": 400,
+                  "begin_time": 160,
+                  "punctuation": ""
+                },
+                {
+                  "text": "好",
+                  "end_time": 800,
+                  "begin_time": 400,
+                  "punctuation": "，"
+                },
+                {
+                  "text": "我",
+                  "end_time": 1280,
+                  "begin_time": 1120,
+                  "punctuation": ""
+                },
+                {
+                  "text": "叫",
+                  "end_time": 1440,
+                  "begin_time": 1280,
+                  "punctuation": ""
+                },
+                {
+                  "text": "张",
+                  "end_time": 1760,
+                  "begin_time": 1520,
+                  "punctuation": ""
+                },
+                {
+                  "text": "明",
+                  "end_time": 2000,
+                  "begin_time": 1760,
+                  "punctuation": "。"
+                }
+              ],
+              "emotion": "neutral",
+              "end_time": 2000,
+              "language": "zh",
+              "begin_time": 0,
+              "sentence_id": 0
+            }
+          }
+        ],
+        "mock": false
+      },
+      "question_scope": {
+        "scope_id": "265d9396-674f-4e9c-b914-5284ed0922b1",
+        "assets": [
+          {
+            "id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+            "filename": "labelled-speech.mp4",
+            "source_sha256": "1eef2b3ae2095123326816ebb3cf1955071639d6a4fec18f8dc86b5339416a9f",
+            "validation_status": "VALID",
+            "duration_ms": 14044,
+            "analysis_version": "d21627c5-99b6-4641-b793-da215bebf0ed",
+            "index_generation": "99071edc-4b02-4b13-82af-189a18337693",
+            "sources": {
+              "SPEECH": "SUCCEEDED",
+              "VISUAL": "NOT_STARTED",
+              "VISIBLE_TEXT": "NOT_STARTED"
+            },
+            "source_kinds": [
+              "SPEECH"
+            ],
+            "coverage": {
+              "speech_processed_ranges": [
+                {
+                  "start_ms": 1436,
+                  "end_ms": 14044
+                }
+              ],
+              "sampling": {
+                "kind": "SPARSE_FRAMES",
+                "rule": "real-pts-window-v1",
+                "endMs": 14044,
+                "startMs": 0,
+                "complete": false,
+                "maxFrames": 25,
+                "intervalMs": 2000
+              },
+              "visual_complete": false,
+              "sampled_at_ms": [
+                0,
+                2000,
+                4000,
+                6000,
+                8000,
+                10000,
+                12000
+              ]
+            }
+          }
+        ],
+        "mock": false,
+        "project_id": "6196cf6f-5640-466e-95e6-6c6ac8ddc7a1"
+      },
+      "requirements": {
+        "mode": "QUERY",
+        "topic": "",
+        "duration_min_ms": null,
+        "duration_max_ms": null,
+        "output_count": 1,
+        "asset_ids": null,
+        "forbidden_content": [],
+        "sources": {}
+      },
+      "pending_tool": null,
+      "usage": {
+        "tools": 1,
+        "repairs": 0,
+        "no_progress": 0,
+        "decisions": 2,
+        "model_calls": 4,
+        "active_seconds": 0.07549883400497492,
+        "status": "ANSWER"
+      }
+    }
+  },
+  "recovery": {
+    "crashed": {
+      "thread_id": "stage4-recovery",
+      "identity": {
+        "session_id": "8dfc05d2-7847-413b-82f6-0c3ef6636936",
+        "requirement_id": "stage4-recovery",
+        "execution_id": "3490d777-b529-433e-91e0-bbb08d7606e8",
+        "turn_id": "4a810aed-0539-48ce-aeaf-d9133ecc7d57"
+      },
+      "status": "FAILED",
+      "waiting": null,
+      "outcome": null,
+      "question_scope": {
+        "scope_id": "a5706bb0-b181-4581-b69a-d1d392b75fc9",
+        "assets": [
+          {
+            "id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+            "filename": "labelled-speech.mp4",
+            "source_sha256": "1eef2b3ae2095123326816ebb3cf1955071639d6a4fec18f8dc86b5339416a9f",
+            "validation_status": "VALID",
+            "duration_ms": 14044,
+            "analysis_version": "d21627c5-99b6-4641-b793-da215bebf0ed",
+            "index_generation": "99071edc-4b02-4b13-82af-189a18337693",
+            "sources": {
+              "SPEECH": "SUCCEEDED",
+              "VISUAL": "NOT_STARTED",
+              "VISIBLE_TEXT": "NOT_STARTED"
+            },
+            "source_kinds": [
+              "SPEECH"
+            ],
+            "coverage": {
+              "speech_processed_ranges": [
+                {
+                  "start_ms": 1436,
+                  "end_ms": 14044
+                }
+              ],
+              "sampling": {
+                "kind": "SPARSE_FRAMES",
+                "rule": "real-pts-window-v1",
+                "endMs": 14044,
+                "startMs": 0,
+                "complete": false,
+                "maxFrames": 25,
+                "intervalMs": 2000
+              },
+              "visual_complete": false,
+              "sampled_at_ms": [
+                0,
+                2000,
+                4000,
+                6000,
+                8000,
+                10000,
+                12000
+              ]
+            }
+          }
+        ],
+        "mock": false,
+        "project_id": "6196cf6f-5640-466e-95e6-6c6ac8ddc7a1"
+      },
+      "requirements": {
+        "mode": "QUERY",
+        "topic": "",
+        "duration_min_ms": null,
+        "duration_max_ms": null,
+        "output_count": 1,
+        "asset_ids": null,
+        "forbidden_content": [],
+        "sources": {}
+      },
+      "pending_tool": {
+        "call_id": "3490d777-b529-433e-91e0-bbb08d7606e8:tool:0",
+        "tool_name": "read_video_range",
+        "arguments": {
+          "cursor": 0,
+          "asset_id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+          "start_ms": 0,
+          "end_ms": 14044
+        },
+        "request_hash": "d9097db32eb73a7c385ad0d1dca6e1b2771dca2b03d1790386ce253c89545c70"
+      },
+      "usage": {
+        "tools": 1,
+        "repairs": 0,
+        "no_progress": 0,
+        "decisions": 1,
+        "model_calls": 2,
+        "active_seconds": 0.044676500008790754,
+        "status": "FAILED"
+      }
+    },
+    "resumed": {
+      "thread_id": "stage4-recovery",
+      "identity": {
+        "session_id": "8dfc05d2-7847-413b-82f6-0c3ef6636936",
+        "requirement_id": "stage4-recovery",
+        "execution_id": "3490d777-b529-433e-91e0-bbb08d7606e8",
+        "turn_id": "4a810aed-0539-48ce-aeaf-d9133ecc7d57"
+      },
+      "status": "ANSWER",
+      "waiting": null,
+      "outcome": {
+        "status": "ANSWER",
+        "content": "姓名张明，三个步骤为上传素材、核查原文、导出。",
+        "evidence_ids": [
+          "dd3fe7cb-e244-4933-9b82-a237974cf844",
+          "d2b00579-6f3e-41da-95d9-1ad6052936ff",
+          "b7bee65a-5061-4d81-a8ea-d1653e04b4bd",
+          "a3d03189-6aec-4f41-8d9f-7308455d3ae3",
+          "af8f4450-216b-45a4-9894-557b08438689"
+        ],
+        "sources": [
+          {
+            "id": "dd3fe7cb-e244-4933-9b82-a237974cf844",
+            "text": "第二步，核查原文。",
+            "end_ms": 11836,
+            "asset_id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+            "start_ms": 9916,
+            "time_kind": "INTERVAL",
+            "observation": {
+              "text": "第二步，核查原文。",
+              "words": [
+                {
+                  "text": "第",
+                  "end_time": 8640,
+                  "begin_time": 8480,
+                  "punctuation": ""
+                },
+                {
+                  "text": "二",
+                  "end_time": 8800,
+                  "begin_time": 8640,
+                  "punctuation": ""
+                },
+                {
+                  "text": "步",
+                  "end_time": 9120,
+                  "begin_time": 8800,
+                  "punctuation": "，"
+                },
+                {
+                  "text": "核",
+                  "end_time": 9600,
+                  "begin_time": 9440,
+                  "punctuation": ""
+                },
+                {
+                  "text": "查",
+                  "end_time": 9840,
+                  "begin_time": 9600,
+                  "punctuation": ""
+                },
+                {
+                  "text": "原",
+                  "end_time": 10080,
+                  "begin_time": 9840,
+                  "punctuation": ""
+                },
+                {
+                  "text": "文",
+                  "end_time": 10400,
+                  "begin_time": 10080,
+                  "punctuation": "。"
+                }
+              ],
+              "emotion": "neutral",
+              "end_time": 10400,
+              "language": "zh",
+              "begin_time": 8480,
+              "sentence_id": 3
+            },
+            "source_kind": "SPEECH",
+            "audio_end_ms": 10400,
+            "audio_start_ms": 8480,
+            "analysis_version": "d21627c5-99b6-4641-b793-da215bebf0ed",
+            "temporal_precision": "MODEL_TIMESTAMPS"
+          },
+          {
+            "id": "d2b00579-6f3e-41da-95d9-1ad6052936ff",
+            "text": "第一步，上传素材。",
+            "end_ms": 9356,
+            "asset_id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+            "start_ms": 7276,
+            "time_kind": "INTERVAL",
+            "observation": {
+              "text": "第一步，上传素材。",
+              "words": [
+                {
+                  "text": "第",
+                  "end_time": 6080,
+                  "begin_time": 5840,
+                  "punctuation": ""
+                },
+                {
+                  "text": "一",
+                  "end_time": 6160,
+                  "begin_time": 6080,
+                  "punctuation": ""
+                },
+                {
+                  "text": "步",
+                  "end_time": 6400,
+                  "begin_time": 6160,
+                  "punctuation": "，"
+                },
+                {
+                  "text": "上",
+                  "end_time": 6960,
+                  "begin_time": 6720,
+                  "punctuation": ""
+                },
+                {
+                  "text": "传",
+                  "end_time": 7360,
+                  "begin_time": 7040,
+                  "punctuation": ""
+                },
+                {
+                  "text": "素",
+                  "end_time": 7520,
+                  "begin_time": 7360,
+                  "punctuation": ""
+                },
+                {
+                  "text": "材",
+                  "end_time": 7920,
+                  "begin_time": 7600,
+                  "punctuation": "。"
+                }
+              ],
+              "emotion": "neutral",
+              "end_time": 7920,
+              "language": "zh",
+              "begin_time": 5840,
+              "sentence_id": 2
+            },
+            "source_kind": "SPEECH",
+            "audio_end_ms": 7920,
+            "audio_start_ms": 5840,
+            "analysis_version": "d21627c5-99b6-4641-b793-da215bebf0ed",
+            "temporal_precision": "MODEL_TIMESTAMPS"
+          },
+          {
+            "id": "b7bee65a-5061-4d81-a8ea-d1653e04b4bd",
+            "text": "第三步，导出。",
+            "end_ms": 13916,
+            "asset_id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+            "start_ms": 12476,
+            "time_kind": "INTERVAL",
+            "observation": {
+              "text": "第三步，导出。",
+              "words": [
+                {
+                  "text": "第",
+                  "end_time": 11200,
+                  "begin_time": 11040,
+                  "punctuation": ""
+                },
+                {
+                  "text": "三",
+                  "end_time": 11440,
+                  "begin_time": 11200,
+                  "punctuation": ""
+                },
+                {
+                  "text": "步",
+                  "end_time": 11760,
+                  "begin_time": 11520,
+                  "punctuation": "，"
+                },
+                {
+                  "text": "导",
+                  "end_time": 12240,
+                  "begin_time": 12080,
+                  "punctuation": ""
+                },
+                {
+                  "text": "出",
+                  "end_time": 12480,
+                  "begin_time": 12240,
+                  "punctuation": "。"
+                }
+              ],
+              "emotion": "neutral",
+              "end_time": 12480,
+              "language": "zh",
+              "begin_time": 11040,
+              "sentence_id": 4
+            },
+            "source_kind": "SPEECH",
+            "audio_end_ms": 12480,
+            "audio_start_ms": 11040,
+            "analysis_version": "d21627c5-99b6-4641-b793-da215bebf0ed",
+            "temporal_precision": "MODEL_TIMESTAMPS"
+          },
+          {
+            "id": "a3d03189-6aec-4f41-8d9f-7308455d3ae3",
+            "text": "今天介绍三个视频制作步骤。",
+            "end_ms": 6716,
+            "asset_id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+            "start_ms": 3996,
+            "time_kind": "INTERVAL",
+            "observation": {
+              "text": "今天介绍三个视频制作步骤。",
+              "words": [
+                {
+                  "text": "今",
+                  "end_time": 2800,
+                  "begin_time": 2560,
+                  "punctuation": ""
+                },
+                {
+                  "text": "天",
+                  "end_time": 3120,
+                  "begin_time": 2800,
+                  "punctuation": ""
+                },
+                {
+                  "text": "介",
+                  "end_time": 3280,
+                  "begin_time": 3120,
+                  "punctuation": ""
+                },
+                {
+                  "text": "绍",
+                  "end_time": 3520,
+                  "begin_time": 3280,
+                  "punctuation": ""
+                },
+                {
+                  "text": "三",
+                  "end_time": 3760,
+                  "begin_time": 3520,
+                  "punctuation": ""
+                },
+                {
+                  "text": "个",
+                  "end_time": 4000,
+                  "begin_time": 3840,
+                  "punctuation": ""
+                },
+                {
+                  "text": "视",
+                  "end_time": 4160,
+                  "begin_time": 4000,
+                  "punctuation": ""
+                },
+                {
+                  "text": "频",
+                  "end_time": 4480,
+                  "begin_time": 4160,
+                  "punctuation": ""
+                },
+                {
+                  "text": "制",
+                  "end_time": 4640,
+                  "begin_time": 4480,
+                  "punctuation": ""
+                },
+                {
+                  "text": "作",
+                  "end_time": 4800,
+                  "begin_time": 4640,
+                  "punctuation": ""
+                },
+                {
+                  "text": "步",
+                  "end_time": 4960,
+                  "begin_time": 4800,
+                  "punctuation": ""
+                },
+                {
+                  "text": "骤",
+                  "end_time": 5280,
+                  "begin_time": 5040,
+                  "punctuation": "。"
+                }
+              ],
+              "emotion": "neutral",
+              "end_time": 5280,
+              "language": "zh",
+              "begin_time": 2560,
+              "sentence_id": 1
+            },
+            "source_kind": "SPEECH",
+            "audio_end_ms": 5280,
+            "audio_start_ms": 2560,
+            "analysis_version": "d21627c5-99b6-4641-b793-da215bebf0ed",
+            "temporal_precision": "MODEL_TIMESTAMPS"
+          },
+          {
+            "id": "af8f4450-216b-45a4-9894-557b08438689",
+            "text": "大家好，我叫张明。",
+            "end_ms": 3436,
+            "asset_id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+            "start_ms": 1436,
+            "time_kind": "INTERVAL",
+            "observation": {
+              "text": "大家好，我叫张明。",
+              "words": [
+                {
+                  "text": "大",
+                  "end_time": 160,
+                  "begin_time": 0,
+                  "punctuation": ""
+                },
+                {
+                  "text": "家",
+                  "end_time": 400,
+                  "begin_time": 160,
+                  "punctuation": ""
+                },
+                {
+                  "text": "好",
+                  "end_time": 800,
+                  "begin_time": 400,
+                  "punctuation": "，"
+                },
+                {
+                  "text": "我",
+                  "end_time": 1280,
+                  "begin_time": 1120,
+                  "punctuation": ""
+                },
+                {
+                  "text": "叫",
+                  "end_time": 1440,
+                  "begin_time": 1280,
+                  "punctuation": ""
+                },
+                {
+                  "text": "张",
+                  "end_time": 1760,
+                  "begin_time": 1520,
+                  "punctuation": ""
+                },
+                {
+                  "text": "明",
+                  "end_time": 2000,
+                  "begin_time": 1760,
+                  "punctuation": "。"
+                }
+              ],
+              "emotion": "neutral",
+              "end_time": 2000,
+              "language": "zh",
+              "begin_time": 0,
+              "sentence_id": 0
+            },
+            "source_kind": "SPEECH",
+            "audio_end_ms": 2000,
+            "audio_start_ms": 0,
+            "analysis_version": "d21627c5-99b6-4641-b793-da215bebf0ed",
+            "temporal_precision": "MODEL_TIMESTAMPS"
+          }
+        ],
+        "mock": false
+      },
+      "question_scope": {
+        "scope_id": "a5706bb0-b181-4581-b69a-d1d392b75fc9",
+        "assets": [
+          {
+            "id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+            "filename": "labelled-speech.mp4",
+            "source_sha256": "1eef2b3ae2095123326816ebb3cf1955071639d6a4fec18f8dc86b5339416a9f",
+            "validation_status": "VALID",
+            "duration_ms": 14044,
+            "analysis_version": "d21627c5-99b6-4641-b793-da215bebf0ed",
+            "index_generation": "99071edc-4b02-4b13-82af-189a18337693",
+            "sources": {
+              "SPEECH": "SUCCEEDED",
+              "VISUAL": "NOT_STARTED",
+              "VISIBLE_TEXT": "NOT_STARTED"
+            },
+            "source_kinds": [
+              "SPEECH"
+            ],
+            "coverage": {
+              "speech_processed_ranges": [
+                {
+                  "start_ms": 1436,
+                  "end_ms": 14044
+                }
+              ],
+              "sampling": {
+                "kind": "SPARSE_FRAMES",
+                "rule": "real-pts-window-v1",
+                "endMs": 14044,
+                "startMs": 0,
+                "complete": false,
+                "maxFrames": 25,
+                "intervalMs": 2000
+              },
+              "visual_complete": false,
+              "sampled_at_ms": [
+                0,
+                2000,
+                4000,
+                6000,
+                8000,
+                10000,
+                12000
+              ]
+            }
+          }
+        ],
+        "mock": false,
+        "project_id": "6196cf6f-5640-466e-95e6-6c6ac8ddc7a1"
+      },
+      "requirements": {
+        "mode": "QUERY",
+        "topic": "",
+        "duration_min_ms": null,
+        "duration_max_ms": null,
+        "output_count": 1,
+        "asset_ids": null,
+        "forbidden_content": [],
+        "sources": {}
+      },
+      "pending_tool": null,
+      "usage": {
+        "tools": 1,
+        "repairs": 0,
+        "no_progress": 0,
+        "decisions": 2,
+        "model_calls": 3,
+        "active_seconds": 0.10041158301464748,
+        "status": "ANSWER"
+      }
+    },
+    "java_receipt_before_crash": {
+      "request": {
+        "call_id": "3490d777-b529-433e-91e0-bbb08d7606e8:tool:0",
+        "tool_name": "read_video_range",
+        "arguments": {
+          "cursor": 0,
+          "asset_id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+          "start_ms": 0,
+          "end_ms": 14044
+        },
+        "request_hash": "d9097db32eb73a7c385ad0d1dca6e1b2771dca2b03d1790386ce253c89545c70"
+      },
+      "result": {
+        "call_id": "3490d777-b529-433e-91e0-bbb08d7606e8:tool:0",
+        "tool_name": "read_video_range",
+        "request_hash": "d9097db32eb73a7c385ad0d1dca6e1b2771dca2b03d1790386ce253c89545c70",
+        "status": "READY",
+        "data": {
+          "next_cursor": null
+        },
+        "coverage": {
+          "scope_id": "a5706bb0-b181-4581-b69a-d1d392b75fc9",
+          "asset": {
+            "id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+            "sources": {
+              "SPEECH": "SUCCEEDED",
+              "VISUAL": "NOT_STARTED",
+              "VISIBLE_TEXT": "NOT_STARTED"
+            },
+            "coverage": {
+              "sampling": {
+                "kind": "SPARSE_FRAMES",
+                "rule": "real-pts-window-v1",
+                "endMs": 14044,
+                "startMs": 0,
+                "complete": false,
+                "maxFrames": 25,
+                "intervalMs": 2000
+              },
+              "sampled_at_ms": [
+                0,
+                2000,
+                4000,
+                6000,
+                8000,
+                10000,
+                12000
+              ],
+              "visual_complete": false,
+              "speech_processed_ranges": [
+                {
+                  "end_ms": 14044,
+                  "start_ms": 1436
+                }
+              ]
+            },
+            "filename": "labelled-speech.mp4",
+            "duration_ms": 14044,
+            "source_kinds": [
+              "SPEECH"
+            ],
+            "source_sha256": "1eef2b3ae2095123326816ebb3cf1955071639d6a4fec18f8dc86b5339416a9f",
+            "analysis_version": "d21627c5-99b6-4641-b793-da215bebf0ed",
+            "index_generation": "99071edc-4b02-4b13-82af-189a18337693",
+            "validation_status": "VALID"
+          },
+          "start_ms": 0,
+          "end_ms": 14044,
+          "cursor": 0,
+          "page_complete": true
+        },
+        "records": [
+          {
+            "id": "af8f4450-216b-45a4-9894-557b08438689",
+            "asset_id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+            "analysis_version": "d21627c5-99b6-4641-b793-da215bebf0ed",
+            "source_kind": "SPEECH",
+            "text": "大家好，我叫张明。",
+            "time_kind": "INTERVAL",
+            "start_ms": 1436,
+            "end_ms": 3436,
+            "audio_start_ms": 0,
+            "audio_end_ms": 2000,
+            "temporal_precision": "MODEL_TIMESTAMPS",
+            "observation": {
+              "text": "大家好，我叫张明。",
+              "words": [
+                {
+                  "text": "大",
+                  "end_time": 160,
+                  "begin_time": 0,
+                  "punctuation": ""
+                },
+                {
+                  "text": "家",
+                  "end_time": 400,
+                  "begin_time": 160,
+                  "punctuation": ""
+                },
+                {
+                  "text": "好",
+                  "end_time": 800,
+                  "begin_time": 400,
+                  "punctuation": "，"
+                },
+                {
+                  "text": "我",
+                  "end_time": 1280,
+                  "begin_time": 1120,
+                  "punctuation": ""
+                },
+                {
+                  "text": "叫",
+                  "end_time": 1440,
+                  "begin_time": 1280,
+                  "punctuation": ""
+                },
+                {
+                  "text": "张",
+                  "end_time": 1760,
+                  "begin_time": 1520,
+                  "punctuation": ""
+                },
+                {
+                  "text": "明",
+                  "end_time": 2000,
+                  "begin_time": 1760,
+                  "punctuation": "。"
+                }
+              ],
+              "emotion": "neutral",
+              "end_time": 2000,
+              "language": "zh",
+              "begin_time": 0,
+              "sentence_id": 0
+            }
+          },
+          {
+            "id": "a3d03189-6aec-4f41-8d9f-7308455d3ae3",
+            "asset_id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+            "analysis_version": "d21627c5-99b6-4641-b793-da215bebf0ed",
+            "source_kind": "SPEECH",
+            "text": "今天介绍三个视频制作步骤。",
+            "time_kind": "INTERVAL",
+            "start_ms": 3996,
+            "end_ms": 6716,
+            "audio_start_ms": 2560,
+            "audio_end_ms": 5280,
+            "temporal_precision": "MODEL_TIMESTAMPS",
+            "observation": {
+              "text": "今天介绍三个视频制作步骤。",
+              "words": [
+                {
+                  "text": "今",
+                  "end_time": 2800,
+                  "begin_time": 2560,
+                  "punctuation": ""
+                },
+                {
+                  "text": "天",
+                  "end_time": 3120,
+                  "begin_time": 2800,
+                  "punctuation": ""
+                },
+                {
+                  "text": "介",
+                  "end_time": 3280,
+                  "begin_time": 3120,
+                  "punctuation": ""
+                },
+                {
+                  "text": "绍",
+                  "end_time": 3520,
+                  "begin_time": 3280,
+                  "punctuation": ""
+                },
+                {
+                  "text": "三",
+                  "end_time": 3760,
+                  "begin_time": 3520,
+                  "punctuation": ""
+                },
+                {
+                  "text": "个",
+                  "end_time": 4000,
+                  "begin_time": 3840,
+                  "punctuation": ""
+                },
+                {
+                  "text": "视",
+                  "end_time": 4160,
+                  "begin_time": 4000,
+                  "punctuation": ""
+                },
+                {
+                  "text": "频",
+                  "end_time": 4480,
+                  "begin_time": 4160,
+                  "punctuation": ""
+                },
+                {
+                  "text": "制",
+                  "end_time": 4640,
+                  "begin_time": 4480,
+                  "punctuation": ""
+                },
+                {
+                  "text": "作",
+                  "end_time": 4800,
+                  "begin_time": 4640,
+                  "punctuation": ""
+                },
+                {
+                  "text": "步",
+                  "end_time": 4960,
+                  "begin_time": 4800,
+                  "punctuation": ""
+                },
+                {
+                  "text": "骤",
+                  "end_time": 5280,
+                  "begin_time": 5040,
+                  "punctuation": "。"
+                }
+              ],
+              "emotion": "neutral",
+              "end_time": 5280,
+              "language": "zh",
+              "begin_time": 2560,
+              "sentence_id": 1
+            }
+          },
+          {
+            "id": "d2b00579-6f3e-41da-95d9-1ad6052936ff",
+            "asset_id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+            "analysis_version": "d21627c5-99b6-4641-b793-da215bebf0ed",
+            "source_kind": "SPEECH",
+            "text": "第一步，上传素材。",
+            "time_kind": "INTERVAL",
+            "start_ms": 7276,
+            "end_ms": 9356,
+            "audio_start_ms": 5840,
+            "audio_end_ms": 7920,
+            "temporal_precision": "MODEL_TIMESTAMPS",
+            "observation": {
+              "text": "第一步，上传素材。",
+              "words": [
+                {
+                  "text": "第",
+                  "end_time": 6080,
+                  "begin_time": 5840,
+                  "punctuation": ""
+                },
+                {
+                  "text": "一",
+                  "end_time": 6160,
+                  "begin_time": 6080,
+                  "punctuation": ""
+                },
+                {
+                  "text": "步",
+                  "end_time": 6400,
+                  "begin_time": 6160,
+                  "punctuation": "，"
+                },
+                {
+                  "text": "上",
+                  "end_time": 6960,
+                  "begin_time": 6720,
+                  "punctuation": ""
+                },
+                {
+                  "text": "传",
+                  "end_time": 7360,
+                  "begin_time": 7040,
+                  "punctuation": ""
+                },
+                {
+                  "text": "素",
+                  "end_time": 7520,
+                  "begin_time": 7360,
+                  "punctuation": ""
+                },
+                {
+                  "text": "材",
+                  "end_time": 7920,
+                  "begin_time": 7600,
+                  "punctuation": "。"
+                }
+              ],
+              "emotion": "neutral",
+              "end_time": 7920,
+              "language": "zh",
+              "begin_time": 5840,
+              "sentence_id": 2
+            }
+          },
+          {
+            "id": "dd3fe7cb-e244-4933-9b82-a237974cf844",
+            "asset_id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+            "analysis_version": "d21627c5-99b6-4641-b793-da215bebf0ed",
+            "source_kind": "SPEECH",
+            "text": "第二步，核查原文。",
+            "time_kind": "INTERVAL",
+            "start_ms": 9916,
+            "end_ms": 11836,
+            "audio_start_ms": 8480,
+            "audio_end_ms": 10400,
+            "temporal_precision": "MODEL_TIMESTAMPS",
+            "observation": {
+              "text": "第二步，核查原文。",
+              "words": [
+                {
+                  "text": "第",
+                  "end_time": 8640,
+                  "begin_time": 8480,
+                  "punctuation": ""
+                },
+                {
+                  "text": "二",
+                  "end_time": 8800,
+                  "begin_time": 8640,
+                  "punctuation": ""
+                },
+                {
+                  "text": "步",
+                  "end_time": 9120,
+                  "begin_time": 8800,
+                  "punctuation": "，"
+                },
+                {
+                  "text": "核",
+                  "end_time": 9600,
+                  "begin_time": 9440,
+                  "punctuation": ""
+                },
+                {
+                  "text": "查",
+                  "end_time": 9840,
+                  "begin_time": 9600,
+                  "punctuation": ""
+                },
+                {
+                  "text": "原",
+                  "end_time": 10080,
+                  "begin_time": 9840,
+                  "punctuation": ""
+                },
+                {
+                  "text": "文",
+                  "end_time": 10400,
+                  "begin_time": 10080,
+                  "punctuation": "。"
+                }
+              ],
+              "emotion": "neutral",
+              "end_time": 10400,
+              "language": "zh",
+              "begin_time": 8480,
+              "sentence_id": 3
+            }
+          },
+          {
+            "id": "b7bee65a-5061-4d81-a8ea-d1653e04b4bd",
+            "asset_id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+            "analysis_version": "d21627c5-99b6-4641-b793-da215bebf0ed",
+            "source_kind": "SPEECH",
+            "text": "第三步，导出。",
+            "time_kind": "INTERVAL",
+            "start_ms": 12476,
+            "end_ms": 13916,
+            "audio_start_ms": 11040,
+            "audio_end_ms": 12480,
+            "temporal_precision": "MODEL_TIMESTAMPS",
+            "observation": {
+              "text": "第三步，导出。",
+              "words": [
+                {
+                  "text": "第",
+                  "end_time": 11200,
+                  "begin_time": 11040,
+                  "punctuation": ""
+                },
+                {
+                  "text": "三",
+                  "end_time": 11440,
+                  "begin_time": 11200,
+                  "punctuation": ""
+                },
+                {
+                  "text": "步",
+                  "end_time": 11760,
+                  "begin_time": 11520,
+                  "punctuation": "，"
+                },
+                {
+                  "text": "导",
+                  "end_time": 12240,
+                  "begin_time": 12080,
+                  "punctuation": ""
+                },
+                {
+                  "text": "出",
+                  "end_time": 12480,
+                  "begin_time": 12240,
+                  "punctuation": "。"
+                }
+              ],
+              "emotion": "neutral",
+              "end_time": 12480,
+              "language": "zh",
+              "begin_time": 11040,
+              "sentence_id": 4
+            }
+          }
+        ],
+        "dependency": null,
+        "error": null,
+        "mock": false
+      },
+      "scope_id": "a5706bb0-b181-4581-b69a-d1d392b75fc9"
+    },
+    "replayed_receipt": {
+      "call_id": "3490d777-b529-433e-91e0-bbb08d7606e8:tool:0",
+      "tool_name": "read_video_range",
+      "request_hash": "d9097db32eb73a7c385ad0d1dca6e1b2771dca2b03d1790386ce253c89545c70",
+      "status": "READY",
+      "data": {
+        "next_cursor": null
+      },
+      "coverage": {
+        "asset": {
+          "id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+          "sources": {
+            "SPEECH": "SUCCEEDED",
+            "VISUAL": "NOT_STARTED",
+            "VISIBLE_TEXT": "NOT_STARTED"
+          },
+          "coverage": {
+            "sampling": {
+              "kind": "SPARSE_FRAMES",
+              "rule": "real-pts-window-v1",
+              "endMs": 14044,
+              "startMs": 0,
+              "complete": false,
+              "maxFrames": 25,
+              "intervalMs": 2000
+            },
+            "sampled_at_ms": [
+              0,
+              2000,
+              4000,
+              6000,
+              8000,
+              10000,
+              12000
+            ],
+            "visual_complete": false,
+            "speech_processed_ranges": [
+              {
+                "end_ms": 14044,
+                "start_ms": 1436
+              }
+            ]
+          },
+          "filename": "labelled-speech.mp4",
+          "duration_ms": 14044,
+          "source_kinds": [
+            "SPEECH"
+          ],
+          "source_sha256": "1eef2b3ae2095123326816ebb3cf1955071639d6a4fec18f8dc86b5339416a9f",
+          "analysis_version": "d21627c5-99b6-4641-b793-da215bebf0ed",
+          "index_generation": "99071edc-4b02-4b13-82af-189a18337693",
+          "validation_status": "VALID"
+        },
+        "cursor": 0,
+        "end_ms": 14044,
+        "scope_id": "a5706bb0-b181-4581-b69a-d1d392b75fc9",
+        "start_ms": 0,
+        "page_complete": true
+      },
+      "records": [
+        {
+          "id": "af8f4450-216b-45a4-9894-557b08438689",
+          "text": "大家好，我叫张明。",
+          "end_ms": 3436,
+          "asset_id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+          "start_ms": 1436,
+          "time_kind": "INTERVAL",
+          "observation": {
+            "text": "大家好，我叫张明。",
+            "words": [
+              {
+                "text": "大",
+                "end_time": 160,
+                "begin_time": 0,
+                "punctuation": ""
+              },
+              {
+                "text": "家",
+                "end_time": 400,
+                "begin_time": 160,
+                "punctuation": ""
+              },
+              {
+                "text": "好",
+                "end_time": 800,
+                "begin_time": 400,
+                "punctuation": "，"
+              },
+              {
+                "text": "我",
+                "end_time": 1280,
+                "begin_time": 1120,
+                "punctuation": ""
+              },
+              {
+                "text": "叫",
+                "end_time": 1440,
+                "begin_time": 1280,
+                "punctuation": ""
+              },
+              {
+                "text": "张",
+                "end_time": 1760,
+                "begin_time": 1520,
+                "punctuation": ""
+              },
+              {
+                "text": "明",
+                "end_time": 2000,
+                "begin_time": 1760,
+                "punctuation": "。"
+              }
+            ],
+            "emotion": "neutral",
+            "end_time": 2000,
+            "language": "zh",
+            "begin_time": 0,
+            "sentence_id": 0
+          },
+          "source_kind": "SPEECH",
+          "audio_end_ms": 2000,
+          "audio_start_ms": 0,
+          "analysis_version": "d21627c5-99b6-4641-b793-da215bebf0ed",
+          "temporal_precision": "MODEL_TIMESTAMPS"
+        },
+        {
+          "id": "a3d03189-6aec-4f41-8d9f-7308455d3ae3",
+          "text": "今天介绍三个视频制作步骤。",
+          "end_ms": 6716,
+          "asset_id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+          "start_ms": 3996,
+          "time_kind": "INTERVAL",
+          "observation": {
+            "text": "今天介绍三个视频制作步骤。",
+            "words": [
+              {
+                "text": "今",
+                "end_time": 2800,
+                "begin_time": 2560,
+                "punctuation": ""
+              },
+              {
+                "text": "天",
+                "end_time": 3120,
+                "begin_time": 2800,
+                "punctuation": ""
+              },
+              {
+                "text": "介",
+                "end_time": 3280,
+                "begin_time": 3120,
+                "punctuation": ""
+              },
+              {
+                "text": "绍",
+                "end_time": 3520,
+                "begin_time": 3280,
+                "punctuation": ""
+              },
+              {
+                "text": "三",
+                "end_time": 3760,
+                "begin_time": 3520,
+                "punctuation": ""
+              },
+              {
+                "text": "个",
+                "end_time": 4000,
+                "begin_time": 3840,
+                "punctuation": ""
+              },
+              {
+                "text": "视",
+                "end_time": 4160,
+                "begin_time": 4000,
+                "punctuation": ""
+              },
+              {
+                "text": "频",
+                "end_time": 4480,
+                "begin_time": 4160,
+                "punctuation": ""
+              },
+              {
+                "text": "制",
+                "end_time": 4640,
+                "begin_time": 4480,
+                "punctuation": ""
+              },
+              {
+                "text": "作",
+                "end_time": 4800,
+                "begin_time": 4640,
+                "punctuation": ""
+              },
+              {
+                "text": "步",
+                "end_time": 4960,
+                "begin_time": 4800,
+                "punctuation": ""
+              },
+              {
+                "text": "骤",
+                "end_time": 5280,
+                "begin_time": 5040,
+                "punctuation": "。"
+              }
+            ],
+            "emotion": "neutral",
+            "end_time": 5280,
+            "language": "zh",
+            "begin_time": 2560,
+            "sentence_id": 1
+          },
+          "source_kind": "SPEECH",
+          "audio_end_ms": 5280,
+          "audio_start_ms": 2560,
+          "analysis_version": "d21627c5-99b6-4641-b793-da215bebf0ed",
+          "temporal_precision": "MODEL_TIMESTAMPS"
+        },
+        {
+          "id": "d2b00579-6f3e-41da-95d9-1ad6052936ff",
+          "text": "第一步，上传素材。",
+          "end_ms": 9356,
+          "asset_id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+          "start_ms": 7276,
+          "time_kind": "INTERVAL",
+          "observation": {
+            "text": "第一步，上传素材。",
+            "words": [
+              {
+                "text": "第",
+                "end_time": 6080,
+                "begin_time": 5840,
+                "punctuation": ""
+              },
+              {
+                "text": "一",
+                "end_time": 6160,
+                "begin_time": 6080,
+                "punctuation": ""
+              },
+              {
+                "text": "步",
+                "end_time": 6400,
+                "begin_time": 6160,
+                "punctuation": "，"
+              },
+              {
+                "text": "上",
+                "end_time": 6960,
+                "begin_time": 6720,
+                "punctuation": ""
+              },
+              {
+                "text": "传",
+                "end_time": 7360,
+                "begin_time": 7040,
+                "punctuation": ""
+              },
+              {
+                "text": "素",
+                "end_time": 7520,
+                "begin_time": 7360,
+                "punctuation": ""
+              },
+              {
+                "text": "材",
+                "end_time": 7920,
+                "begin_time": 7600,
+                "punctuation": "。"
+              }
+            ],
+            "emotion": "neutral",
+            "end_time": 7920,
+            "language": "zh",
+            "begin_time": 5840,
+            "sentence_id": 2
+          },
+          "source_kind": "SPEECH",
+          "audio_end_ms": 7920,
+          "audio_start_ms": 5840,
+          "analysis_version": "d21627c5-99b6-4641-b793-da215bebf0ed",
+          "temporal_precision": "MODEL_TIMESTAMPS"
+        },
+        {
+          "id": "dd3fe7cb-e244-4933-9b82-a237974cf844",
+          "text": "第二步，核查原文。",
+          "end_ms": 11836,
+          "asset_id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+          "start_ms": 9916,
+          "time_kind": "INTERVAL",
+          "observation": {
+            "text": "第二步，核查原文。",
+            "words": [
+              {
+                "text": "第",
+                "end_time": 8640,
+                "begin_time": 8480,
+                "punctuation": ""
+              },
+              {
+                "text": "二",
+                "end_time": 8800,
+                "begin_time": 8640,
+                "punctuation": ""
+              },
+              {
+                "text": "步",
+                "end_time": 9120,
+                "begin_time": 8800,
+                "punctuation": "，"
+              },
+              {
+                "text": "核",
+                "end_time": 9600,
+                "begin_time": 9440,
+                "punctuation": ""
+              },
+              {
+                "text": "查",
+                "end_time": 9840,
+                "begin_time": 9600,
+                "punctuation": ""
+              },
+              {
+                "text": "原",
+                "end_time": 10080,
+                "begin_time": 9840,
+                "punctuation": ""
+              },
+              {
+                "text": "文",
+                "end_time": 10400,
+                "begin_time": 10080,
+                "punctuation": "。"
+              }
+            ],
+            "emotion": "neutral",
+            "end_time": 10400,
+            "language": "zh",
+            "begin_time": 8480,
+            "sentence_id": 3
+          },
+          "source_kind": "SPEECH",
+          "audio_end_ms": 10400,
+          "audio_start_ms": 8480,
+          "analysis_version": "d21627c5-99b6-4641-b793-da215bebf0ed",
+          "temporal_precision": "MODEL_TIMESTAMPS"
+        },
+        {
+          "id": "b7bee65a-5061-4d81-a8ea-d1653e04b4bd",
+          "text": "第三步，导出。",
+          "end_ms": 13916,
+          "asset_id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+          "start_ms": 12476,
+          "time_kind": "INTERVAL",
+          "observation": {
+            "text": "第三步，导出。",
+            "words": [
+              {
+                "text": "第",
+                "end_time": 11200,
+                "begin_time": 11040,
+                "punctuation": ""
+              },
+              {
+                "text": "三",
+                "end_time": 11440,
+                "begin_time": 11200,
+                "punctuation": ""
+              },
+              {
+                "text": "步",
+                "end_time": 11760,
+                "begin_time": 11520,
+                "punctuation": "，"
+              },
+              {
+                "text": "导",
+                "end_time": 12240,
+                "begin_time": 12080,
+                "punctuation": ""
+              },
+              {
+                "text": "出",
+                "end_time": 12480,
+                "begin_time": 12240,
+                "punctuation": "。"
+              }
+            ],
+            "emotion": "neutral",
+            "end_time": 12480,
+            "language": "zh",
+            "begin_time": 11040,
+            "sentence_id": 4
+          },
+          "source_kind": "SPEECH",
+          "audio_end_ms": 12480,
+          "audio_start_ms": 11040,
+          "analysis_version": "d21627c5-99b6-4641-b793-da215bebf0ed",
+          "temporal_precision": "MODEL_TIMESTAMPS"
+        }
+      ],
+      "dependency": null,
+      "error": null,
+      "mock": false
+    }
+  }
+}

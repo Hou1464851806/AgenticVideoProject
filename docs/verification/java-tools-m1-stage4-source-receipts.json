@@ -1,0 +1,105 @@
+{
+  "asr": [
+    {
+      "filename": "labelled-speech.mp4",
+      "id": "c551008e-c1cc-4e27-bd9e-a07582ed9748",
+      "model": "qwen3-asr-flash-filetrans",
+      "status": "SUCCEEDED",
+      "request_id": "5eb74720-8709-9b1e-a800-3741ebb1ba74",
+      "usage_json": {
+        "seconds": 10
+      }
+    },
+    {
+      "filename": "human-speech.mp4",
+      "id": "cf6a7238-c57b-4ede-91c3-e9825706ee7c",
+      "model": "qwen3-asr-flash-filetrans",
+      "status": "SUCCEEDED",
+      "request_id": "317107b9-9884-9db9-a06b-3a1f78c555b0",
+      "usage_json": {
+        "seconds": 5
+      }
+    },
+    {
+      "filename": "speech-mention-only.mp4",
+      "id": "9f3d8805-273f-47d0-ad7b-64098c6096b9",
+      "model": "qwen3-asr-flash-filetrans",
+      "status": "SUCCEEDED",
+      "request_id": "2e0b3149-ebf8-94a4-9115-7a4d6efe935f",
+      "usage_json": {
+        "seconds": 4
+      }
+    }
+  ],
+  "vision": [
+    {
+      "filename": "labelled-vision-vfr.mp4",
+      "id": "67361af4-9acd-4d09-9ef8-60ddc30240a7",
+      "model": "qwen3-vl-plus",
+      "status": "SUCCEEDED",
+      "request_id": "a20dd99b-565c-9c84-a4cd-b3ca4f06cbb9",
+      "usage_json": {
+        "image_tokens": 512,
+        "input_tokens": 597,
+        "total_tokens": 645,
+        "output_tokens": 48,
+        "input_tokens_details": {
+          "text_tokens": 85,
+          "image_tokens": 512
+        },
+        "output_tokens_details": {
+          "text_tokens": 48
+        },
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      }
+    },
+    {
+      "filename": "labelled-vision-vfr.mp4",
+      "id": "4c962fde-b521-4c59-8920-a8d4d3c99462",
+      "model": "qwen3-vl-plus",
+      "status": "SUCCEEDED",
+      "request_id": "40b765c2-ab41-96c1-b983-9d923f4e3123",
+      "usage_json": {
+        "image_tokens": 512,
+        "input_tokens": 597,
+        "total_tokens": 645,
+        "output_tokens": 48,
+        "input_tokens_details": {
+          "text_tokens": 85,
+          "image_tokens": 512
+        },
+        "output_tokens_details": {
+          "text_tokens": 48
+        },
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      }
+    },
+    {
+      "filename": "speech-mention-only.mp4",
+      "id": "b795fa50-d062-457f-8250-a2e1c1359bc4",
+      "model": "qwen3-vl-plus",
+      "status": "SUCCEEDED",
+      "request_id": "80360d46-00c0-9c3a-95a6-e7e02d00e726",
+      "usage_json": {
+        "image_tokens": 512,
+        "input_tokens": 597,
+        "total_tokens": 640,
+        "output_tokens": 43,
+        "input_tokens_details": {
+          "text_tokens": 85,
+          "image_tokens": 512
+        },
+        "output_tokens_details": {
+          "text_tokens": 43
+        },
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        }
+      }
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 # Independent Python Agent MVP
 
-本目录只负责 LangGraph 决策、条件、证据、草稿、等待、预算和恢复。工具通过 `ToolExecutor` 执行；当前仅有固定样本 Mock，Java 执行器留待后续接入。ASR/VLM/Embedding 旧适配器隔离在 `analysis/`，CLI 不会调用它们。
+本目录只负责 LangGraph 决策、条件、证据、草稿、等待、预算和恢复。工具通过 `ToolExecutor` 执行；可使用固定样本 Mock 或 `JavaToolExecutor` 的真实问答模式。ASR/VLM/Embedding 与索引由 Java 后端负责，旧 Python 分析适配器已删除。
 
 ## 安装与运行
 
@@ -19,7 +19,34 @@ cp .env.example .env
 .venv/bin/python -m agent_service run '只用lecture素材生成严格30秒的缓存流程剪辑草稿'
 ```
 
-进度输出到 stderr，结果 JSON 输出到 stdout。结果始终带 `mock: true`。`DRAFT_READY` 仅代表模拟校验通过，没有保存或渲染。`WAITING` 正常退出；`INCOMPLETE` / `FAILED` 退出码 1。`--no-trace` 显式禁用观测。
+进度输出到 stderr，结果 JSON 输出到 stdout。Mock 模式结果带 `mock: true`，Java 真实模式带 `mock: false`。`DRAFT_READY` 仅代表模拟校验通过，没有保存或渲染。`WAITING` 正常退出；`INCOMPLETE` / `FAILED` 退出码 1。`--no-trace` 显式禁用观测。
+
+## Java 真实问答（M1 第四阶段）
+
+先按 [后端说明](../backend/README.md)启动 Java 与基础设施，并上传素材完成所需来源分析。根 `.env` 配置 `INTERNAL_WORKER_TOKEN` 与 `DEEPSEEK_API_KEY`，凭据仅留在传输层。项目和素材 UUID 可从现有项目 API 取得；未探测／未就绪状态由真实反馈说明。
+
+```sh
+.venv/bin/python -m agent_service --java-url http://localhost:8080 --project PROJECT_UUID --asset ASSET_UUID --data-dir .local/java run '视频讲了哪些步骤？请引用原文'
+.venv/bin/python -m agent_service --java-url http://localhost:8080 --data-dir .local/java reply THREAD_ID '查语音步骤'
+.venv/bin/python -m agent_service --java-url http://localhost:8080 --data-dir .local/java resume THREAD_ID
+.venv/bin/python -m agent_service --java-url http://localhost:8080 --data-dir .local/java run '继续问另一个问题' --thread THREAD_ID
+```
+
+全局选项放在子命令前；`--asset` 可以重复，首次省略表示冻结该项目当前素材范围。checkpoint 保存 `question_scope`（范围身份及原元数据），补答和故障恢复 GET 原快照并核对一致性，恢复时无需重新指定项目或素材。普通后续消息在原素材范围创建新快照，清除旧观察及覆盖后再回答。真实需求不能切换到 Mock 恢复；有意开始不同模式使用 `--new`。
+
+真实模式仅开放 `list_assets/get_video_overview/search_evidence/read_video_range` 与问答；细读、草稿和制作明确不可用。`--script` 可与 `--java-url` 组合，表示脚本决策读取真实证据，不能称为真实模型验收。不会创建后台等待任务或接受 `complete-mock/tool-result`。
+
+语音引用保留原区间、音轨时间和上下文；视觉引用保留 `POINT/observed_at_ms`，不会制造1ms区间。素材分页累积前页，目录读完与分析覆盖分别保存。来源未就绪、权限、依赖失效和执行不确定直接收尾；只有参数错误进入有限修正。工具传输中断不自动重试，明确输出 `INCOMPLETE`，不能当作空结果。
+
+从仓库根目录执行第四阶段专用联调（使用清单中的已有素材；查询可能产生 Embedding 费用，不重新执行 ASR/VLM）：
+
+```sh
+agent-service/.venv/bin/python agent-service/scripts/verify_java_agent.py --samples docs/verification/java-tools-m1-stage4-samples.json --data-dir agent-service/.local/stage4-scripted --output agent-service/.local/stage4-scripted.json --no-trace
+agent-service/.venv/bin/python agent-service/scripts/verify_java_agent.py --samples docs/verification/java-tools-m1-stage4-samples.json --data-dir agent-service/.local/stage4-deepseek --output agent-service/.local/stage4-deepseek.json --deepseek
+agent-service/.venv/bin/python agent-service/scripts/verify_java_resume.py --input agent-service/.local/stage4-scripted.json --data-dir agent-service/.local/stage4-resume --output agent-service/.local/stage4-resume.json
+```
+
+清单 ID 只适用于本次本机数据，其他环境须显式替换项目与素材，失效不会自动改用其他范围。脚本模型四视频／真实模型两视频／跨进程补答恢复与观测验证分别记录在 [第四阶段记录](../docs/verification/java-tools-m1-stage4.md)，不能代替第五阶段完整 M1 验收。
 
 ## 本机 Langfuse
 
@@ -31,7 +58,7 @@ curl -f http://localhost:3035/api/public/health
 
 打开 <http://localhost:3035>。账号和密码见私有 `.env.langfuse` 的 `LANGFUSE_INIT_USER_EMAIL` / `LANGFUSE_INIT_USER_PASSWORD`；初始化脚本不打印凭据，已有文件不会覆盖。CLI 自动加载这个文件。独立数据卷与项目业务设施隔离，Web 仅绑定本机 3035，样本对象存储仅绑定本机 9095。镜像已按本次验证的 digest 固定，Langfuse 服务版本 4.59.0。
 
-每次运行或恢复生成一个 trace，使用相同 execution_id 关联恢复片段；LangGraph callback 记录节点，真实 DeepSeek 调用记录 generation 和 token，执行器边界记录带 Mock 标识的工具 observation。脚本模型不会伪造 generation。Langfuse 不可用会有终端警告，Agent 仍使用 SQLite 正常运行。
+每次运行或恢复生成一个 trace，使用相同 execution_id 关联恢复片段；LangGraph callback 记录节点，真实 DeepSeek 调用记录 generation 和 token，执行器边界记录带当前 `mock` 标记和调用身份的工具 observation。脚本模型不会伪造 generation。Langfuse 不可用会有终端警告，Agent 仍使用 SQLite 正常运行。
 
 ```sh
 docker compose --env-file .env.langfuse -f compose.langfuse.yaml stop
@@ -84,7 +111,6 @@ state = await agent.inspect(result['thread_id'])
 | `model.py`, `prompts.py` | DeepSeek 协议与有界输入、提示模板 |
 | `tools/` | 工具目录、Schema、单一执行器接口、固定 Mock 样本 |
 | `tracing.py` | 可选的本机 Langfuse 适配，不改变决策 |
-| `analysis/` | 保留的百炼 ASR/VLM/Embedding/索引适配器，独立 MVP 不使用 |
 
 默认每轮执行最多 12 次模型请求、20 次工具动作、3 次修正、3 次连续无进展、300 秒有效执行；单操作安全尝试最多 2 次，输出 2048 token，模型请求 64KiB，工具反馈 32KiB。补答与工具恢复沿用原执行预算；普通后续用户消息开启新执行。新需求采用新 thread，不继承旧条件。
 
@@ -94,6 +120,24 @@ state = await agent.inspect(result['thread_id'])
 .venv/bin/python -m pytest -q
 ```
 
-默认测试不调用任何付费模型；保留的百炼音频测试需显式 `RUN_LIVE_ASR=1` 及对应凭据、测试音频，且不属于本 MVP。真实 DeepSeek 验证用上面的无 `--script` 入口，SQLite 回执保存调用数与用量；查看 JSON 中的 trace_id 在本机 UI 定位。
+默认测试不调用任何付费模型；百炼真实验收统一使用根目录 Java 验收入口。真实 DeepSeek 验证用上面的无 `--script` 入口，SQLite 回执保存调用数与用量；查看 JSON 中的 trace_id 在本机 UI 定位。
 
-设计与逐项验收结果见 [最终设计](../docs/agent-mvp-design.md) 和 [验收记录](../docs/verification/agent-mvp.md)。根项目 Compose 将旧 agent-service 放入 `agent-integration-pending` profile；尚未恢复 HTTP/MQ 协议，不应将其作为业务服务启动。
+设计与逐项验收结果见 [最终设计](../docs/agent-mvp-design.md) 和 [验收记录](../docs/verification/agent-mvp.md)。根项目 Compose 已删除旧 agent-service 服务；Python 通过本机 CLI 调用 Java HTTP 读取工具。
+
+## M1 综合验收
+
+在仓库根目录执行，先启动 Compose 并配置百炼、DeepSeek 与内部凭据：
+
+```sh
+agent-service/.venv/bin/python agent-service/scripts/verify_java_m1.py --output agent-service/.local/stage5-new
+```
+
+此命令创建新项目、上传四个固定视频，执行真实 Java 分析和索引、开发/保留语义查询、四工具读取及四次真实 DeepSeek 问答；会发生模型费用。缺凭据返回 `UNVERIFIED` / 退出码2。输出保留范围、模型回执及用量、工具请求与结果、最终 JSON 和 trace ID。需要 PostgreSQL Compose 服务以导出权威回执。
+
+实际 Java 进程故障验收另行执行（会终止并重启本机 business-api，保留数据卷）：
+
+```sh
+agent-service/.venv/bin/python agent-service/scripts/verify_java_crash.py
+```
+
+完整结果与未验证边界见[第五阶段记录](../docs/verification/java-tools-m1-stage5.md)。

@@ -1,0 +1,4096 @@
+{
+  "date": "2026-10-15",
+  "timezone": "Asia/Shanghai",
+  "samples": [
+    {
+      "fixture": "human-speech.mp4",
+      "scope": {
+        "project_id": "a4232be7-747f-41ff-8020-86d037be8b81",
+        "scope_id": "e499c6a6-f839-47ec-85eb-c51f6e6d476e",
+        "assets": [
+          {
+            "id": "24d8834c-10bf-4e17-a6de-9dec4e2a493a",
+            "filename": "human-speech.mp4",
+            "source_sha256": "d23fbd05ef147aa5ecbb297c045fec49f77a644f0172a172107330f5c1680a52",
+            "validation_status": "VALID",
+            "duration_ms": 11000,
+            "analysis_version": "60cf9182-5912-4b02-b3b1-f60742e13b86",
+            "index_generation": "0e093e6f-e904-4ea2-b547-660b8286dca1",
+            "sources": {
+              "SPEECH": "SUCCEEDED",
+              "VISUAL": "SUCCEEDED",
+              "VISIBLE_TEXT": "SUCCEEDED"
+            },
+            "source_kinds": [
+              "SPEECH",
+              "VISUAL",
+              "VISIBLE_TEXT"
+            ],
+            "coverage": {
+              "speech_processed_ranges": [
+                {
+                  "start_ms": 0,
+                  "end_ms": 10380
+                }
+              ],
+              "sampling": {
+                "kind": "SPARSE_FRAMES",
+                "rule": "real-pts-window-v1",
+                "endMs": 11000,
+                "startMs": 0,
+                "complete": false,
+                "maxFrames": 25,
+                "intervalMs": 2000
+              },
+              "visual_complete": false,
+              "sampled_at_ms": [
+                0,
+                2000,
+                4000,
+                6000,
+                8000,
+                10000
+              ]
+            }
+          }
+        ],
+        "mock": false
+      },
+      "tool_results": [
+        {
+          "call_id": "assets",
+          "tool_name": "list_assets",
+          "request_hash": "96cd871589fd80904fe46b140e6dcf1c1a6535c7a85ff35773fb0f58afa796ab",
+          "status": "READY",
+          "mock": false,
+          "data": {
+            "assets": [
+              {
+                "id": "24d8834c-10bf-4e17-a6de-9dec4e2a493a",
+                "sources": {
+                  "SPEECH": "SUCCEEDED",
+                  "VISUAL": "SUCCEEDED",
+                  "VISIBLE_TEXT": "SUCCEEDED"
+                },
+                "coverage": {
+                  "sampling": {
+                    "kind": "SPARSE_FRAMES",
+                    "rule": "real-pts-window-v1",
+                    "endMs": 11000,
+                    "startMs": 0,
+                    "complete": false,
+                    "maxFrames": 25,
+                    "intervalMs": 2000
+                  },
+                  "sampled_at_ms": [
+                    0,
+                    2000,
+                    4000,
+                    6000,
+                    8000,
+                    10000
+                  ],
+                  "visual_complete": false,
+                  "speech_processed_ranges": [
+                    {
+                      "end_ms": 10380,
+                      "start_ms": 0
+                    }
+                  ]
+                },
+                "filename": "human-speech.mp4",
+                "duration_ms": 11000,
+                "source_kinds": [
+                  "SPEECH",
+                  "VISUAL",
+                  "VISIBLE_TEXT"
+                ],
+                "source_sha256": "d23fbd05ef147aa5ecbb297c045fec49f77a644f0172a172107330f5c1680a52",
+                "analysis_version": "60cf9182-5912-4b02-b3b1-f60742e13b86",
+                "index_generation": "0e093e6f-e904-4ea2-b547-660b8286dca1",
+                "validation_status": "VALID"
+              }
+            ],
+            "next_cursor": null
+          },
+          "coverage": {
+            "scope_id": "e499c6a6-f839-47ec-85eb-c51f6e6d476e",
+            "cursor": 0,
+            "page_complete": true
+          },
+          "records": [],
+          "dependency": null,
+          "error": null
+        },
+        {
+          "call_id": "overview",
+          "tool_name": "get_video_overview",
+          "request_hash": "bc964774e0c181f487d22c48a584f5b1595890226e7ce405c938e52879fdb0d1",
+          "status": "READY",
+          "mock": false,
+          "data": {
+            "entries": [
+              {
+                "excerpt": "纯蓝色背景，无任何物体、图案或文字。",
+                "source_kind": "VISUAL",
+                "purpose": "NAVIGATION",
+                "observed_at_ms": 0,
+                "navigation_ids": [
+                  "4e65342f-6d83-474b-8ee1-c78da12595bf"
+                ]
+              },
+              {
+                "excerpt": "这并不是告别，这是一个篇章的结束，也是新篇章的开始。",
+                "source_kind": "SPEECH",
+                "purpose": "NAVIGATION",
+                "start_ms": 1900,
+                "end_ms": 7340,
+                "navigation_ids": [
+                  "c4186914-7672-4df2-bc64-42aa8300c988"
+                ]
+              },
+              {
+                "excerpt": "纯蓝色背景，无任何物体、图案或文字。",
+                "source_kind": "VISUAL",
+                "purpose": "NAVIGATION",
+                "observed_at_ms": 2000,
+                "navigation_ids": [
+                  "06429e48-7f5a-427b-b075-b4412d429594"
+                ]
+              },
+              {
+                "excerpt": "纯蓝色背景，无任何物体、图案或文字。",
+                "source_kind": "VISUAL",
+                "purpose": "NAVIGATION",
+                "observed_at_ms": 4000,
+                "navigation_ids": [
+                  "186a9cd1-c712-42e5-a883-2fdc52c55006"
+                ]
+              },
+              {
+                "excerpt": "纯蓝色背景，无任何物体、图案或文字。",
+                "source_kind": "VISUAL",
+                "purpose": "NAVIGATION",
+                "observed_at_ms": 6000,
+                "navigation_ids": [
+                  "863241df-71cf-46ef-9569-f8ae1bcbae7a"
+                ]
+              },
+              {
+                "excerpt": "纯蓝色背景，无任何物体、图案或文字。",
+                "source_kind": "VISUAL",
+                "purpose": "NAVIGATION",
+                "observed_at_ms": 8000,
+                "navigation_ids": [
+                  "0e64f51e-dc91-4af4-bd48-4ac86bf5ab3d"
+                ]
+              },
+              {
+                "excerpt": "纯蓝色背景，无任何物体、图案或文字。",
+                "source_kind": "VISUAL",
+                "purpose": "NAVIGATION",
+                "observed_at_ms": 10000,
+                "navigation_ids": [
+                  "a1fe887d-4788-4c7b-a01b-d20e2137af59"
+                ]
+              }
+            ],
+            "next_cursor": null
+          },
+          "coverage": {
+            "scope_id": "e499c6a6-f839-47ec-85eb-c51f6e6d476e",
+            "asset": {
+              "id": "24d8834c-10bf-4e17-a6de-9dec4e2a493a",
+              "sources": {
+                "SPEECH": "SUCCEEDED",
+                "VISUAL": "SUCCEEDED",
+                "VISIBLE_TEXT": "SUCCEEDED"
+              },
+              "coverage": {
+                "sampling": {
+                  "kind": "SPARSE_FRAMES",
+                  "rule": "real-pts-window-v1",
+                  "endMs": 11000,
+                  "startMs": 0,
+                  "complete": false,
+                  "maxFrames": 25,
+                  "intervalMs": 2000
+                },
+                "sampled_at_ms": [
+                  0,
+                  2000,
+                  4000,
+                  6000,
+                  8000,
+                  10000
+                ],
+                "visual_complete": false,
+                "speech_processed_ranges": [
+                  {
+                    "end_ms": 10380,
+                    "start_ms": 0
+                  }
+                ]
+              },
+              "filename": "human-speech.mp4",
+              "duration_ms": 11000,
+              "source_kinds": [
+                "SPEECH",
+                "VISUAL",
+                "VISIBLE_TEXT"
+              ],
+              "source_sha256": "d23fbd05ef147aa5ecbb297c045fec49f77a644f0172a172107330f5c1680a52",
+              "analysis_version": "60cf9182-5912-4b02-b3b1-f60742e13b86",
+              "index_generation": "0e093e6f-e904-4ea2-b547-660b8286dca1",
+              "validation_status": "VALID"
+            },
+            "cursor": 0,
+            "page_complete": true,
+            "navigation_complete": true
+          },
+          "records": [],
+          "dependency": null,
+          "error": null
+        },
+        {
+          "call_id": "range",
+          "tool_name": "read_video_range",
+          "request_hash": "77595483c915e4c22ab3a52c911037b2c5860cf458d1341c39f313c17e5fbb54",
+          "status": "READY",
+          "mock": false,
+          "data": {
+            "next_cursor": null
+          },
+          "coverage": {
+            "scope_id": "e499c6a6-f839-47ec-85eb-c51f6e6d476e",
+            "asset": {
+              "id": "24d8834c-10bf-4e17-a6de-9dec4e2a493a",
+              "sources": {
+                "SPEECH": "SUCCEEDED",
+                "VISUAL": "SUCCEEDED",
+                "VISIBLE_TEXT": "SUCCEEDED"
+              },
+              "coverage": {
+                "sampling": {
+                  "kind": "SPARSE_FRAMES",
+                  "rule": "real-pts-window-v1",
+                  "endMs": 11000,
+                  "startMs": 0,
+                  "complete": false,
+                  "maxFrames": 25,
+                  "intervalMs": 2000
+                },
+                "sampled_at_ms": [
+                  0,
+                  2000,
+                  4000,
+                  6000,
+                  8000,
+                  10000
+                ],
+                "visual_complete": false,
+                "speech_processed_ranges": [
+                  {
+                    "end_ms": 10380,
+                    "start_ms": 0
+                  }
+                ]
+              },
+              "filename": "human-speech.mp4",
+              "duration_ms": 11000,
+              "source_kinds": [
+                "SPEECH",
+                "VISUAL",
+                "VISIBLE_TEXT"
+              ],
+              "source_sha256": "d23fbd05ef147aa5ecbb297c045fec49f77a644f0172a172107330f5c1680a52",
+              "analysis_version": "60cf9182-5912-4b02-b3b1-f60742e13b86",
+              "index_generation": "0e093e6f-e904-4ea2-b547-660b8286dca1",
+              "validation_status": "VALID"
+            },
+            "start_ms": 0,
+            "end_ms": 11000,
+            "cursor": 0,
+            "page_complete": true
+          },
+          "records": [
+            {
+              "id": "4e65342f-6d83-474b-8ee1-c78da12595bf",
+              "asset_id": "24d8834c-10bf-4e17-a6de-9dec4e2a493a",
+              "analysis_version": "60cf9182-5912-4b02-b3b1-f60742e13b86",
+              "source_kind": "VISUAL",
+              "text": "纯蓝色背景，无任何物体、图案或文字。",
+              "time_kind": "POINT",
+              "observed_at_ms": 0,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "78e20b2a-95c3-48ae-a4ac-02a8b49c1121",
+              "observation": {
+                "description": "纯蓝色背景，无任何物体、图案或文字。",
+                "visibleText": []
+              }
+            },
+            {
+              "id": "c4186914-7672-4df2-bc64-42aa8300c988",
+              "asset_id": "24d8834c-10bf-4e17-a6de-9dec4e2a493a",
+              "analysis_version": "60cf9182-5912-4b02-b3b1-f60742e13b86",
+              "source_kind": "SPEECH",
+              "text": "这并不是告别，这是一个篇章的结束，也是新篇章的开始。",
+              "time_kind": "INTERVAL",
+              "start_ms": 1900,
+              "end_ms": 7340,
+              "audio_start_ms": 1900,
+              "audio_end_ms": 7340,
+              "temporal_precision": "MODEL_TIMESTAMPS",
+              "observation": {
+                "text": "这并不是告别，这是一个篇章的结束，也是新篇章的开始。",
+                "words": [
+                  {
+                    "text": "这",
+                    "end_time": 2060,
+                    "begin_time": 1900,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "并",
+                    "end_time": 2300,
+                    "begin_time": 2060,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "不",
+                    "end_time": 2460,
+                    "begin_time": 2300,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "是",
+                    "end_time": 2620,
+                    "begin_time": 2460,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "告",
+                    "end_time": 2860,
+                    "begin_time": 2620,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "别",
+                    "end_time": 3260,
+                    "begin_time": 2860,
+                    "punctuation": "，"
+                  },
+                  {
+                    "text": "这",
+                    "end_time": 4140,
+                    "begin_time": 3980,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "是",
+                    "end_time": 4380,
+                    "begin_time": 4140,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "一",
+                    "end_time": 4380,
+                    "begin_time": 4380,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "个",
+                    "end_time": 4620,
+                    "begin_time": 4380,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "篇",
+                    "end_time": 4860,
+                    "begin_time": 4620,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "章",
+                    "end_time": 5020,
+                    "begin_time": 4860,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "的",
+                    "end_time": 5100,
+                    "begin_time": 5020,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "结",
+                    "end_time": 5340,
+                    "begin_time": 5100,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "束",
+                    "end_time": 5660,
+                    "begin_time": 5340,
+                    "punctuation": "，"
+                  },
+                  {
+                    "text": "也",
+                    "end_time": 5980,
+                    "begin_time": 5820,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "是",
+                    "end_time": 6140,
+                    "begin_time": 5980,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "新",
+                    "end_time": 6380,
+                    "begin_time": 6140,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "篇",
+                    "end_time": 6620,
+                    "begin_time": 6380,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "章",
+                    "end_time": 6780,
+                    "begin_time": 6620,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "的",
+                    "end_time": 6860,
+                    "begin_time": 6780,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "开",
+                    "end_time": 7100,
+                    "begin_time": 6860,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "始",
+                    "end_time": 7340,
+                    "begin_time": 7100,
+                    "punctuation": "。"
+                  }
+                ],
+                "emotion": "neutral",
+                "end_time": 7340,
+                "language": "zh",
+                "begin_time": 1900,
+                "sentence_id": 0
+              }
+            },
+            {
+              "id": "06429e48-7f5a-427b-b075-b4412d429594",
+              "asset_id": "24d8834c-10bf-4e17-a6de-9dec4e2a493a",
+              "analysis_version": "60cf9182-5912-4b02-b3b1-f60742e13b86",
+              "source_kind": "VISUAL",
+              "text": "纯蓝色背景，无任何物体、图案或文字。",
+              "time_kind": "POINT",
+              "observed_at_ms": 2000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "88e6b214-35cf-4f04-9c60-a121014a3394",
+              "observation": {
+                "description": "纯蓝色背景，无任何物体、图案或文字。",
+                "visibleText": []
+              }
+            },
+            {
+              "id": "186a9cd1-c712-42e5-a883-2fdc52c55006",
+              "asset_id": "24d8834c-10bf-4e17-a6de-9dec4e2a493a",
+              "analysis_version": "60cf9182-5912-4b02-b3b1-f60742e13b86",
+              "source_kind": "VISUAL",
+              "text": "纯蓝色背景，无任何物体、图案或文字。",
+              "time_kind": "POINT",
+              "observed_at_ms": 4000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "8b62738c-649b-4d48-86dc-118360de8733",
+              "observation": {
+                "description": "纯蓝色背景，无任何物体、图案或文字。",
+                "visibleText": []
+              }
+            },
+            {
+              "id": "863241df-71cf-46ef-9569-f8ae1bcbae7a",
+              "asset_id": "24d8834c-10bf-4e17-a6de-9dec4e2a493a",
+              "analysis_version": "60cf9182-5912-4b02-b3b1-f60742e13b86",
+              "source_kind": "VISUAL",
+              "text": "纯蓝色背景，无任何物体、图案或文字。",
+              "time_kind": "POINT",
+              "observed_at_ms": 6000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "f02ce739-a9c0-4e37-99d6-aff2140aba4c",
+              "observation": {
+                "description": "纯蓝色背景，无任何物体、图案或文字。",
+                "visibleText": []
+              }
+            },
+            {
+              "id": "0e64f51e-dc91-4af4-bd48-4ac86bf5ab3d",
+              "asset_id": "24d8834c-10bf-4e17-a6de-9dec4e2a493a",
+              "analysis_version": "60cf9182-5912-4b02-b3b1-f60742e13b86",
+              "source_kind": "VISUAL",
+              "text": "纯蓝色背景，无任何物体、图案或文字。",
+              "time_kind": "POINT",
+              "observed_at_ms": 8000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "0338d76c-76de-42dc-80da-8787b545c7b6",
+              "observation": {
+                "description": "纯蓝色背景，无任何物体、图案或文字。",
+                "visibleText": []
+              }
+            },
+            {
+              "id": "a1fe887d-4788-4c7b-a01b-d20e2137af59",
+              "asset_id": "24d8834c-10bf-4e17-a6de-9dec4e2a493a",
+              "analysis_version": "60cf9182-5912-4b02-b3b1-f60742e13b86",
+              "source_kind": "VISUAL",
+              "text": "纯蓝色背景，无任何物体、图案或文字。",
+              "time_kind": "POINT",
+              "observed_at_ms": 10000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "27ac0ef4-fb0a-479c-b631-db65aca2fb69",
+              "observation": {
+                "description": "纯蓝色背景，无任何物体、图案或文字。",
+                "visibleText": []
+              }
+            }
+          ],
+          "dependency": null,
+          "error": null
+        },
+        {
+          "call_id": "search",
+          "tool_name": "search_evidence",
+          "request_hash": "0bcc55f8acd3321862443f511a49b1c003d6d09c0e9ad11818128c05d5f2dcf7",
+          "status": "READY",
+          "mock": false,
+          "data": {
+            "query_id": "e49b3e94-4d65-4f78-99a5-f870eb2a2817",
+            "candidate_limit": 100,
+            "channel_limit": 50,
+            "candidates_truncated": false,
+            "channels": {
+              "LITERAL": {
+                "status": "AVAILABLE"
+              },
+              "DENSE": {
+                "status": "AVAILABLE",
+                "failures": []
+              },
+              "BM25": {
+                "status": "AVAILABLE",
+                "failures": []
+              }
+            },
+            "index_generations": [
+              "0e093e6f-e904-4ea2-b547-660b8286dca1"
+            ],
+            "model_calls": [
+              {
+                "id": "eb945270-d5e6-4251-92b8-9289bb62e6da",
+                "status": "SUCCEEDED",
+                "request_id": "03efee51-4709-9065-b66d-070c6aebff42"
+              }
+            ],
+            "next_cursor": null
+          },
+          "coverage": {
+            "scope_id": "e499c6a6-f839-47ec-85eb-c51f6e6d476e",
+            "assets": [
+              {
+                "id": "24d8834c-10bf-4e17-a6de-9dec4e2a493a",
+                "sources": {
+                  "SPEECH": "SUCCEEDED",
+                  "VISUAL": "SUCCEEDED",
+                  "VISIBLE_TEXT": "SUCCEEDED"
+                },
+                "coverage": {
+                  "sampling": {
+                    "kind": "SPARSE_FRAMES",
+                    "rule": "real-pts-window-v1",
+                    "endMs": 11000,
+                    "startMs": 0,
+                    "complete": false,
+                    "maxFrames": 25,
+                    "intervalMs": 2000
+                  },
+                  "sampled_at_ms": [
+                    0,
+                    2000,
+                    4000,
+                    6000,
+                    8000,
+                    10000
+                  ],
+                  "visual_complete": false,
+                  "speech_processed_ranges": [
+                    {
+                      "end_ms": 10380,
+                      "start_ms": 0
+                    }
+                  ]
+                },
+                "filename": "human-speech.mp4",
+                "duration_ms": 11000,
+                "source_kinds": [
+                  "SPEECH",
+                  "VISUAL",
+                  "VISIBLE_TEXT"
+                ],
+                "source_sha256": "d23fbd05ef147aa5ecbb297c045fec49f77a644f0172a172107330f5c1680a52",
+                "analysis_version": "60cf9182-5912-4b02-b3b1-f60742e13b86",
+                "index_generation": "0e093e6f-e904-4ea2-b547-660b8286dca1",
+                "validation_status": "VALID"
+              }
+            ],
+            "source_kinds": [
+              "SPEECH",
+              "VISIBLE_TEXT",
+              "VISUAL"
+            ],
+            "cursor": 0,
+            "page_complete": true
+          },
+          "records": [
+            {
+              "id": "c4186914-7672-4df2-bc64-42aa8300c988",
+              "asset_id": "24d8834c-10bf-4e17-a6de-9dec4e2a493a",
+              "analysis_version": "60cf9182-5912-4b02-b3b1-f60742e13b86",
+              "source_kind": "SPEECH",
+              "text": "这并不是告别，这是一个篇章的结束，也是新篇章的开始。",
+              "time_kind": "INTERVAL",
+              "start_ms": 1900,
+              "end_ms": 7340,
+              "audio_start_ms": 1900,
+              "audio_end_ms": 7340,
+              "temporal_precision": "MODEL_TIMESTAMPS",
+              "observation": {
+                "text": "这并不是告别，这是一个篇章的结束，也是新篇章的开始。",
+                "words": [
+                  {
+                    "text": "这",
+                    "end_time": 2060,
+                    "begin_time": 1900,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "并",
+                    "end_time": 2300,
+                    "begin_time": 2060,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "不",
+                    "end_time": 2460,
+                    "begin_time": 2300,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "是",
+                    "end_time": 2620,
+                    "begin_time": 2460,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "告",
+                    "end_time": 2860,
+                    "begin_time": 2620,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "别",
+                    "end_time": 3260,
+                    "begin_time": 2860,
+                    "punctuation": "，"
+                  },
+                  {
+                    "text": "这",
+                    "end_time": 4140,
+                    "begin_time": 3980,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "是",
+                    "end_time": 4380,
+                    "begin_time": 4140,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "一",
+                    "end_time": 4380,
+                    "begin_time": 4380,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "个",
+                    "end_time": 4620,
+                    "begin_time": 4380,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "篇",
+                    "end_time": 4860,
+                    "begin_time": 4620,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "章",
+                    "end_time": 5020,
+                    "begin_time": 4860,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "的",
+                    "end_time": 5100,
+                    "begin_time": 5020,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "结",
+                    "end_time": 5340,
+                    "begin_time": 5100,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "束",
+                    "end_time": 5660,
+                    "begin_time": 5340,
+                    "punctuation": "，"
+                  },
+                  {
+                    "text": "也",
+                    "end_time": 5980,
+                    "begin_time": 5820,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "是",
+                    "end_time": 6140,
+                    "begin_time": 5980,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "新",
+                    "end_time": 6380,
+                    "begin_time": 6140,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "篇",
+                    "end_time": 6620,
+                    "begin_time": 6380,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "章",
+                    "end_time": 6780,
+                    "begin_time": 6620,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "的",
+                    "end_time": 6860,
+                    "begin_time": 6780,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "开",
+                    "end_time": 7100,
+                    "begin_time": 6860,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "始",
+                    "end_time": 7340,
+                    "begin_time": 7100,
+                    "punctuation": "。"
+                  }
+                ],
+                "emotion": "neutral",
+                "end_time": 7340,
+                "language": "zh",
+                "begin_time": 1900,
+                "sentence_id": 0
+              }
+            },
+            {
+              "id": "4e65342f-6d83-474b-8ee1-c78da12595bf",
+              "asset_id": "24d8834c-10bf-4e17-a6de-9dec4e2a493a",
+              "analysis_version": "60cf9182-5912-4b02-b3b1-f60742e13b86",
+              "source_kind": "VISUAL",
+              "text": "纯蓝色背景，无任何物体、图案或文字。",
+              "time_kind": "POINT",
+              "observed_at_ms": 0,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "78e20b2a-95c3-48ae-a4ac-02a8b49c1121",
+              "observation": {
+                "description": "纯蓝色背景，无任何物体、图案或文字。",
+                "visibleText": []
+              }
+            },
+            {
+              "id": "863241df-71cf-46ef-9569-f8ae1bcbae7a",
+              "asset_id": "24d8834c-10bf-4e17-a6de-9dec4e2a493a",
+              "analysis_version": "60cf9182-5912-4b02-b3b1-f60742e13b86",
+              "source_kind": "VISUAL",
+              "text": "纯蓝色背景，无任何物体、图案或文字。",
+              "time_kind": "POINT",
+              "observed_at_ms": 6000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "f02ce739-a9c0-4e37-99d6-aff2140aba4c",
+              "observation": {
+                "description": "纯蓝色背景，无任何物体、图案或文字。",
+                "visibleText": []
+              }
+            },
+            {
+              "id": "0e64f51e-dc91-4af4-bd48-4ac86bf5ab3d",
+              "asset_id": "24d8834c-10bf-4e17-a6de-9dec4e2a493a",
+              "analysis_version": "60cf9182-5912-4b02-b3b1-f60742e13b86",
+              "source_kind": "VISUAL",
+              "text": "纯蓝色背景，无任何物体、图案或文字。",
+              "time_kind": "POINT",
+              "observed_at_ms": 8000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "0338d76c-76de-42dc-80da-8787b545c7b6",
+              "observation": {
+                "description": "纯蓝色背景，无任何物体、图案或文字。",
+                "visibleText": []
+              }
+            },
+            {
+              "id": "186a9cd1-c712-42e5-a883-2fdc52c55006",
+              "asset_id": "24d8834c-10bf-4e17-a6de-9dec4e2a493a",
+              "analysis_version": "60cf9182-5912-4b02-b3b1-f60742e13b86",
+              "source_kind": "VISUAL",
+              "text": "纯蓝色背景，无任何物体、图案或文字。",
+              "time_kind": "POINT",
+              "observed_at_ms": 4000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "8b62738c-649b-4d48-86dc-118360de8733",
+              "observation": {
+                "description": "纯蓝色背景，无任何物体、图案或文字。",
+                "visibleText": []
+              }
+            },
+            {
+              "id": "a1fe887d-4788-4c7b-a01b-d20e2137af59",
+              "asset_id": "24d8834c-10bf-4e17-a6de-9dec4e2a493a",
+              "analysis_version": "60cf9182-5912-4b02-b3b1-f60742e13b86",
+              "source_kind": "VISUAL",
+              "text": "纯蓝色背景，无任何物体、图案或文字。",
+              "time_kind": "POINT",
+              "observed_at_ms": 10000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "27ac0ef4-fb0a-479c-b631-db65aca2fb69",
+              "observation": {
+                "description": "纯蓝色背景，无任何物体、图案或文字。",
+                "visibleText": []
+              }
+            },
+            {
+              "id": "06429e48-7f5a-427b-b075-b4412d429594",
+              "asset_id": "24d8834c-10bf-4e17-a6de-9dec4e2a493a",
+              "analysis_version": "60cf9182-5912-4b02-b3b1-f60742e13b86",
+              "source_kind": "VISUAL",
+              "text": "纯蓝色背景，无任何物体、图案或文字。",
+              "time_kind": "POINT",
+              "observed_at_ms": 2000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "88e6b214-35cf-4f04-9c60-a121014a3394",
+              "observation": {
+                "description": "纯蓝色背景，无任何物体、图案或文字。",
+                "visibleText": []
+              }
+            }
+          ],
+          "dependency": null,
+          "error": null
+        }
+      ],
+      "model_receipts": {
+        "asr": [
+          {
+            "id": "d65a0750-8157-4ef0-a2ee-282a67819228",
+            "model": "qwen3-asr-flash-filetrans",
+            "status": "SUCCEEDED",
+            "provider_task_id": "9fa47d93-a11e-4ed2-888d-69f0b5e603d1",
+            "request_id": "18440736-80f3-95b9-af70-43bbdf7ef557",
+            "usage_json": {
+              "seconds": 5
+            }
+          }
+        ],
+        "vision": [
+          {
+            "id": "18dcc41f-f317-4de5-b24a-2c4dc260be15",
+            "model": "qwen3-vl-plus",
+            "status": "SUCCEEDED",
+            "request_id": "c9e20b5b-99aa-9fae-a52e-af1cad72de26",
+            "usage_json": {
+              "image_tokens": 512,
+              "input_tokens": 597,
+              "total_tokens": 618,
+              "output_tokens": 21,
+              "input_tokens_details": {
+                "text_tokens": 85,
+                "image_tokens": 512
+              },
+              "output_tokens_details": {
+                "text_tokens": 21
+              },
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              }
+            }
+          }
+        ],
+        "document_embeddings": [
+          {
+            "ordinal": 0,
+            "status": "SUCCEEDED",
+            "request_id": null,
+            "usage_json": {
+              "reused": true
+            }
+          },
+          {
+            "ordinal": 1,
+            "status": "SUCCEEDED",
+            "request_id": "796dff63-46d6-96da-b564-18899e7357e3",
+            "usage_json": {
+              "total_tokens": 15
+            }
+          }
+        ],
+        "query_embeddings": [
+          {
+            "id": "eb945270-d5e6-4251-92b8-9289bb62e6da",
+            "model": "text-embedding-v4",
+            "status": "SUCCEEDED",
+            "request_id": "03efee51-4709-9065-b66d-070c6aebff42",
+            "usage_json": {
+              "total_tokens": 2
+            }
+          }
+        ]
+      }
+    },
+    {
+      "fixture": "speech-mention-only.mp4",
+      "scope": {
+        "project_id": "7e00e32d-a723-4b29-a62f-9e15477e9d1a",
+        "scope_id": "63c21ae1-2bc7-46b9-b257-c73a5f64b4c1",
+        "assets": [
+          {
+            "id": "7ba2ef96-7191-49f2-a925-908a95c25705",
+            "filename": "speech-mention-only.mp4",
+            "source_sha256": "a5c5668fa7ae3a7c12c8ac3672d098a9ba3a74d7dfdc066b715184d05b36a551",
+            "validation_status": "VALID",
+            "duration_ms": 4351,
+            "analysis_version": "055dcd09-204b-4078-9d46-1506ad0244ea",
+            "index_generation": "6f48039e-812f-4893-a157-e4916531ad82",
+            "sources": {
+              "SPEECH": "SUCCEEDED",
+              "VISUAL": "SUCCEEDED",
+              "VISIBLE_TEXT": "SUCCEEDED"
+            },
+            "source_kinds": [
+              "SPEECH",
+              "VISUAL",
+              "VISIBLE_TEXT"
+            ],
+            "coverage": {
+              "speech_processed_ranges": [
+                {
+                  "start_ms": 0,
+                  "end_ms": 4351
+                }
+              ],
+              "sampling": {
+                "kind": "SPARSE_FRAMES",
+                "rule": "real-pts-window-v1",
+                "endMs": 4351,
+                "startMs": 0,
+                "complete": false,
+                "maxFrames": 25,
+                "intervalMs": 2000
+              },
+              "visual_complete": false,
+              "sampled_at_ms": [
+                0,
+                2000,
+                4000
+              ]
+            }
+          }
+        ],
+        "mock": false
+      },
+      "tool_results": [
+        {
+          "call_id": "assets",
+          "tool_name": "list_assets",
+          "request_hash": "96cd871589fd80904fe46b140e6dcf1c1a6535c7a85ff35773fb0f58afa796ab",
+          "status": "READY",
+          "mock": false,
+          "data": {
+            "assets": [
+              {
+                "id": "7ba2ef96-7191-49f2-a925-908a95c25705",
+                "sources": {
+                  "SPEECH": "SUCCEEDED",
+                  "VISUAL": "SUCCEEDED",
+                  "VISIBLE_TEXT": "SUCCEEDED"
+                },
+                "coverage": {
+                  "sampling": {
+                    "kind": "SPARSE_FRAMES",
+                    "rule": "real-pts-window-v1",
+                    "endMs": 4351,
+                    "startMs": 0,
+                    "complete": false,
+                    "maxFrames": 25,
+                    "intervalMs": 2000
+                  },
+                  "sampled_at_ms": [
+                    0,
+                    2000,
+                    4000
+                  ],
+                  "visual_complete": false,
+                  "speech_processed_ranges": [
+                    {
+                      "end_ms": 4351,
+                      "start_ms": 0
+                    }
+                  ]
+                },
+                "filename": "speech-mention-only.mp4",
+                "duration_ms": 4351,
+                "source_kinds": [
+                  "SPEECH",
+                  "VISUAL",
+                  "VISIBLE_TEXT"
+                ],
+                "source_sha256": "a5c5668fa7ae3a7c12c8ac3672d098a9ba3a74d7dfdc066b715184d05b36a551",
+                "analysis_version": "055dcd09-204b-4078-9d46-1506ad0244ea",
+                "index_generation": "6f48039e-812f-4893-a157-e4916531ad82",
+                "validation_status": "VALID"
+              }
+            ],
+            "next_cursor": null
+          },
+          "coverage": {
+            "scope_id": "63c21ae1-2bc7-46b9-b257-c73a5f64b4c1",
+            "cursor": 0,
+            "page_complete": true
+          },
+          "records": [],
+          "dependency": null,
+          "error": null
+        },
+        {
+          "call_id": "overview",
+          "tool_name": "get_video_overview",
+          "request_hash": "85d888d101b117a49fd085d6b314dc82fe8d78d39643d865f4554f67b8872ff5",
+          "status": "READY",
+          "mock": false,
+          "data": {
+            "entries": [
+              {
+                "excerpt": "视频里提着一只猫，展开前画面只有红色矩形。",
+                "source_kind": "SPEECH",
+                "purpose": "NAVIGATION",
+                "start_ms": 0,
+                "end_ms": 3840,
+                "navigation_ids": [
+                  "40922cfb-624a-41ed-b46d-49a738eb0ac7"
+                ]
+              },
+              {
+                "excerpt": "证据42",
+                "source_kind": "VISIBLE_TEXT",
+                "purpose": "NAVIGATION",
+                "observed_at_ms": 0,
+                "navigation_ids": [
+                  "5141bdde-3676-4917-8790-52b9e494a52e"
+                ]
+              },
+              {
+                "excerpt": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "source_kind": "VISUAL",
+                "purpose": "NAVIGATION",
+                "observed_at_ms": 0,
+                "navigation_ids": [
+                  "f5756334-1297-4222-b826-4a301ad151bc"
+                ]
+              },
+              {
+                "excerpt": "证据42",
+                "source_kind": "VISIBLE_TEXT",
+                "purpose": "NAVIGATION",
+                "observed_at_ms": 2000,
+                "navigation_ids": [
+                  "732b1059-b085-4ce1-982d-7597d1d22c30"
+                ]
+              },
+              {
+                "excerpt": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "source_kind": "VISUAL",
+                "purpose": "NAVIGATION",
+                "observed_at_ms": 2000,
+                "navigation_ids": [
+                  "679c7bf4-d4af-4c7c-b4c3-3ee50b946df7"
+                ]
+              },
+              {
+                "excerpt": "证据42",
+                "source_kind": "VISIBLE_TEXT",
+                "purpose": "NAVIGATION",
+                "observed_at_ms": 4000,
+                "navigation_ids": [
+                  "9019acd3-5cfc-4547-86d7-e8b053023106"
+                ]
+              },
+              {
+                "excerpt": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "source_kind": "VISUAL",
+                "purpose": "NAVIGATION",
+                "observed_at_ms": 4000,
+                "navigation_ids": [
+                  "ab089e69-f7e1-44c8-9e99-ad88c84a54a4"
+                ]
+              }
+            ],
+            "next_cursor": null
+          },
+          "coverage": {
+            "scope_id": "63c21ae1-2bc7-46b9-b257-c73a5f64b4c1",
+            "asset": {
+              "id": "7ba2ef96-7191-49f2-a925-908a95c25705",
+              "sources": {
+                "SPEECH": "SUCCEEDED",
+                "VISUAL": "SUCCEEDED",
+                "VISIBLE_TEXT": "SUCCEEDED"
+              },
+              "coverage": {
+                "sampling": {
+                  "kind": "SPARSE_FRAMES",
+                  "rule": "real-pts-window-v1",
+                  "endMs": 4351,
+                  "startMs": 0,
+                  "complete": false,
+                  "maxFrames": 25,
+                  "intervalMs": 2000
+                },
+                "sampled_at_ms": [
+                  0,
+                  2000,
+                  4000
+                ],
+                "visual_complete": false,
+                "speech_processed_ranges": [
+                  {
+                    "end_ms": 4351,
+                    "start_ms": 0
+                  }
+                ]
+              },
+              "filename": "speech-mention-only.mp4",
+              "duration_ms": 4351,
+              "source_kinds": [
+                "SPEECH",
+                "VISUAL",
+                "VISIBLE_TEXT"
+              ],
+              "source_sha256": "a5c5668fa7ae3a7c12c8ac3672d098a9ba3a74d7dfdc066b715184d05b36a551",
+              "analysis_version": "055dcd09-204b-4078-9d46-1506ad0244ea",
+              "index_generation": "6f48039e-812f-4893-a157-e4916531ad82",
+              "validation_status": "VALID"
+            },
+            "cursor": 0,
+            "page_complete": true,
+            "navigation_complete": true
+          },
+          "records": [],
+          "dependency": null,
+          "error": null
+        },
+        {
+          "call_id": "range",
+          "tool_name": "read_video_range",
+          "request_hash": "3fc4f785af9f40b8ab2eb42d4ba5ef11c5bfc060d67061764c4eddeaee0ccab1",
+          "status": "READY",
+          "mock": false,
+          "data": {
+            "next_cursor": null
+          },
+          "coverage": {
+            "scope_id": "63c21ae1-2bc7-46b9-b257-c73a5f64b4c1",
+            "asset": {
+              "id": "7ba2ef96-7191-49f2-a925-908a95c25705",
+              "sources": {
+                "SPEECH": "SUCCEEDED",
+                "VISUAL": "SUCCEEDED",
+                "VISIBLE_TEXT": "SUCCEEDED"
+              },
+              "coverage": {
+                "sampling": {
+                  "kind": "SPARSE_FRAMES",
+                  "rule": "real-pts-window-v1",
+                  "endMs": 4351,
+                  "startMs": 0,
+                  "complete": false,
+                  "maxFrames": 25,
+                  "intervalMs": 2000
+                },
+                "sampled_at_ms": [
+                  0,
+                  2000,
+                  4000
+                ],
+                "visual_complete": false,
+                "speech_processed_ranges": [
+                  {
+                    "end_ms": 4351,
+                    "start_ms": 0
+                  }
+                ]
+              },
+              "filename": "speech-mention-only.mp4",
+              "duration_ms": 4351,
+              "source_kinds": [
+                "SPEECH",
+                "VISUAL",
+                "VISIBLE_TEXT"
+              ],
+              "source_sha256": "a5c5668fa7ae3a7c12c8ac3672d098a9ba3a74d7dfdc066b715184d05b36a551",
+              "analysis_version": "055dcd09-204b-4078-9d46-1506ad0244ea",
+              "index_generation": "6f48039e-812f-4893-a157-e4916531ad82",
+              "validation_status": "VALID"
+            },
+            "start_ms": 0,
+            "end_ms": 4351,
+            "cursor": 0,
+            "page_complete": true
+          },
+          "records": [
+            {
+              "id": "40922cfb-624a-41ed-b46d-49a738eb0ac7",
+              "asset_id": "7ba2ef96-7191-49f2-a925-908a95c25705",
+              "analysis_version": "055dcd09-204b-4078-9d46-1506ad0244ea",
+              "source_kind": "SPEECH",
+              "text": "视频里提着一只猫，展开前画面只有红色矩形。",
+              "time_kind": "INTERVAL",
+              "start_ms": 0,
+              "end_ms": 3840,
+              "audio_start_ms": 0,
+              "audio_end_ms": 3840,
+              "temporal_precision": "MODEL_TIMESTAMPS",
+              "observation": {
+                "text": "视频里提着一只猫，展开前画面只有红色矩形。",
+                "words": [
+                  {
+                    "text": "视",
+                    "end_time": 160,
+                    "begin_time": 0,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "频",
+                    "end_time": 320,
+                    "begin_time": 160,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "里",
+                    "end_time": 480,
+                    "begin_time": 320,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "提",
+                    "end_time": 720,
+                    "begin_time": 480,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "着",
+                    "end_time": 800,
+                    "begin_time": 720,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "一",
+                    "end_time": 960,
+                    "begin_time": 880,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "只",
+                    "end_time": 1120,
+                    "begin_time": 960,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "猫",
+                    "end_time": 1280,
+                    "begin_time": 1120,
+                    "punctuation": "，"
+                  },
+                  {
+                    "text": "展",
+                    "end_time": 1760,
+                    "begin_time": 1600,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "开",
+                    "end_time": 2240,
+                    "begin_time": 2000,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "前",
+                    "end_time": 2240,
+                    "begin_time": 2240,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "画",
+                    "end_time": 2400,
+                    "begin_time": 2240,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "面",
+                    "end_time": 2640,
+                    "begin_time": 2400,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "只",
+                    "end_time": 2880,
+                    "begin_time": 2640,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "有",
+                    "end_time": 2960,
+                    "begin_time": 2880,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "红",
+                    "end_time": 3200,
+                    "begin_time": 2960,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "色",
+                    "end_time": 3360,
+                    "begin_time": 3200,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "矩",
+                    "end_time": 3520,
+                    "begin_time": 3360,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "形",
+                    "end_time": 3840,
+                    "begin_time": 3520,
+                    "punctuation": "。"
+                  }
+                ],
+                "emotion": "neutral",
+                "end_time": 3840,
+                "language": "zh",
+                "begin_time": 0,
+                "sentence_id": 0
+              }
+            },
+            {
+              "id": "5141bdde-3676-4917-8790-52b9e494a52e",
+              "asset_id": "7ba2ef96-7191-49f2-a925-908a95c25705",
+              "analysis_version": "055dcd09-204b-4078-9d46-1506ad0244ea",
+              "source_kind": "VISIBLE_TEXT",
+              "text": "证据42",
+              "time_kind": "POINT",
+              "observed_at_ms": 0,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "5ad9dd70-3af1-4b18-8e33-249ac16102fb",
+              "observation": {
+                "description": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "visibleText": [
+                  "证据42"
+                ]
+              }
+            },
+            {
+              "id": "f5756334-1297-4222-b826-4a301ad151bc",
+              "asset_id": "7ba2ef96-7191-49f2-a925-908a95c25705",
+              "analysis_version": "055dcd09-204b-4078-9d46-1506ad0244ea",
+              "source_kind": "VISUAL",
+              "text": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+              "time_kind": "POINT",
+              "observed_at_ms": 0,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "5ad9dd70-3af1-4b18-8e33-249ac16102fb",
+              "observation": {
+                "description": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "visibleText": [
+                  "证据42"
+                ]
+              }
+            },
+            {
+              "id": "732b1059-b085-4ce1-982d-7597d1d22c30",
+              "asset_id": "7ba2ef96-7191-49f2-a925-908a95c25705",
+              "analysis_version": "055dcd09-204b-4078-9d46-1506ad0244ea",
+              "source_kind": "VISIBLE_TEXT",
+              "text": "证据42",
+              "time_kind": "POINT",
+              "observed_at_ms": 2000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "5a60b726-1b24-4698-afb6-8ab453558520",
+              "observation": {
+                "description": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "visibleText": [
+                  "证据42"
+                ]
+              }
+            },
+            {
+              "id": "679c7bf4-d4af-4c7c-b4c3-3ee50b946df7",
+              "asset_id": "7ba2ef96-7191-49f2-a925-908a95c25705",
+              "analysis_version": "055dcd09-204b-4078-9d46-1506ad0244ea",
+              "source_kind": "VISUAL",
+              "text": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+              "time_kind": "POINT",
+              "observed_at_ms": 2000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "5a60b726-1b24-4698-afb6-8ab453558520",
+              "observation": {
+                "description": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "visibleText": [
+                  "证据42"
+                ]
+              }
+            },
+            {
+              "id": "9019acd3-5cfc-4547-86d7-e8b053023106",
+              "asset_id": "7ba2ef96-7191-49f2-a925-908a95c25705",
+              "analysis_version": "055dcd09-204b-4078-9d46-1506ad0244ea",
+              "source_kind": "VISIBLE_TEXT",
+              "text": "证据42",
+              "time_kind": "POINT",
+              "observed_at_ms": 4000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "3385ae55-349f-433c-885b-12101637ea97",
+              "observation": {
+                "description": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "visibleText": [
+                  "证据42"
+                ]
+              }
+            },
+            {
+              "id": "ab089e69-f7e1-44c8-9e99-ad88c84a54a4",
+              "asset_id": "7ba2ef96-7191-49f2-a925-908a95c25705",
+              "analysis_version": "055dcd09-204b-4078-9d46-1506ad0244ea",
+              "source_kind": "VISUAL",
+              "text": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+              "time_kind": "POINT",
+              "observed_at_ms": 4000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "3385ae55-349f-433c-885b-12101637ea97",
+              "observation": {
+                "description": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "visibleText": [
+                  "证据42"
+                ]
+              }
+            }
+          ],
+          "dependency": null,
+          "error": null
+        },
+        {
+          "call_id": "search",
+          "tool_name": "search_evidence",
+          "request_hash": "eabac34e82ce46180497dc33957d9b36af49ce8b2b489767e27da326f7ed4e7c",
+          "status": "READY",
+          "mock": false,
+          "data": {
+            "query_id": "5d5d01c9-47ad-443a-be3f-46acb4165ba2",
+            "candidate_limit": 100,
+            "channel_limit": 50,
+            "candidates_truncated": false,
+            "channels": {
+              "LITERAL": {
+                "status": "AVAILABLE"
+              },
+              "DENSE": {
+                "status": "AVAILABLE",
+                "failures": []
+              },
+              "BM25": {
+                "status": "AVAILABLE",
+                "failures": []
+              }
+            },
+            "index_generations": [
+              "6f48039e-812f-4893-a157-e4916531ad82"
+            ],
+            "model_calls": [
+              {
+                "id": "33ece8b3-a89f-4976-84ee-8ec905298ff5",
+                "status": "SUCCEEDED",
+                "request_id": "9ca3fbb7-c0c4-9c81-b841-c86a77e98f58"
+              }
+            ],
+            "next_cursor": null
+          },
+          "coverage": {
+            "scope_id": "63c21ae1-2bc7-46b9-b257-c73a5f64b4c1",
+            "assets": [
+              {
+                "id": "7ba2ef96-7191-49f2-a925-908a95c25705",
+                "sources": {
+                  "SPEECH": "SUCCEEDED",
+                  "VISUAL": "SUCCEEDED",
+                  "VISIBLE_TEXT": "SUCCEEDED"
+                },
+                "coverage": {
+                  "sampling": {
+                    "kind": "SPARSE_FRAMES",
+                    "rule": "real-pts-window-v1",
+                    "endMs": 4351,
+                    "startMs": 0,
+                    "complete": false,
+                    "maxFrames": 25,
+                    "intervalMs": 2000
+                  },
+                  "sampled_at_ms": [
+                    0,
+                    2000,
+                    4000
+                  ],
+                  "visual_complete": false,
+                  "speech_processed_ranges": [
+                    {
+                      "end_ms": 4351,
+                      "start_ms": 0
+                    }
+                  ]
+                },
+                "filename": "speech-mention-only.mp4",
+                "duration_ms": 4351,
+                "source_kinds": [
+                  "SPEECH",
+                  "VISUAL",
+                  "VISIBLE_TEXT"
+                ],
+                "source_sha256": "a5c5668fa7ae3a7c12c8ac3672d098a9ba3a74d7dfdc066b715184d05b36a551",
+                "analysis_version": "055dcd09-204b-4078-9d46-1506ad0244ea",
+                "index_generation": "6f48039e-812f-4893-a157-e4916531ad82",
+                "validation_status": "VALID"
+              }
+            ],
+            "source_kinds": [
+              "SPEECH",
+              "VISIBLE_TEXT",
+              "VISUAL"
+            ],
+            "cursor": 0,
+            "page_complete": true
+          },
+          "records": [
+            {
+              "id": "679c7bf4-d4af-4c7c-b4c3-3ee50b946df7",
+              "asset_id": "7ba2ef96-7191-49f2-a925-908a95c25705",
+              "analysis_version": "055dcd09-204b-4078-9d46-1506ad0244ea",
+              "source_kind": "VISUAL",
+              "text": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+              "time_kind": "POINT",
+              "observed_at_ms": 2000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "5a60b726-1b24-4698-afb6-8ab453558520",
+              "observation": {
+                "description": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "visibleText": [
+                  "证据42"
+                ]
+              }
+            },
+            {
+              "id": "f5756334-1297-4222-b826-4a301ad151bc",
+              "asset_id": "7ba2ef96-7191-49f2-a925-908a95c25705",
+              "analysis_version": "055dcd09-204b-4078-9d46-1506ad0244ea",
+              "source_kind": "VISUAL",
+              "text": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+              "time_kind": "POINT",
+              "observed_at_ms": 0,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "5ad9dd70-3af1-4b18-8e33-249ac16102fb",
+              "observation": {
+                "description": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "visibleText": [
+                  "证据42"
+                ]
+              }
+            },
+            {
+              "id": "40922cfb-624a-41ed-b46d-49a738eb0ac7",
+              "asset_id": "7ba2ef96-7191-49f2-a925-908a95c25705",
+              "analysis_version": "055dcd09-204b-4078-9d46-1506ad0244ea",
+              "source_kind": "SPEECH",
+              "text": "视频里提着一只猫，展开前画面只有红色矩形。",
+              "time_kind": "INTERVAL",
+              "start_ms": 0,
+              "end_ms": 3840,
+              "audio_start_ms": 0,
+              "audio_end_ms": 3840,
+              "temporal_precision": "MODEL_TIMESTAMPS",
+              "observation": {
+                "text": "视频里提着一只猫，展开前画面只有红色矩形。",
+                "words": [
+                  {
+                    "text": "视",
+                    "end_time": 160,
+                    "begin_time": 0,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "频",
+                    "end_time": 320,
+                    "begin_time": 160,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "里",
+                    "end_time": 480,
+                    "begin_time": 320,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "提",
+                    "end_time": 720,
+                    "begin_time": 480,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "着",
+                    "end_time": 800,
+                    "begin_time": 720,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "一",
+                    "end_time": 960,
+                    "begin_time": 880,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "只",
+                    "end_time": 1120,
+                    "begin_time": 960,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "猫",
+                    "end_time": 1280,
+                    "begin_time": 1120,
+                    "punctuation": "，"
+                  },
+                  {
+                    "text": "展",
+                    "end_time": 1760,
+                    "begin_time": 1600,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "开",
+                    "end_time": 2240,
+                    "begin_time": 2000,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "前",
+                    "end_time": 2240,
+                    "begin_time": 2240,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "画",
+                    "end_time": 2400,
+                    "begin_time": 2240,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "面",
+                    "end_time": 2640,
+                    "begin_time": 2400,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "只",
+                    "end_time": 2880,
+                    "begin_time": 2640,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "有",
+                    "end_time": 2960,
+                    "begin_time": 2880,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "红",
+                    "end_time": 3200,
+                    "begin_time": 2960,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "色",
+                    "end_time": 3360,
+                    "begin_time": 3200,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "矩",
+                    "end_time": 3520,
+                    "begin_time": 3360,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "形",
+                    "end_time": 3840,
+                    "begin_time": 3520,
+                    "punctuation": "。"
+                  }
+                ],
+                "emotion": "neutral",
+                "end_time": 3840,
+                "language": "zh",
+                "begin_time": 0,
+                "sentence_id": 0
+              }
+            },
+            {
+              "id": "ab089e69-f7e1-44c8-9e99-ad88c84a54a4",
+              "asset_id": "7ba2ef96-7191-49f2-a925-908a95c25705",
+              "analysis_version": "055dcd09-204b-4078-9d46-1506ad0244ea",
+              "source_kind": "VISUAL",
+              "text": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+              "time_kind": "POINT",
+              "observed_at_ms": 4000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "3385ae55-349f-433c-885b-12101637ea97",
+              "observation": {
+                "description": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "visibleText": [
+                  "证据42"
+                ]
+              }
+            },
+            {
+              "id": "5141bdde-3676-4917-8790-52b9e494a52e",
+              "asset_id": "7ba2ef96-7191-49f2-a925-908a95c25705",
+              "analysis_version": "055dcd09-204b-4078-9d46-1506ad0244ea",
+              "source_kind": "VISIBLE_TEXT",
+              "text": "证据42",
+              "time_kind": "POINT",
+              "observed_at_ms": 0,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "5ad9dd70-3af1-4b18-8e33-249ac16102fb",
+              "observation": {
+                "description": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "visibleText": [
+                  "证据42"
+                ]
+              }
+            },
+            {
+              "id": "732b1059-b085-4ce1-982d-7597d1d22c30",
+              "asset_id": "7ba2ef96-7191-49f2-a925-908a95c25705",
+              "analysis_version": "055dcd09-204b-4078-9d46-1506ad0244ea",
+              "source_kind": "VISIBLE_TEXT",
+              "text": "证据42",
+              "time_kind": "POINT",
+              "observed_at_ms": 2000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "5a60b726-1b24-4698-afb6-8ab453558520",
+              "observation": {
+                "description": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "visibleText": [
+                  "证据42"
+                ]
+              }
+            },
+            {
+              "id": "9019acd3-5cfc-4547-86d7-e8b053023106",
+              "asset_id": "7ba2ef96-7191-49f2-a925-908a95c25705",
+              "analysis_version": "055dcd09-204b-4078-9d46-1506ad0244ea",
+              "source_kind": "VISIBLE_TEXT",
+              "text": "证据42",
+              "time_kind": "POINT",
+              "observed_at_ms": 4000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "3385ae55-349f-433c-885b-12101637ea97",
+              "observation": {
+                "description": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "visibleText": [
+                  "证据42"
+                ]
+              }
+            }
+          ],
+          "dependency": null,
+          "error": null
+        }
+      ],
+      "model_receipts": {
+        "asr": [
+          {
+            "id": "dc699440-2915-48fc-98c5-c5a73abe163b",
+            "model": "qwen3-asr-flash-filetrans",
+            "status": "SUCCEEDED",
+            "provider_task_id": "b4555d00-dc63-499d-a6f6-8b0923ea539f",
+            "request_id": "9934e556-b677-98cb-83b1-78ccccca84a1",
+            "usage_json": {
+              "seconds": 4
+            }
+          }
+        ],
+        "vision": [
+          {
+            "id": "bc695899-33f6-45fb-be19-456455629f25",
+            "model": "qwen3-vl-plus",
+            "status": "SUCCEEDED",
+            "request_id": "ba458032-6b9e-9394-b55a-25ffe8d7d902",
+            "usage_json": {
+              "image_tokens": 512,
+              "input_tokens": 597,
+              "total_tokens": 645,
+              "output_tokens": 48,
+              "input_tokens_details": {
+                "text_tokens": 85,
+                "image_tokens": 512
+              },
+              "output_tokens_details": {
+                "text_tokens": 48
+              },
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              }
+            }
+          }
+        ],
+        "document_embeddings": [
+          {
+            "ordinal": 0,
+            "status": "SUCCEEDED",
+            "request_id": null,
+            "usage_json": {
+              "reused": true
+            }
+          },
+          {
+            "ordinal": 1,
+            "status": "SUCCEEDED",
+            "request_id": "cb34073b-2be7-982a-a565-2a7ccb3fa9a5",
+            "usage_json": {
+              "total_tokens": 102
+            }
+          }
+        ],
+        "query_embeddings": [
+          {
+            "id": "33ece8b3-a89f-4976-84ee-8ec905298ff5",
+            "model": "text-embedding-v4",
+            "status": "SUCCEEDED",
+            "request_id": "9ca3fbb7-c0c4-9c81-b841-c86a77e98f58",
+            "usage_json": {
+              "total_tokens": 3
+            }
+          }
+        ]
+      }
+    },
+    {
+      "fixture": "labelled-speech.mp4",
+      "scope": {
+        "project_id": "255c31d0-609f-42aa-94b5-3eb2d005b26e",
+        "scope_id": "43e4c575-7a48-4f5d-85ec-fe601c9fd9e9",
+        "assets": [
+          {
+            "id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+            "filename": "labelled-speech.mp4",
+            "source_sha256": "1eef2b3ae2095123326816ebb3cf1955071639d6a4fec18f8dc86b5339416a9f",
+            "validation_status": "VALID",
+            "duration_ms": 14044,
+            "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+            "index_generation": "73155d38-1ff9-49a5-9543-d31aa5887a28",
+            "sources": {
+              "SPEECH": "SUCCEEDED",
+              "VISUAL": "SUCCEEDED",
+              "VISIBLE_TEXT": "SUCCEEDED"
+            },
+            "source_kinds": [
+              "SPEECH",
+              "VISUAL",
+              "VISIBLE_TEXT"
+            ],
+            "coverage": {
+              "speech_processed_ranges": [
+                {
+                  "start_ms": 1436,
+                  "end_ms": 14044
+                }
+              ],
+              "sampling": {
+                "kind": "SPARSE_FRAMES",
+                "rule": "real-pts-window-v1",
+                "endMs": 14044,
+                "startMs": 0,
+                "complete": false,
+                "maxFrames": 25,
+                "intervalMs": 2000
+              },
+              "visual_complete": false,
+              "sampled_at_ms": [
+                0,
+                2000,
+                4000,
+                6000,
+                8000,
+                10000,
+                12000
+              ]
+            }
+          }
+        ],
+        "mock": false
+      },
+      "tool_results": [
+        {
+          "call_id": "assets",
+          "tool_name": "list_assets",
+          "request_hash": "96cd871589fd80904fe46b140e6dcf1c1a6535c7a85ff35773fb0f58afa796ab",
+          "status": "READY",
+          "mock": false,
+          "data": {
+            "assets": [
+              {
+                "id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+                "sources": {
+                  "SPEECH": "SUCCEEDED",
+                  "VISUAL": "SUCCEEDED",
+                  "VISIBLE_TEXT": "SUCCEEDED"
+                },
+                "coverage": {
+                  "sampling": {
+                    "kind": "SPARSE_FRAMES",
+                    "rule": "real-pts-window-v1",
+                    "endMs": 14044,
+                    "startMs": 0,
+                    "complete": false,
+                    "maxFrames": 25,
+                    "intervalMs": 2000
+                  },
+                  "sampled_at_ms": [
+                    0,
+                    2000,
+                    4000,
+                    6000,
+                    8000,
+                    10000,
+                    12000
+                  ],
+                  "visual_complete": false,
+                  "speech_processed_ranges": [
+                    {
+                      "end_ms": 14044,
+                      "start_ms": 1436
+                    }
+                  ]
+                },
+                "filename": "labelled-speech.mp4",
+                "duration_ms": 14044,
+                "source_kinds": [
+                  "SPEECH",
+                  "VISUAL",
+                  "VISIBLE_TEXT"
+                ],
+                "source_sha256": "1eef2b3ae2095123326816ebb3cf1955071639d6a4fec18f8dc86b5339416a9f",
+                "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+                "index_generation": "73155d38-1ff9-49a5-9543-d31aa5887a28",
+                "validation_status": "VALID"
+              }
+            ],
+            "next_cursor": null
+          },
+          "coverage": {
+            "scope_id": "43e4c575-7a48-4f5d-85ec-fe601c9fd9e9",
+            "cursor": 0,
+            "page_complete": true
+          },
+          "records": [],
+          "dependency": null,
+          "error": null
+        },
+        {
+          "call_id": "overview",
+          "tool_name": "get_video_overview",
+          "request_hash": "ab4f6db6343e714eb82df6d4fa0e92f8d929156a9da6fd8d45f5259e63f6eeb1",
+          "status": "READY",
+          "mock": false,
+          "data": {
+            "entries": [
+              {
+                "excerpt": "纯绿色背景，无任何物体或图案。",
+                "source_kind": "VISUAL",
+                "purpose": "NAVIGATION",
+                "observed_at_ms": 0,
+                "navigation_ids": [
+                  "68538116-e886-436f-9707-0fc3bbd59fc9"
+                ]
+              },
+              {
+                "excerpt": "大家好，我叫张明。",
+                "source_kind": "SPEECH",
+                "purpose": "NAVIGATION",
+                "start_ms": 1436,
+                "end_ms": 3436,
+                "navigation_ids": [
+                  "28241c5e-a7e0-4674-a861-da36161da365"
+                ]
+              },
+              {
+                "excerpt": "纯绿色背景，无任何物体或图案。",
+                "source_kind": "VISUAL",
+                "purpose": "NAVIGATION",
+                "observed_at_ms": 2000,
+                "navigation_ids": [
+                  "4db17e4d-bed5-4e8a-96b7-ef1286913707"
+                ]
+              },
+              {
+                "excerpt": "今天介绍三个视频制作步骤。",
+                "source_kind": "SPEECH",
+                "purpose": "NAVIGATION",
+                "start_ms": 3996,
+                "end_ms": 6716,
+                "navigation_ids": [
+                  "22ad1bf8-0c04-4d61-9dd3-f89f3a45114a"
+                ]
+              },
+              {
+                "excerpt": "纯绿色背景，无任何物体或图案。",
+                "source_kind": "VISUAL",
+                "purpose": "NAVIGATION",
+                "observed_at_ms": 4000,
+                "navigation_ids": [
+                  "0fc412bd-2df5-4b80-99b4-eeb2f65d5edc"
+                ]
+              },
+              {
+                "excerpt": "纯绿色背景，无任何物体或图案。",
+                "source_kind": "VISUAL",
+                "purpose": "NAVIGATION",
+                "observed_at_ms": 6000,
+                "navigation_ids": [
+                  "1032a3e1-c24f-41b5-83a8-8fdb64d39e0b"
+                ]
+              },
+              {
+                "excerpt": "第一步，上传素材。",
+                "source_kind": "SPEECH",
+                "purpose": "NAVIGATION",
+                "start_ms": 7276,
+                "end_ms": 9356,
+                "navigation_ids": [
+                  "7e70acf8-a76b-4a69-a63c-7606fea6d76d"
+                ]
+              },
+              {
+                "excerpt": "纯绿色背景，无任何物体或图案。",
+                "source_kind": "VISUAL",
+                "purpose": "NAVIGATION",
+                "observed_at_ms": 8000,
+                "navigation_ids": [
+                  "1969a128-8e7f-4d56-9bd1-021bd0dfb8db"
+                ]
+              },
+              {
+                "excerpt": "第二步，核查原文。",
+                "source_kind": "SPEECH",
+                "purpose": "NAVIGATION",
+                "start_ms": 9916,
+                "end_ms": 11836,
+                "navigation_ids": [
+                  "b924b2b5-efa3-4a87-8b02-0ad293623924"
+                ]
+              },
+              {
+                "excerpt": "纯绿色背景，无任何物体或图案。",
+                "source_kind": "VISUAL",
+                "purpose": "NAVIGATION",
+                "observed_at_ms": 10000,
+                "navigation_ids": [
+                  "2ed1d9ed-a278-4d8c-8c82-76a094be4369"
+                ]
+              },
+              {
+                "excerpt": "纯绿色背景，无任何物体或图案。",
+                "source_kind": "VISUAL",
+                "purpose": "NAVIGATION",
+                "observed_at_ms": 12000,
+                "navigation_ids": [
+                  "75f15612-c8e4-4895-ba56-40410d03355d"
+                ]
+              },
+              {
+                "excerpt": "第三步，导出。",
+                "source_kind": "SPEECH",
+                "purpose": "NAVIGATION",
+                "start_ms": 12476,
+                "end_ms": 13916,
+                "navigation_ids": [
+                  "2a093c72-df07-4d0d-b22e-58560c9c3ca1"
+                ]
+              }
+            ],
+            "next_cursor": null
+          },
+          "coverage": {
+            "scope_id": "43e4c575-7a48-4f5d-85ec-fe601c9fd9e9",
+            "asset": {
+              "id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+              "sources": {
+                "SPEECH": "SUCCEEDED",
+                "VISUAL": "SUCCEEDED",
+                "VISIBLE_TEXT": "SUCCEEDED"
+              },
+              "coverage": {
+                "sampling": {
+                  "kind": "SPARSE_FRAMES",
+                  "rule": "real-pts-window-v1",
+                  "endMs": 14044,
+                  "startMs": 0,
+                  "complete": false,
+                  "maxFrames": 25,
+                  "intervalMs": 2000
+                },
+                "sampled_at_ms": [
+                  0,
+                  2000,
+                  4000,
+                  6000,
+                  8000,
+                  10000,
+                  12000
+                ],
+                "visual_complete": false,
+                "speech_processed_ranges": [
+                  {
+                    "end_ms": 14044,
+                    "start_ms": 1436
+                  }
+                ]
+              },
+              "filename": "labelled-speech.mp4",
+              "duration_ms": 14044,
+              "source_kinds": [
+                "SPEECH",
+                "VISUAL",
+                "VISIBLE_TEXT"
+              ],
+              "source_sha256": "1eef2b3ae2095123326816ebb3cf1955071639d6a4fec18f8dc86b5339416a9f",
+              "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+              "index_generation": "73155d38-1ff9-49a5-9543-d31aa5887a28",
+              "validation_status": "VALID"
+            },
+            "cursor": 0,
+            "page_complete": true,
+            "navigation_complete": true
+          },
+          "records": [],
+          "dependency": null,
+          "error": null
+        },
+        {
+          "call_id": "range",
+          "tool_name": "read_video_range",
+          "request_hash": "015e851742e0065b7e8660607d595460c4715538492021d19bf798390bd7ae37",
+          "status": "READY",
+          "mock": false,
+          "data": {
+            "next_cursor": null
+          },
+          "coverage": {
+            "scope_id": "43e4c575-7a48-4f5d-85ec-fe601c9fd9e9",
+            "asset": {
+              "id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+              "sources": {
+                "SPEECH": "SUCCEEDED",
+                "VISUAL": "SUCCEEDED",
+                "VISIBLE_TEXT": "SUCCEEDED"
+              },
+              "coverage": {
+                "sampling": {
+                  "kind": "SPARSE_FRAMES",
+                  "rule": "real-pts-window-v1",
+                  "endMs": 14044,
+                  "startMs": 0,
+                  "complete": false,
+                  "maxFrames": 25,
+                  "intervalMs": 2000
+                },
+                "sampled_at_ms": [
+                  0,
+                  2000,
+                  4000,
+                  6000,
+                  8000,
+                  10000,
+                  12000
+                ],
+                "visual_complete": false,
+                "speech_processed_ranges": [
+                  {
+                    "end_ms": 14044,
+                    "start_ms": 1436
+                  }
+                ]
+              },
+              "filename": "labelled-speech.mp4",
+              "duration_ms": 14044,
+              "source_kinds": [
+                "SPEECH",
+                "VISUAL",
+                "VISIBLE_TEXT"
+              ],
+              "source_sha256": "1eef2b3ae2095123326816ebb3cf1955071639d6a4fec18f8dc86b5339416a9f",
+              "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+              "index_generation": "73155d38-1ff9-49a5-9543-d31aa5887a28",
+              "validation_status": "VALID"
+            },
+            "start_ms": 0,
+            "end_ms": 14044,
+            "cursor": 0,
+            "page_complete": true
+          },
+          "records": [
+            {
+              "id": "68538116-e886-436f-9707-0fc3bbd59fc9",
+              "asset_id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+              "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+              "source_kind": "VISUAL",
+              "text": "纯绿色背景，无任何物体或图案。",
+              "time_kind": "POINT",
+              "observed_at_ms": 0,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "799ee200-0f9f-4a7b-b385-e3918de40423",
+              "observation": {
+                "description": "纯绿色背景，无任何物体或图案。",
+                "visibleText": []
+              }
+            },
+            {
+              "id": "28241c5e-a7e0-4674-a861-da36161da365",
+              "asset_id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+              "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+              "source_kind": "SPEECH",
+              "text": "大家好，我叫张明。",
+              "time_kind": "INTERVAL",
+              "start_ms": 1436,
+              "end_ms": 3436,
+              "audio_start_ms": 0,
+              "audio_end_ms": 2000,
+              "temporal_precision": "MODEL_TIMESTAMPS",
+              "observation": {
+                "text": "大家好，我叫张明。",
+                "words": [
+                  {
+                    "text": "大",
+                    "end_time": 160,
+                    "begin_time": 0,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "家",
+                    "end_time": 400,
+                    "begin_time": 160,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "好",
+                    "end_time": 720,
+                    "begin_time": 400,
+                    "punctuation": "，"
+                  },
+                  {
+                    "text": "我",
+                    "end_time": 1280,
+                    "begin_time": 1120,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "叫",
+                    "end_time": 1440,
+                    "begin_time": 1280,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "张",
+                    "end_time": 1760,
+                    "begin_time": 1520,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "明",
+                    "end_time": 2000,
+                    "begin_time": 1760,
+                    "punctuation": "。"
+                  }
+                ],
+                "emotion": "neutral",
+                "end_time": 2000,
+                "language": "zh",
+                "begin_time": 0,
+                "sentence_id": 0
+              }
+            },
+            {
+              "id": "4db17e4d-bed5-4e8a-96b7-ef1286913707",
+              "asset_id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+              "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+              "source_kind": "VISUAL",
+              "text": "纯绿色背景，无任何物体或图案。",
+              "time_kind": "POINT",
+              "observed_at_ms": 2000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "fb0e3dda-912e-403b-bf9d-e1e198d5bdf8",
+              "observation": {
+                "description": "纯绿色背景，无任何物体或图案。",
+                "visibleText": []
+              }
+            },
+            {
+              "id": "22ad1bf8-0c04-4d61-9dd3-f89f3a45114a",
+              "asset_id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+              "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+              "source_kind": "SPEECH",
+              "text": "今天介绍三个视频制作步骤。",
+              "time_kind": "INTERVAL",
+              "start_ms": 3996,
+              "end_ms": 6716,
+              "audio_start_ms": 2560,
+              "audio_end_ms": 5280,
+              "temporal_precision": "MODEL_TIMESTAMPS",
+              "observation": {
+                "text": "今天介绍三个视频制作步骤。",
+                "words": [
+                  {
+                    "text": "今",
+                    "end_time": 2800,
+                    "begin_time": 2560,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "天",
+                    "end_time": 3120,
+                    "begin_time": 2800,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "介",
+                    "end_time": 3280,
+                    "begin_time": 3120,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "绍",
+                    "end_time": 3520,
+                    "begin_time": 3280,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "三",
+                    "end_time": 3760,
+                    "begin_time": 3520,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "个",
+                    "end_time": 4000,
+                    "begin_time": 3840,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "视",
+                    "end_time": 4160,
+                    "begin_time": 4000,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "频",
+                    "end_time": 4480,
+                    "begin_time": 4160,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "制",
+                    "end_time": 4640,
+                    "begin_time": 4480,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "作",
+                    "end_time": 4800,
+                    "begin_time": 4640,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "步",
+                    "end_time": 4960,
+                    "begin_time": 4800,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "骤",
+                    "end_time": 5280,
+                    "begin_time": 5040,
+                    "punctuation": "。"
+                  }
+                ],
+                "emotion": "neutral",
+                "end_time": 5280,
+                "language": "zh",
+                "begin_time": 2560,
+                "sentence_id": 1
+              }
+            },
+            {
+              "id": "0fc412bd-2df5-4b80-99b4-eeb2f65d5edc",
+              "asset_id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+              "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+              "source_kind": "VISUAL",
+              "text": "纯绿色背景，无任何物体或图案。",
+              "time_kind": "POINT",
+              "observed_at_ms": 4000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "6fc1a19c-3f79-4e42-aad3-813fc79b850a",
+              "observation": {
+                "description": "纯绿色背景，无任何物体或图案。",
+                "visibleText": []
+              }
+            },
+            {
+              "id": "1032a3e1-c24f-41b5-83a8-8fdb64d39e0b",
+              "asset_id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+              "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+              "source_kind": "VISUAL",
+              "text": "纯绿色背景，无任何物体或图案。",
+              "time_kind": "POINT",
+              "observed_at_ms": 6000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "269c70f0-9fdb-44ae-adc6-846daee3adb4",
+              "observation": {
+                "description": "纯绿色背景，无任何物体或图案。",
+                "visibleText": []
+              }
+            },
+            {
+              "id": "7e70acf8-a76b-4a69-a63c-7606fea6d76d",
+              "asset_id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+              "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+              "source_kind": "SPEECH",
+              "text": "第一步，上传素材。",
+              "time_kind": "INTERVAL",
+              "start_ms": 7276,
+              "end_ms": 9356,
+              "audio_start_ms": 5840,
+              "audio_end_ms": 7920,
+              "temporal_precision": "MODEL_TIMESTAMPS",
+              "observation": {
+                "text": "第一步，上传素材。",
+                "words": [
+                  {
+                    "text": "第",
+                    "end_time": 6080,
+                    "begin_time": 5840,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "一",
+                    "end_time": 6160,
+                    "begin_time": 6080,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "步",
+                    "end_time": 6400,
+                    "begin_time": 6160,
+                    "punctuation": "，"
+                  },
+                  {
+                    "text": "上",
+                    "end_time": 7040,
+                    "begin_time": 6720,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "传",
+                    "end_time": 7360,
+                    "begin_time": 7040,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "素",
+                    "end_time": 7520,
+                    "begin_time": 7360,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "材",
+                    "end_time": 7920,
+                    "begin_time": 7600,
+                    "punctuation": "。"
+                  }
+                ],
+                "emotion": "neutral",
+                "end_time": 7920,
+                "language": "zh",
+                "begin_time": 5840,
+                "sentence_id": 2
+              }
+            },
+            {
+              "id": "1969a128-8e7f-4d56-9bd1-021bd0dfb8db",
+              "asset_id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+              "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+              "source_kind": "VISUAL",
+              "text": "纯绿色背景，无任何物体或图案。",
+              "time_kind": "POINT",
+              "observed_at_ms": 8000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "5555d1be-2129-431f-89f2-0de5f2ab7c34",
+              "observation": {
+                "description": "纯绿色背景，无任何物体或图案。",
+                "visibleText": []
+              }
+            },
+            {
+              "id": "b924b2b5-efa3-4a87-8b02-0ad293623924",
+              "asset_id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+              "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+              "source_kind": "SPEECH",
+              "text": "第二步，核查原文。",
+              "time_kind": "INTERVAL",
+              "start_ms": 9916,
+              "end_ms": 11836,
+              "audio_start_ms": 8480,
+              "audio_end_ms": 10400,
+              "temporal_precision": "MODEL_TIMESTAMPS",
+              "observation": {
+                "text": "第二步，核查原文。",
+                "words": [
+                  {
+                    "text": "第",
+                    "end_time": 8640,
+                    "begin_time": 8480,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "二",
+                    "end_time": 8800,
+                    "begin_time": 8640,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "步",
+                    "end_time": 9120,
+                    "begin_time": 8800,
+                    "punctuation": "，"
+                  },
+                  {
+                    "text": "核",
+                    "end_time": 9600,
+                    "begin_time": 9440,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "查",
+                    "end_time": 9840,
+                    "begin_time": 9600,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "原",
+                    "end_time": 10080,
+                    "begin_time": 9840,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "文",
+                    "end_time": 10400,
+                    "begin_time": 10080,
+                    "punctuation": "。"
+                  }
+                ],
+                "emotion": "neutral",
+                "end_time": 10400,
+                "language": "zh",
+                "begin_time": 8480,
+                "sentence_id": 3
+              }
+            },
+            {
+              "id": "2ed1d9ed-a278-4d8c-8c82-76a094be4369",
+              "asset_id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+              "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+              "source_kind": "VISUAL",
+              "text": "纯绿色背景，无任何物体或图案。",
+              "time_kind": "POINT",
+              "observed_at_ms": 10000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "8a7a5dfe-b2be-4cd1-b861-fee6fda0efc3",
+              "observation": {
+                "description": "纯绿色背景，无任何物体或图案。",
+                "visibleText": []
+              }
+            },
+            {
+              "id": "75f15612-c8e4-4895-ba56-40410d03355d",
+              "asset_id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+              "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+              "source_kind": "VISUAL",
+              "text": "纯绿色背景，无任何物体或图案。",
+              "time_kind": "POINT",
+              "observed_at_ms": 12000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "ae4cd2e9-fac0-4a3f-9e7e-ea686d74bfd1",
+              "observation": {
+                "description": "纯绿色背景，无任何物体或图案。",
+                "visibleText": []
+              }
+            },
+            {
+              "id": "2a093c72-df07-4d0d-b22e-58560c9c3ca1",
+              "asset_id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+              "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+              "source_kind": "SPEECH",
+              "text": "第三步，导出。",
+              "time_kind": "INTERVAL",
+              "start_ms": 12476,
+              "end_ms": 13916,
+              "audio_start_ms": 11040,
+              "audio_end_ms": 12480,
+              "temporal_precision": "MODEL_TIMESTAMPS",
+              "observation": {
+                "text": "第三步，导出。",
+                "words": [
+                  {
+                    "text": "第",
+                    "end_time": 11200,
+                    "begin_time": 11040,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "三",
+                    "end_time": 11440,
+                    "begin_time": 11200,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "步",
+                    "end_time": 11760,
+                    "begin_time": 11520,
+                    "punctuation": "，"
+                  },
+                  {
+                    "text": "导",
+                    "end_time": 12240,
+                    "begin_time": 12080,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "出",
+                    "end_time": 12480,
+                    "begin_time": 12240,
+                    "punctuation": "。"
+                  }
+                ],
+                "emotion": "neutral",
+                "end_time": 12480,
+                "language": "zh",
+                "begin_time": 11040,
+                "sentence_id": 4
+              }
+            }
+          ],
+          "dependency": null,
+          "error": null
+        },
+        {
+          "call_id": "search",
+          "tool_name": "search_evidence",
+          "request_hash": "69e074847217995fcd9df75cd0d18e82bade24b77e3d50d9a03c4cfd436f9f47",
+          "status": "READY",
+          "mock": false,
+          "data": {
+            "query_id": "64281ca2-d328-47cb-bb9e-99bc3e2cf159",
+            "candidate_limit": 100,
+            "channel_limit": 50,
+            "candidates_truncated": false,
+            "channels": {
+              "LITERAL": {
+                "status": "AVAILABLE"
+              },
+              "DENSE": {
+                "status": "AVAILABLE",
+                "failures": []
+              },
+              "BM25": {
+                "status": "AVAILABLE",
+                "failures": []
+              }
+            },
+            "index_generations": [
+              "73155d38-1ff9-49a5-9543-d31aa5887a28"
+            ],
+            "model_calls": [
+              {
+                "id": "1ccd7a13-8448-4352-a476-c28177405042",
+                "status": "SUCCEEDED",
+                "request_id": "dd9aedda-384b-9181-8ff5-a06e2ea48c27"
+              }
+            ],
+            "next_cursor": null
+          },
+          "coverage": {
+            "scope_id": "43e4c575-7a48-4f5d-85ec-fe601c9fd9e9",
+            "assets": [
+              {
+                "id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+                "sources": {
+                  "SPEECH": "SUCCEEDED",
+                  "VISUAL": "SUCCEEDED",
+                  "VISIBLE_TEXT": "SUCCEEDED"
+                },
+                "coverage": {
+                  "sampling": {
+                    "kind": "SPARSE_FRAMES",
+                    "rule": "real-pts-window-v1",
+                    "endMs": 14044,
+                    "startMs": 0,
+                    "complete": false,
+                    "maxFrames": 25,
+                    "intervalMs": 2000
+                  },
+                  "sampled_at_ms": [
+                    0,
+                    2000,
+                    4000,
+                    6000,
+                    8000,
+                    10000,
+                    12000
+                  ],
+                  "visual_complete": false,
+                  "speech_processed_ranges": [
+                    {
+                      "end_ms": 14044,
+                      "start_ms": 1436
+                    }
+                  ]
+                },
+                "filename": "labelled-speech.mp4",
+                "duration_ms": 14044,
+                "source_kinds": [
+                  "SPEECH",
+                  "VISUAL",
+                  "VISIBLE_TEXT"
+                ],
+                "source_sha256": "1eef2b3ae2095123326816ebb3cf1955071639d6a4fec18f8dc86b5339416a9f",
+                "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+                "index_generation": "73155d38-1ff9-49a5-9543-d31aa5887a28",
+                "validation_status": "VALID"
+              }
+            ],
+            "source_kinds": [
+              "SPEECH",
+              "VISIBLE_TEXT",
+              "VISUAL"
+            ],
+            "cursor": 0,
+            "page_complete": true
+          },
+          "records": [
+            {
+              "id": "7e70acf8-a76b-4a69-a63c-7606fea6d76d",
+              "asset_id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+              "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+              "source_kind": "SPEECH",
+              "text": "第一步，上传素材。",
+              "time_kind": "INTERVAL",
+              "start_ms": 7276,
+              "end_ms": 9356,
+              "audio_start_ms": 5840,
+              "audio_end_ms": 7920,
+              "temporal_precision": "MODEL_TIMESTAMPS",
+              "observation": {
+                "text": "第一步，上传素材。",
+                "words": [
+                  {
+                    "text": "第",
+                    "end_time": 6080,
+                    "begin_time": 5840,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "一",
+                    "end_time": 6160,
+                    "begin_time": 6080,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "步",
+                    "end_time": 6400,
+                    "begin_time": 6160,
+                    "punctuation": "，"
+                  },
+                  {
+                    "text": "上",
+                    "end_time": 7040,
+                    "begin_time": 6720,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "传",
+                    "end_time": 7360,
+                    "begin_time": 7040,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "素",
+                    "end_time": 7520,
+                    "begin_time": 7360,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "材",
+                    "end_time": 7920,
+                    "begin_time": 7600,
+                    "punctuation": "。"
+                  }
+                ],
+                "emotion": "neutral",
+                "end_time": 7920,
+                "language": "zh",
+                "begin_time": 5840,
+                "sentence_id": 2
+              }
+            },
+            {
+              "id": "2a093c72-df07-4d0d-b22e-58560c9c3ca1",
+              "asset_id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+              "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+              "source_kind": "SPEECH",
+              "text": "第三步，导出。",
+              "time_kind": "INTERVAL",
+              "start_ms": 12476,
+              "end_ms": 13916,
+              "audio_start_ms": 11040,
+              "audio_end_ms": 12480,
+              "temporal_precision": "MODEL_TIMESTAMPS",
+              "observation": {
+                "text": "第三步，导出。",
+                "words": [
+                  {
+                    "text": "第",
+                    "end_time": 11200,
+                    "begin_time": 11040,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "三",
+                    "end_time": 11440,
+                    "begin_time": 11200,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "步",
+                    "end_time": 11760,
+                    "begin_time": 11520,
+                    "punctuation": "，"
+                  },
+                  {
+                    "text": "导",
+                    "end_time": 12240,
+                    "begin_time": 12080,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "出",
+                    "end_time": 12480,
+                    "begin_time": 12240,
+                    "punctuation": "。"
+                  }
+                ],
+                "emotion": "neutral",
+                "end_time": 12480,
+                "language": "zh",
+                "begin_time": 11040,
+                "sentence_id": 4
+              }
+            },
+            {
+              "id": "22ad1bf8-0c04-4d61-9dd3-f89f3a45114a",
+              "asset_id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+              "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+              "source_kind": "SPEECH",
+              "text": "今天介绍三个视频制作步骤。",
+              "time_kind": "INTERVAL",
+              "start_ms": 3996,
+              "end_ms": 6716,
+              "audio_start_ms": 2560,
+              "audio_end_ms": 5280,
+              "temporal_precision": "MODEL_TIMESTAMPS",
+              "observation": {
+                "text": "今天介绍三个视频制作步骤。",
+                "words": [
+                  {
+                    "text": "今",
+                    "end_time": 2800,
+                    "begin_time": 2560,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "天",
+                    "end_time": 3120,
+                    "begin_time": 2800,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "介",
+                    "end_time": 3280,
+                    "begin_time": 3120,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "绍",
+                    "end_time": 3520,
+                    "begin_time": 3280,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "三",
+                    "end_time": 3760,
+                    "begin_time": 3520,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "个",
+                    "end_time": 4000,
+                    "begin_time": 3840,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "视",
+                    "end_time": 4160,
+                    "begin_time": 4000,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "频",
+                    "end_time": 4480,
+                    "begin_time": 4160,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "制",
+                    "end_time": 4640,
+                    "begin_time": 4480,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "作",
+                    "end_time": 4800,
+                    "begin_time": 4640,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "步",
+                    "end_time": 4960,
+                    "begin_time": 4800,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "骤",
+                    "end_time": 5280,
+                    "begin_time": 5040,
+                    "punctuation": "。"
+                  }
+                ],
+                "emotion": "neutral",
+                "end_time": 5280,
+                "language": "zh",
+                "begin_time": 2560,
+                "sentence_id": 1
+              }
+            },
+            {
+              "id": "b924b2b5-efa3-4a87-8b02-0ad293623924",
+              "asset_id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+              "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+              "source_kind": "SPEECH",
+              "text": "第二步，核查原文。",
+              "time_kind": "INTERVAL",
+              "start_ms": 9916,
+              "end_ms": 11836,
+              "audio_start_ms": 8480,
+              "audio_end_ms": 10400,
+              "temporal_precision": "MODEL_TIMESTAMPS",
+              "observation": {
+                "text": "第二步，核查原文。",
+                "words": [
+                  {
+                    "text": "第",
+                    "end_time": 8640,
+                    "begin_time": 8480,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "二",
+                    "end_time": 8800,
+                    "begin_time": 8640,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "步",
+                    "end_time": 9120,
+                    "begin_time": 8800,
+                    "punctuation": "，"
+                  },
+                  {
+                    "text": "核",
+                    "end_time": 9600,
+                    "begin_time": 9440,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "查",
+                    "end_time": 9840,
+                    "begin_time": 9600,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "原",
+                    "end_time": 10080,
+                    "begin_time": 9840,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "文",
+                    "end_time": 10400,
+                    "begin_time": 10080,
+                    "punctuation": "。"
+                  }
+                ],
+                "emotion": "neutral",
+                "end_time": 10400,
+                "language": "zh",
+                "begin_time": 8480,
+                "sentence_id": 3
+              }
+            },
+            {
+              "id": "68538116-e886-436f-9707-0fc3bbd59fc9",
+              "asset_id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+              "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+              "source_kind": "VISUAL",
+              "text": "纯绿色背景，无任何物体或图案。",
+              "time_kind": "POINT",
+              "observed_at_ms": 0,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "799ee200-0f9f-4a7b-b385-e3918de40423",
+              "observation": {
+                "description": "纯绿色背景，无任何物体或图案。",
+                "visibleText": []
+              }
+            },
+            {
+              "id": "0fc412bd-2df5-4b80-99b4-eeb2f65d5edc",
+              "asset_id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+              "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+              "source_kind": "VISUAL",
+              "text": "纯绿色背景，无任何物体或图案。",
+              "time_kind": "POINT",
+              "observed_at_ms": 4000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "6fc1a19c-3f79-4e42-aad3-813fc79b850a",
+              "observation": {
+                "description": "纯绿色背景，无任何物体或图案。",
+                "visibleText": []
+              }
+            },
+            {
+              "id": "4db17e4d-bed5-4e8a-96b7-ef1286913707",
+              "asset_id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+              "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+              "source_kind": "VISUAL",
+              "text": "纯绿色背景，无任何物体或图案。",
+              "time_kind": "POINT",
+              "observed_at_ms": 2000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "fb0e3dda-912e-403b-bf9d-e1e198d5bdf8",
+              "observation": {
+                "description": "纯绿色背景，无任何物体或图案。",
+                "visibleText": []
+              }
+            },
+            {
+              "id": "2ed1d9ed-a278-4d8c-8c82-76a094be4369",
+              "asset_id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+              "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+              "source_kind": "VISUAL",
+              "text": "纯绿色背景，无任何物体或图案。",
+              "time_kind": "POINT",
+              "observed_at_ms": 10000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "8a7a5dfe-b2be-4cd1-b861-fee6fda0efc3",
+              "observation": {
+                "description": "纯绿色背景，无任何物体或图案。",
+                "visibleText": []
+              }
+            },
+            {
+              "id": "1969a128-8e7f-4d56-9bd1-021bd0dfb8db",
+              "asset_id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+              "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+              "source_kind": "VISUAL",
+              "text": "纯绿色背景，无任何物体或图案。",
+              "time_kind": "POINT",
+              "observed_at_ms": 8000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "5555d1be-2129-431f-89f2-0de5f2ab7c34",
+              "observation": {
+                "description": "纯绿色背景，无任何物体或图案。",
+                "visibleText": []
+              }
+            },
+            {
+              "id": "75f15612-c8e4-4895-ba56-40410d03355d",
+              "asset_id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+              "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+              "source_kind": "VISUAL",
+              "text": "纯绿色背景，无任何物体或图案。",
+              "time_kind": "POINT",
+              "observed_at_ms": 12000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "ae4cd2e9-fac0-4a3f-9e7e-ea686d74bfd1",
+              "observation": {
+                "description": "纯绿色背景，无任何物体或图案。",
+                "visibleText": []
+              }
+            },
+            {
+              "id": "1032a3e1-c24f-41b5-83a8-8fdb64d39e0b",
+              "asset_id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+              "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+              "source_kind": "VISUAL",
+              "text": "纯绿色背景，无任何物体或图案。",
+              "time_kind": "POINT",
+              "observed_at_ms": 6000,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "269c70f0-9fdb-44ae-adc6-846daee3adb4",
+              "observation": {
+                "description": "纯绿色背景，无任何物体或图案。",
+                "visibleText": []
+              }
+            },
+            {
+              "id": "28241c5e-a7e0-4674-a861-da36161da365",
+              "asset_id": "824dbe24-0875-43ad-a710-a95bb2fa9a17",
+              "analysis_version": "49c5fd60-22e6-4d11-927a-362f2128d92c",
+              "source_kind": "SPEECH",
+              "text": "大家好，我叫张明。",
+              "time_kind": "INTERVAL",
+              "start_ms": 1436,
+              "end_ms": 3436,
+              "audio_start_ms": 0,
+              "audio_end_ms": 2000,
+              "temporal_precision": "MODEL_TIMESTAMPS",
+              "observation": {
+                "text": "大家好，我叫张明。",
+                "words": [
+                  {
+                    "text": "大",
+                    "end_time": 160,
+                    "begin_time": 0,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "家",
+                    "end_time": 400,
+                    "begin_time": 160,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "好",
+                    "end_time": 720,
+                    "begin_time": 400,
+                    "punctuation": "，"
+                  },
+                  {
+                    "text": "我",
+                    "end_time": 1280,
+                    "begin_time": 1120,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "叫",
+                    "end_time": 1440,
+                    "begin_time": 1280,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "张",
+                    "end_time": 1760,
+                    "begin_time": 1520,
+                    "punctuation": ""
+                  },
+                  {
+                    "text": "明",
+                    "end_time": 2000,
+                    "begin_time": 1760,
+                    "punctuation": "。"
+                  }
+                ],
+                "emotion": "neutral",
+                "end_time": 2000,
+                "language": "zh",
+                "begin_time": 0,
+                "sentence_id": 0
+              }
+            }
+          ],
+          "dependency": null,
+          "error": null
+        }
+      ],
+      "model_receipts": {
+        "asr": [
+          {
+            "id": "cf7241d6-bdeb-43eb-80bf-bf01aa7088cc",
+            "model": "qwen3-asr-flash-filetrans",
+            "status": "SUCCEEDED",
+            "provider_task_id": "fe04073a-d90f-45ac-91c0-d05a423fc71e",
+            "request_id": "03aaf843-880d-9937-981b-fb199c4efd05",
+            "usage_json": {
+              "seconds": 10
+            }
+          }
+        ],
+        "vision": [
+          {
+            "id": "4f4df7bd-8527-4656-b826-629e4ae85136",
+            "model": "qwen3-vl-plus",
+            "status": "SUCCEEDED",
+            "request_id": "25ce24ed-e61d-95e5-9ad5-a0481b206cb5",
+            "usage_json": {
+              "image_tokens": 512,
+              "input_tokens": 597,
+              "total_tokens": 616,
+              "output_tokens": 19,
+              "input_tokens_details": {
+                "text_tokens": 85,
+                "image_tokens": 512
+              },
+              "output_tokens_details": {
+                "text_tokens": 19
+              },
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              }
+            }
+          }
+        ],
+        "document_embeddings": [
+          {
+            "ordinal": 0,
+            "status": "SUCCEEDED",
+            "request_id": null,
+            "usage_json": {
+              "reused": true
+            }
+          },
+          {
+            "ordinal": 1,
+            "status": "SUCCEEDED",
+            "request_id": "52bfc7e0-aed0-93bf-bc94-28f4c746784e",
+            "usage_json": {
+              "total_tokens": 37
+            }
+          }
+        ],
+        "query_embeddings": [
+          {
+            "id": "1ccd7a13-8448-4352-a476-c28177405042",
+            "model": "text-embedding-v4",
+            "status": "SUCCEEDED",
+            "request_id": "dd9aedda-384b-9181-8ff5-a06e2ea48c27",
+            "usage_json": {
+              "total_tokens": 3
+            }
+          }
+        ]
+      }
+    },
+    {
+      "fixture": "labelled-vision-vfr.mp4",
+      "scope": {
+        "project_id": "c12b2a20-9aa4-4253-a9d1-1a04b637738d",
+        "scope_id": "7ea70a4e-e47a-4122-8fdf-ac57160c6bd6",
+        "assets": [
+          {
+            "id": "fb3ee5df-a6dc-4e3e-83c8-deb75637a3f9",
+            "filename": "labelled-vision-vfr.mp4",
+            "source_sha256": "ab00c235ed6324ae0ade047ae882d9499aaf2724d53daddc3c0b8feb594b773c",
+            "validation_status": "VALID",
+            "duration_ms": 7120,
+            "analysis_version": "9ec0a067-2ff6-485e-a302-dadc3a2ff82e",
+            "index_generation": "609c7c82-1084-4cd0-b42d-173cb595c6ad",
+            "sources": {
+              "SPEECH": "NOT_APPLICABLE",
+              "VISUAL": "SUCCEEDED",
+              "VISIBLE_TEXT": "SUCCEEDED"
+            },
+            "source_kinds": [
+              "VISUAL",
+              "VISIBLE_TEXT"
+            ],
+            "coverage": {
+              "speech_processed_ranges": [],
+              "sampling": {
+                "kind": "SPARSE_FRAMES",
+                "rule": "real-pts-window-v1",
+                "endMs": 7120,
+                "startMs": 0,
+                "complete": false,
+                "maxFrames": 25,
+                "intervalMs": 2000
+              },
+              "visual_complete": false,
+              "sampled_at_ms": [
+                0,
+                2320,
+                4760,
+                7080
+              ]
+            }
+          }
+        ],
+        "mock": false
+      },
+      "tool_results": [
+        {
+          "call_id": "assets",
+          "tool_name": "list_assets",
+          "request_hash": "96cd871589fd80904fe46b140e6dcf1c1a6535c7a85ff35773fb0f58afa796ab",
+          "status": "READY",
+          "mock": false,
+          "data": {
+            "assets": [
+              {
+                "id": "fb3ee5df-a6dc-4e3e-83c8-deb75637a3f9",
+                "sources": {
+                  "SPEECH": "NOT_APPLICABLE",
+                  "VISUAL": "SUCCEEDED",
+                  "VISIBLE_TEXT": "SUCCEEDED"
+                },
+                "coverage": {
+                  "sampling": {
+                    "kind": "SPARSE_FRAMES",
+                    "rule": "real-pts-window-v1",
+                    "endMs": 7120,
+                    "startMs": 0,
+                    "complete": false,
+                    "maxFrames": 25,
+                    "intervalMs": 2000
+                  },
+                  "sampled_at_ms": [
+                    0,
+                    2320,
+                    4760,
+                    7080
+                  ],
+                  "visual_complete": false,
+                  "speech_processed_ranges": []
+                },
+                "filename": "labelled-vision-vfr.mp4",
+                "duration_ms": 7120,
+                "source_kinds": [
+                  "VISUAL",
+                  "VISIBLE_TEXT"
+                ],
+                "source_sha256": "ab00c235ed6324ae0ade047ae882d9499aaf2724d53daddc3c0b8feb594b773c",
+                "analysis_version": "9ec0a067-2ff6-485e-a302-dadc3a2ff82e",
+                "index_generation": "609c7c82-1084-4cd0-b42d-173cb595c6ad",
+                "validation_status": "VALID"
+              }
+            ],
+            "next_cursor": null
+          },
+          "coverage": {
+            "scope_id": "7ea70a4e-e47a-4122-8fdf-ac57160c6bd6",
+            "cursor": 0,
+            "page_complete": true
+          },
+          "records": [],
+          "dependency": null,
+          "error": null
+        },
+        {
+          "call_id": "overview",
+          "tool_name": "get_video_overview",
+          "request_hash": "0a06eeddc88e0c1b36f92a90221c3e3f57b65eb2e44b922998f3025d57461164",
+          "status": "READY",
+          "mock": false,
+          "data": {
+            "entries": [
+              {
+                "excerpt": "证据42",
+                "source_kind": "VISIBLE_TEXT",
+                "purpose": "NAVIGATION",
+                "observed_at_ms": 0,
+                "navigation_ids": [
+                  "57238456-92ee-495c-b9e2-2db84a052970"
+                ]
+              },
+              {
+                "excerpt": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "source_kind": "VISUAL",
+                "purpose": "NAVIGATION",
+                "observed_at_ms": 0,
+                "navigation_ids": [
+                  "69129d65-49d0-45c9-a349-2f09af524aa1"
+                ]
+              },
+              {
+                "excerpt": "画面17",
+                "source_kind": "VISIBLE_TEXT",
+                "purpose": "NAVIGATION",
+                "observed_at_ms": 2320,
+                "navigation_ids": [
+                  "557aaef1-b4c1-4973-8e0d-45f5d90f8270"
+                ]
+              },
+              {
+                "excerpt": "白色背景上有一个位于左上方的纯蓝色矩形色块，下方偏左位置有黑色文字“画面17”。",
+                "source_kind": "VISUAL",
+                "purpose": "NAVIGATION",
+                "observed_at_ms": 2320,
+                "navigation_ids": [
+                  "1420b2fc-af0c-4813-a242-578ac41f16e3"
+                ]
+              },
+              {
+                "excerpt": "证据42",
+                "source_kind": "VISIBLE_TEXT",
+                "purpose": "NAVIGATION",
+                "observed_at_ms": 4760,
+                "navigation_ids": [
+                  "f71947fd-f252-483b-bf89-cfe84cc481b3"
+                ]
+              },
+              {
+                "excerpt": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "source_kind": "VISUAL",
+                "purpose": "NAVIGATION",
+                "observed_at_ms": 4760,
+                "navigation_ids": [
+                  "39323181-7ac1-43cd-9d08-db1e93216209"
+                ]
+              },
+              {
+                "excerpt": "证据42",
+                "source_kind": "VISIBLE_TEXT",
+                "purpose": "NAVIGATION",
+                "observed_at_ms": 7080,
+                "navigation_ids": [
+                  "b4e4d93e-e376-44f3-ab6f-8e2e3888bb3b"
+                ]
+              },
+              {
+                "excerpt": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "source_kind": "VISUAL",
+                "purpose": "NAVIGATION",
+                "observed_at_ms": 7080,
+                "navigation_ids": [
+                  "d1ea6af6-d5c5-4551-8524-8aaece860eca"
+                ]
+              }
+            ],
+            "next_cursor": null
+          },
+          "coverage": {
+            "scope_id": "7ea70a4e-e47a-4122-8fdf-ac57160c6bd6",
+            "asset": {
+              "id": "fb3ee5df-a6dc-4e3e-83c8-deb75637a3f9",
+              "sources": {
+                "SPEECH": "NOT_APPLICABLE",
+                "VISUAL": "SUCCEEDED",
+                "VISIBLE_TEXT": "SUCCEEDED"
+              },
+              "coverage": {
+                "sampling": {
+                  "kind": "SPARSE_FRAMES",
+                  "rule": "real-pts-window-v1",
+                  "endMs": 7120,
+                  "startMs": 0,
+                  "complete": false,
+                  "maxFrames": 25,
+                  "intervalMs": 2000
+                },
+                "sampled_at_ms": [
+                  0,
+                  2320,
+                  4760,
+                  7080
+                ],
+                "visual_complete": false,
+                "speech_processed_ranges": []
+              },
+              "filename": "labelled-vision-vfr.mp4",
+              "duration_ms": 7120,
+              "source_kinds": [
+                "VISUAL",
+                "VISIBLE_TEXT"
+              ],
+              "source_sha256": "ab00c235ed6324ae0ade047ae882d9499aaf2724d53daddc3c0b8feb594b773c",
+              "analysis_version": "9ec0a067-2ff6-485e-a302-dadc3a2ff82e",
+              "index_generation": "609c7c82-1084-4cd0-b42d-173cb595c6ad",
+              "validation_status": "VALID"
+            },
+            "cursor": 0,
+            "page_complete": true,
+            "navigation_complete": true
+          },
+          "records": [],
+          "dependency": null,
+          "error": null
+        },
+        {
+          "call_id": "range",
+          "tool_name": "read_video_range",
+          "request_hash": "27135fe737a25c432524e59d27efc6d40b2998f5583a742855095c9ea80acf2d",
+          "status": "READY",
+          "mock": false,
+          "data": {
+            "next_cursor": null
+          },
+          "coverage": {
+            "scope_id": "7ea70a4e-e47a-4122-8fdf-ac57160c6bd6",
+            "asset": {
+              "id": "fb3ee5df-a6dc-4e3e-83c8-deb75637a3f9",
+              "sources": {
+                "SPEECH": "NOT_APPLICABLE",
+                "VISUAL": "SUCCEEDED",
+                "VISIBLE_TEXT": "SUCCEEDED"
+              },
+              "coverage": {
+                "sampling": {
+                  "kind": "SPARSE_FRAMES",
+                  "rule": "real-pts-window-v1",
+                  "endMs": 7120,
+                  "startMs": 0,
+                  "complete": false,
+                  "maxFrames": 25,
+                  "intervalMs": 2000
+                },
+                "sampled_at_ms": [
+                  0,
+                  2320,
+                  4760,
+                  7080
+                ],
+                "visual_complete": false,
+                "speech_processed_ranges": []
+              },
+              "filename": "labelled-vision-vfr.mp4",
+              "duration_ms": 7120,
+              "source_kinds": [
+                "VISUAL",
+                "VISIBLE_TEXT"
+              ],
+              "source_sha256": "ab00c235ed6324ae0ade047ae882d9499aaf2724d53daddc3c0b8feb594b773c",
+              "analysis_version": "9ec0a067-2ff6-485e-a302-dadc3a2ff82e",
+              "index_generation": "609c7c82-1084-4cd0-b42d-173cb595c6ad",
+              "validation_status": "VALID"
+            },
+            "start_ms": 0,
+            "end_ms": 7120,
+            "cursor": 0,
+            "page_complete": true
+          },
+          "records": [
+            {
+              "id": "57238456-92ee-495c-b9e2-2db84a052970",
+              "asset_id": "fb3ee5df-a6dc-4e3e-83c8-deb75637a3f9",
+              "analysis_version": "9ec0a067-2ff6-485e-a302-dadc3a2ff82e",
+              "source_kind": "VISIBLE_TEXT",
+              "text": "证据42",
+              "time_kind": "POINT",
+              "observed_at_ms": 0,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "b509e31e-de21-4f50-af47-36d0f82dd6fa",
+              "observation": {
+                "description": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "visibleText": [
+                  "证据42"
+                ]
+              }
+            },
+            {
+              "id": "69129d65-49d0-45c9-a349-2f09af524aa1",
+              "asset_id": "fb3ee5df-a6dc-4e3e-83c8-deb75637a3f9",
+              "analysis_version": "9ec0a067-2ff6-485e-a302-dadc3a2ff82e",
+              "source_kind": "VISUAL",
+              "text": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+              "time_kind": "POINT",
+              "observed_at_ms": 0,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "b509e31e-de21-4f50-af47-36d0f82dd6fa",
+              "observation": {
+                "description": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "visibleText": [
+                  "证据42"
+                ]
+              }
+            },
+            {
+              "id": "557aaef1-b4c1-4973-8e0d-45f5d90f8270",
+              "asset_id": "fb3ee5df-a6dc-4e3e-83c8-deb75637a3f9",
+              "analysis_version": "9ec0a067-2ff6-485e-a302-dadc3a2ff82e",
+              "source_kind": "VISIBLE_TEXT",
+              "text": "画面17",
+              "time_kind": "POINT",
+              "observed_at_ms": 2320,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "909f2b7b-c251-406e-a0f8-826972f96cf4",
+              "observation": {
+                "description": "白色背景上有一个位于左上方的纯蓝色矩形色块，下方偏左位置有黑色文字“画面17”。",
+                "visibleText": [
+                  "画面17"
+                ]
+              }
+            },
+            {
+              "id": "1420b2fc-af0c-4813-a242-578ac41f16e3",
+              "asset_id": "fb3ee5df-a6dc-4e3e-83c8-deb75637a3f9",
+              "analysis_version": "9ec0a067-2ff6-485e-a302-dadc3a2ff82e",
+              "source_kind": "VISUAL",
+              "text": "白色背景上有一个位于左上方的纯蓝色矩形色块，下方偏左位置有黑色文字“画面17”。",
+              "time_kind": "POINT",
+              "observed_at_ms": 2320,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "909f2b7b-c251-406e-a0f8-826972f96cf4",
+              "observation": {
+                "description": "白色背景上有一个位于左上方的纯蓝色矩形色块，下方偏左位置有黑色文字“画面17”。",
+                "visibleText": [
+                  "画面17"
+                ]
+              }
+            },
+            {
+              "id": "f71947fd-f252-483b-bf89-cfe84cc481b3",
+              "asset_id": "fb3ee5df-a6dc-4e3e-83c8-deb75637a3f9",
+              "analysis_version": "9ec0a067-2ff6-485e-a302-dadc3a2ff82e",
+              "source_kind": "VISIBLE_TEXT",
+              "text": "证据42",
+              "time_kind": "POINT",
+              "observed_at_ms": 4760,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "85d1b440-7d1a-4f98-8c1f-70db749b1dfe",
+              "observation": {
+                "description": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "visibleText": [
+                  "证据42"
+                ]
+              }
+            },
+            {
+              "id": "39323181-7ac1-43cd-9d08-db1e93216209",
+              "asset_id": "fb3ee5df-a6dc-4e3e-83c8-deb75637a3f9",
+              "analysis_version": "9ec0a067-2ff6-485e-a302-dadc3a2ff82e",
+              "source_kind": "VISUAL",
+              "text": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+              "time_kind": "POINT",
+              "observed_at_ms": 4760,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "85d1b440-7d1a-4f98-8c1f-70db749b1dfe",
+              "observation": {
+                "description": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "visibleText": [
+                  "证据42"
+                ]
+              }
+            },
+            {
+              "id": "b4e4d93e-e376-44f3-ab6f-8e2e3888bb3b",
+              "asset_id": "fb3ee5df-a6dc-4e3e-83c8-deb75637a3f9",
+              "analysis_version": "9ec0a067-2ff6-485e-a302-dadc3a2ff82e",
+              "source_kind": "VISIBLE_TEXT",
+              "text": "证据42",
+              "time_kind": "POINT",
+              "observed_at_ms": 7080,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "1bada748-cc15-4388-aca0-48d572e88778",
+              "observation": {
+                "description": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "visibleText": [
+                  "证据42"
+                ]
+              }
+            },
+            {
+              "id": "d1ea6af6-d5c5-4551-8524-8aaece860eca",
+              "asset_id": "fb3ee5df-a6dc-4e3e-83c8-deb75637a3f9",
+              "analysis_version": "9ec0a067-2ff6-485e-a302-dadc3a2ff82e",
+              "source_kind": "VISUAL",
+              "text": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+              "time_kind": "POINT",
+              "observed_at_ms": 7080,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "1bada748-cc15-4388-aca0-48d572e88778",
+              "observation": {
+                "description": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "visibleText": [
+                  "证据42"
+                ]
+              }
+            }
+          ],
+          "dependency": null,
+          "error": null
+        },
+        {
+          "call_id": "search",
+          "tool_name": "search_evidence",
+          "request_hash": "e3557aa03c32733c6ab72353cccc2bfb04a60bd9045910e9520534a41445a4c5",
+          "status": "READY",
+          "mock": false,
+          "data": {
+            "query_id": "b74c7cf3-1b51-4794-9538-9f5837e85c72",
+            "candidate_limit": 100,
+            "channel_limit": 50,
+            "candidates_truncated": false,
+            "channels": {
+              "LITERAL": {
+                "status": "AVAILABLE"
+              },
+              "DENSE": {
+                "status": "AVAILABLE",
+                "failures": []
+              },
+              "BM25": {
+                "status": "AVAILABLE",
+                "failures": []
+              }
+            },
+            "index_generations": [
+              "609c7c82-1084-4cd0-b42d-173cb595c6ad"
+            ],
+            "model_calls": [
+              {
+                "id": "2330c656-80da-49ef-83b3-aea26a25317b",
+                "status": "SUCCEEDED",
+                "request_id": "4f49846a-ffa3-9042-9625-68571d8665e3"
+              }
+            ],
+            "next_cursor": null
+          },
+          "coverage": {
+            "scope_id": "7ea70a4e-e47a-4122-8fdf-ac57160c6bd6",
+            "assets": [
+              {
+                "id": "fb3ee5df-a6dc-4e3e-83c8-deb75637a3f9",
+                "sources": {
+                  "SPEECH": "NOT_APPLICABLE",
+                  "VISUAL": "SUCCEEDED",
+                  "VISIBLE_TEXT": "SUCCEEDED"
+                },
+                "coverage": {
+                  "sampling": {
+                    "kind": "SPARSE_FRAMES",
+                    "rule": "real-pts-window-v1",
+                    "endMs": 7120,
+                    "startMs": 0,
+                    "complete": false,
+                    "maxFrames": 25,
+                    "intervalMs": 2000
+                  },
+                  "sampled_at_ms": [
+                    0,
+                    2320,
+                    4760,
+                    7080
+                  ],
+                  "visual_complete": false,
+                  "speech_processed_ranges": []
+                },
+                "filename": "labelled-vision-vfr.mp4",
+                "duration_ms": 7120,
+                "source_kinds": [
+                  "VISUAL",
+                  "VISIBLE_TEXT"
+                ],
+                "source_sha256": "ab00c235ed6324ae0ade047ae882d9499aaf2724d53daddc3c0b8feb594b773c",
+                "analysis_version": "9ec0a067-2ff6-485e-a302-dadc3a2ff82e",
+                "index_generation": "609c7c82-1084-4cd0-b42d-173cb595c6ad",
+                "validation_status": "VALID"
+              }
+            ],
+            "source_kinds": [
+              "SPEECH",
+              "VISIBLE_TEXT",
+              "VISUAL"
+            ],
+            "cursor": 0,
+            "page_complete": true
+          },
+          "records": [
+            {
+              "id": "57238456-92ee-495c-b9e2-2db84a052970",
+              "asset_id": "fb3ee5df-a6dc-4e3e-83c8-deb75637a3f9",
+              "analysis_version": "9ec0a067-2ff6-485e-a302-dadc3a2ff82e",
+              "source_kind": "VISIBLE_TEXT",
+              "text": "证据42",
+              "time_kind": "POINT",
+              "observed_at_ms": 0,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "b509e31e-de21-4f50-af47-36d0f82dd6fa",
+              "observation": {
+                "description": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "visibleText": [
+                  "证据42"
+                ]
+              }
+            },
+            {
+              "id": "b4e4d93e-e376-44f3-ab6f-8e2e3888bb3b",
+              "asset_id": "fb3ee5df-a6dc-4e3e-83c8-deb75637a3f9",
+              "analysis_version": "9ec0a067-2ff6-485e-a302-dadc3a2ff82e",
+              "source_kind": "VISIBLE_TEXT",
+              "text": "证据42",
+              "time_kind": "POINT",
+              "observed_at_ms": 7080,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "1bada748-cc15-4388-aca0-48d572e88778",
+              "observation": {
+                "description": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "visibleText": [
+                  "证据42"
+                ]
+              }
+            },
+            {
+              "id": "f71947fd-f252-483b-bf89-cfe84cc481b3",
+              "asset_id": "fb3ee5df-a6dc-4e3e-83c8-deb75637a3f9",
+              "analysis_version": "9ec0a067-2ff6-485e-a302-dadc3a2ff82e",
+              "source_kind": "VISIBLE_TEXT",
+              "text": "证据42",
+              "time_kind": "POINT",
+              "observed_at_ms": 4760,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "85d1b440-7d1a-4f98-8c1f-70db749b1dfe",
+              "observation": {
+                "description": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "visibleText": [
+                  "证据42"
+                ]
+              }
+            },
+            {
+              "id": "69129d65-49d0-45c9-a349-2f09af524aa1",
+              "asset_id": "fb3ee5df-a6dc-4e3e-83c8-deb75637a3f9",
+              "analysis_version": "9ec0a067-2ff6-485e-a302-dadc3a2ff82e",
+              "source_kind": "VISUAL",
+              "text": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+              "time_kind": "POINT",
+              "observed_at_ms": 0,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "b509e31e-de21-4f50-af47-36d0f82dd6fa",
+              "observation": {
+                "description": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "visibleText": [
+                  "证据42"
+                ]
+              }
+            },
+            {
+              "id": "d1ea6af6-d5c5-4551-8524-8aaece860eca",
+              "asset_id": "fb3ee5df-a6dc-4e3e-83c8-deb75637a3f9",
+              "analysis_version": "9ec0a067-2ff6-485e-a302-dadc3a2ff82e",
+              "source_kind": "VISUAL",
+              "text": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+              "time_kind": "POINT",
+              "observed_at_ms": 7080,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "1bada748-cc15-4388-aca0-48d572e88778",
+              "observation": {
+                "description": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "visibleText": [
+                  "证据42"
+                ]
+              }
+            },
+            {
+              "id": "39323181-7ac1-43cd-9d08-db1e93216209",
+              "asset_id": "fb3ee5df-a6dc-4e3e-83c8-deb75637a3f9",
+              "analysis_version": "9ec0a067-2ff6-485e-a302-dadc3a2ff82e",
+              "source_kind": "VISUAL",
+              "text": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+              "time_kind": "POINT",
+              "observed_at_ms": 4760,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "85d1b440-7d1a-4f98-8c1f-70db749b1dfe",
+              "observation": {
+                "description": "白色背景上有一个红色实心矩形，位于画面左上方；矩形下方偏左位置有黑色文字“证据42”。",
+                "visibleText": [
+                  "证据42"
+                ]
+              }
+            },
+            {
+              "id": "557aaef1-b4c1-4973-8e0d-45f5d90f8270",
+              "asset_id": "fb3ee5df-a6dc-4e3e-83c8-deb75637a3f9",
+              "analysis_version": "9ec0a067-2ff6-485e-a302-dadc3a2ff82e",
+              "source_kind": "VISIBLE_TEXT",
+              "text": "画面17",
+              "time_kind": "POINT",
+              "observed_at_ms": 2320,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "909f2b7b-c251-406e-a0f8-826972f96cf4",
+              "observation": {
+                "description": "白色背景上有一个位于左上方的纯蓝色矩形色块，下方偏左位置有黑色文字“画面17”。",
+                "visibleText": [
+                  "画面17"
+                ]
+              }
+            },
+            {
+              "id": "1420b2fc-af0c-4813-a242-578ac41f16e3",
+              "asset_id": "fb3ee5df-a6dc-4e3e-83c8-deb75637a3f9",
+              "analysis_version": "9ec0a067-2ff6-485e-a302-dadc3a2ff82e",
+              "source_kind": "VISUAL",
+              "text": "白色背景上有一个位于左上方的纯蓝色矩形色块，下方偏左位置有黑色文字“画面17”。",
+              "time_kind": "POINT",
+              "observed_at_ms": 2320,
+              "temporal_precision": "FRAME_OBSERVATION",
+              "frame_id": "909f2b7b-c251-406e-a0f8-826972f96cf4",
+              "observation": {
+                "description": "白色背景上有一个位于左上方的纯蓝色矩形色块，下方偏左位置有黑色文字“画面17”。",
+                "visibleText": [
+                  "画面17"
+                ]
+              }
+            }
+          ],
+          "dependency": null,
+          "error": null
+        }
+      ],
+      "model_receipts": {
+        "asr": [],
+        "vision": [
+          {
+            "id": "579f8e7e-c641-4297-8880-57d5e51c9fff",
+            "model": "qwen3-vl-plus",
+            "status": "SUCCEEDED",
+            "request_id": "5a97768b-47de-9de6-9fd1-a43930e87c5b",
+            "usage_json": {
+              "image_tokens": 512,
+              "input_tokens": 597,
+              "total_tokens": 645,
+              "output_tokens": 48,
+              "input_tokens_details": {
+                "text_tokens": 85,
+                "image_tokens": 512
+              },
+              "output_tokens_details": {
+                "text_tokens": 48
+              },
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              }
+            }
+          },
+          {
+            "id": "c841d9e8-af86-43aa-861b-f32e4f1a9f2a",
+            "model": "qwen3-vl-plus",
+            "status": "SUCCEEDED",
+            "request_id": "e82b51dc-f20c-92e3-8fbb-db290583b182",
+            "usage_json": {
+              "image_tokens": 512,
+              "input_tokens": 597,
+              "total_tokens": 643,
+              "output_tokens": 46,
+              "input_tokens_details": {
+                "text_tokens": 85,
+                "image_tokens": 512
+              },
+              "output_tokens_details": {
+                "text_tokens": 46
+              },
+              "prompt_tokens_details": {
+                "cached_tokens": 0
+              }
+            }
+          }
+        ],
+        "document_embeddings": [
+          {
+            "ordinal": 0,
+            "status": "SUCCEEDED",
+            "request_id": "e49339ca-07fa-96eb-91f4-3604f28473de",
+            "usage_json": {
+              "total_tokens": 134
+            }
+          }
+        ],
+        "query_embeddings": [
+          {
+            "id": "2330c656-80da-49ef-83b3-aea26a25317b",
+            "model": "text-embedding-v4",
+            "status": "SUCCEEDED",
+            "request_id": "4f49846a-ffa3-9042-9625-68571d8665e3",
+            "usage_json": {
+              "total_tokens": 4
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

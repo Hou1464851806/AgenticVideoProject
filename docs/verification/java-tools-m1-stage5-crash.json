@@ -1,0 +1,29 @@
+{
+  "fault": "SIGKILL Java container while media task RUNNING",
+  "project_id": "f910854d-6f48-4196-8b48-2e107268b6ce",
+  "asset_id": "aaa2d545-5574-4afa-9815-b7da6febffbf",
+  "before": {
+    "attemptCount": 1,
+    "type": "MEDIA_PREPARE",
+    "id": "99f02668-e4b9-4587-98b8-c3f8b4734735",
+    "status": "RUNNING"
+  },
+  "after": {
+    "attemptCount": 2,
+    "type": "MEDIA_PREPARE",
+    "id": "99f02668-e4b9-4587-98b8-c3f8b4734735",
+    "status": "SUCCEEDED"
+  },
+  "attempts": [
+    {
+      "attempt_number": 1,
+      "status": "EXPIRED",
+      "local_execution": true
+    },
+    {
+      "attempt_number": 2,
+      "status": "SUCCEEDED",
+      "local_execution": true
+    }
+  ]
+}

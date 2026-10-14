@@ -1,0 +1,12 @@
+{
+  "backlog": {
+    "peak_actual_media_execution": 1,
+    "minimum_observed_queue_depth": 2,
+    "uploads": 3
+  },
+  "ack-loss": {
+    "attempts": 1,
+    "deliveries": 2,
+    "paid_visual_calls": 2
+  }
+}

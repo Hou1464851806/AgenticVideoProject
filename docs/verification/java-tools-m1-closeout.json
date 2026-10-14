@@ -1,0 +1,262 @@
+{
+  "date": "2026-10-15",
+  "timezone": "Asia/Shanghai",
+  "review_base": "49fd46b",
+  "review_diff": "git diff --cached HEAD",
+  "standards": {
+    "blocking_findings": 0,
+    "method": "independent read-only agent"
+  },
+  "spec": {
+    "findings": 1,
+    "resolved": 1,
+    "finding": "Per-channel candidate limit was applied per index group instead of before fusion",
+    "independent_fix_review": "passed"
+  },
+  "regression_red": {
+    "test": "ReadToolsIntegrationTest#candidateLimitAppliesAcrossAllIndexGroupsBeforeFusion",
+    "tests": 1,
+    "failures": 1,
+    "errors": 0,
+    "reason": "Expected candidates_truncated=true; actual false"
+  },
+  "tools_after_fix": {
+    "tests": 11,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "python": {
+    "tests": 67,
+    "failures": 0,
+    "skipped": 0
+  },
+  "frontend_build": "passed",
+  "paid_models_this_review": "NOT_RUN; fifth-stage actual reports retained",
+  "browser_media_crash_this_review": "NOT_RUN; fifth-stage actual reports retained",
+  "complete_java_after_fix": {
+    "status": "PASSED",
+    "command": "mvn -B -ntp verify",
+    "totals": {
+      "tests": 153,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 4
+    },
+    "passed": 149,
+    "classes": [
+      {
+        "name": "com.agenticvideo.business.analysis.VisualApiIntegrationTest",
+        "tests": "9",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "17.05"
+      },
+      {
+        "name": "com.agenticvideo.business.auth.AuthenticationApiIntegrationTest",
+        "tests": "4",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "5.224"
+      },
+      {
+        "name": "com.agenticvideo.business.auth.AuthenticationRateLimitIntegrationTest",
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "3.144"
+      },
+      {
+        "name": "com.agenticvideo.business.conversation.ConversationApiIntegrationTest",
+        "tests": "30",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "31.027"
+      },
+      {
+        "name": "com.agenticvideo.business.conversation.ConversationRecoveryApiIntegrationTest",
+        "tests": "9",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "39.376"
+      },
+      {
+        "name": "com.agenticvideo.business.conversation.ModelRecordLimitApiIntegrationTest",
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "3.612"
+      },
+      {
+        "name": "com.agenticvideo.business.plan.EditPlanApiIntegrationTest",
+        "tests": "16",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "21.23"
+      },
+      {
+        "name": "com.agenticvideo.business.project.ProjectApiIntegrationTest",
+        "tests": "3",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "6.818"
+      },
+      {
+        "name": "com.agenticvideo.business.render.ExportApiIntegrationTest",
+        "tests": "9",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "17.233"
+      },
+      {
+        "name": "com.agenticvideo.business.render.PreviewApiIntegrationTest",
+        "tests": "5",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "10.052"
+      },
+      {
+        "name": "com.agenticvideo.business.render.RenderCapacityIntegrationTest",
+        "tests": "2",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "6.035"
+      },
+      {
+        "name": "com.agenticvideo.business.search.SearchIndexApiIntegrationTest",
+        "tests": "9",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "19.854"
+      },
+      {
+        "name": "com.agenticvideo.business.task.JavaAnalysisLiveTest",
+        "tests": "4",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "4",
+        "time": "0.002"
+      },
+      {
+        "name": "com.agenticvideo.business.task.LocalAnalysisIntegrationTest",
+        "tests": "7",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "70.233"
+      },
+      {
+        "name": "com.agenticvideo.business.task.LocalMediaIntegrationTest",
+        "tests": "5",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "54.889"
+      },
+      {
+        "name": "com.agenticvideo.business.task.OutboxPublishingIntegrationTest",
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "13.221"
+      },
+      {
+        "name": "com.agenticvideo.business.task.TaskApiIntegrationTest",
+        "tests": "2",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "14.649"
+      },
+      {
+        "name": "com.agenticvideo.business.tools.ReadToolsIntegrationTest",
+        "tests": "10",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "19.773"
+      },
+      {
+        "name": "com.agenticvideo.business.tools.ToolJsonTest",
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "0.004"
+      },
+      {
+        "name": "com.agenticvideo.business.upload.UploadApiIntegrationTest",
+        "tests": "14",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "163.16"
+      },
+      {
+        "name": "com.agenticvideo.business.upload.UploadExpiryIntegrationTest",
+        "tests": "2",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "16.438"
+      },
+      {
+        "name": "com.agenticvideo.business.upload.UploadGlobalCapacityIntegrationTest",
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "6.327"
+      },
+      {
+        "name": "com.agenticvideo.business.upload.UploadLowSpaceIntegrationTest",
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "4.93"
+      },
+      {
+        "name": "com.agenticvideo.business.upload.UploadQuotaIntegrationTest",
+        "tests": "2",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "11.213"
+      },
+      {
+        "name": "com.agenticvideo.business.upload.UploadSpaceRecheckIntegrationTest",
+        "tests": "1",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "5.154"
+      },
+      {
+        "name": "com.agenticvideo.business.usage.ProjectUsageApiIntegrationTest",
+        "tests": "4",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0",
+        "time": "10.187"
+      }
+    ],
+    "skipped_class": "com.agenticvideo.business.task.JavaAnalysisLiveTest"
+  },
+  "compose_configuration": "passed",
+  "operation_document_links": "passed",
+  "configured_credentials_in_commit": "absent"
+}

@@ -1,7 +1,9 @@
 from .contracts import PARAMETERS
 
+READ_TOOLS = frozenset({"list_assets", "get_video_overview", "search_evidence", "read_video_range"})
+
 DESCRIPTIONS = {
-    "list_assets": "List scoped sample assets, durations and available source kinds.",
+    "list_assets": "List scoped assets, durations and available source kinds.",
     "get_video_overview": "Read paginated whole-video navigation. Overview is not precise evidence. Consume all pages for whole-video claims.",
     "search_evidence": "Find bounded raw observations by topic or exact phrase. Empty matches do not prove absence. Choose SPEECH/VISUAL/VISIBLE_TEXT correctly.",
     "read_video_range": "Read original records in a bounded millisecond range. Check speech context before selecting clips.",
@@ -18,6 +20,6 @@ DISABLED = {
 }
 
 
-def model_tools() -> list[dict]:
+def model_tools(mock=True) -> list[dict]:
     return [{"name": name, "description": DESCRIPTIONS[name], "parameters": schema.model_json_schema()}
-            for name, schema in PARAMETERS.items() if name != "validate_edit_draft"]
+            for name, schema in PARAMETERS.items() if name != "validate_edit_draft" and (mock or name in READ_TOOLS)]

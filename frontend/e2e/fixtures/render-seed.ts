@@ -27,3 +27,21 @@ export async function renderSeed(page:Page) {
   await expect.poll(async()=>(await(await page.request.get(`/api/v1/assets/${assetId}`)).json()).data.analysis?.stages.ASR,{timeout:120000}).toBe('SUCCEEDED');
   const seed={username,projectId:project.id,assetId};mkdirSync(resolve('../.scratch/asr-fixture'),{recursive:true});writeFileSync(file,JSON.stringify(seed),{mode:0o600});return seed;
 }
+
+// Wait for conversation view restoration before choosing a test's immutable revision.
+export async function openRenderRevision(page:Page, projectId:string, planId:string, revisionId:string) {
+  const sessions=(await(await page.request.get(`/api/v1/projects/${projectId}/conversations`)).json()).data.items;
+  const selected=page.url().startsWith('http')?await page.evaluate(id=>localStorage.getItem(`conversation:${id}`),projectId):null;
+  const session=sessions.find((item:{id:string})=>item.id===selected)??sessions[sessions.length-1];
+  const saved=session?(await(await page.request.get(`/api/v1/conversations/${session.id}/messages`)).json()).data.view:null;
+  await page.goto(`/?project=${projectId}`);
+  if(saved?.planId&&saved?.revisionId){
+    await expect(page.getByLabel('查看方案',{exact:true})).toHaveValue(saved.planId);
+    await expect(page.getByLabel('查看版本',{exact:true})).toHaveValue(saved.revisionId);
+    await expect(page.getByRole('heading',{level:4,name:/^V[0-9]+ ·/})).toBeVisible();
+  }
+  await page.getByLabel('查看方案',{exact:true}).selectOption(planId);
+  await page.getByLabel('查看版本',{exact:true}).selectOption(revisionId);
+  await expect(page.getByLabel('查看方案',{exact:true})).toHaveValue(planId);
+  await expect(page.getByLabel('查看版本',{exact:true})).toHaveValue(revisionId);
+}

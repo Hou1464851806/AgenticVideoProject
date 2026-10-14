@@ -1,0 +1,38 @@
+[
+  {
+    "value": {
+      "tool": "list_assets",
+      "args": {
+        "cursor": 0
+      }
+    },
+    "hash": "d01b044f1776af21386b8fc50b60bd21621ee2e14bb772319088bd55831e8767"
+  },
+  {
+    "value": {
+      "tool": "search_evidence",
+      "args": {
+        "query": "核查原文🙂 \"引号\"\n\\",
+        "asset_ids": null,
+        "source_kinds": [
+          "SPEECH",
+          "VISIBLE_TEXT"
+        ],
+        "cursor": 0
+      }
+    },
+    "hash": "d95783ea35ae2ea67c9d8d0b40eba02a66a29f37dfefbccfcab3f43aaa72bdfd"
+  },
+  {
+    "value": {
+      "tool": "read_video_range",
+      "args": {
+        "asset_id": "12345678-1234-1234-1234-123456789abc",
+        "start_ms": 1436,
+        "end_ms": 20000,
+        "cursor": 0
+      }
+    },
+    "hash": "868b20102b24bb81e0fd2e7d276838103268314650919898e1bfbbd07d1dc292"
+  }
+]

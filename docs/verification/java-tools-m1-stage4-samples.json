@@ -1,0 +1,53 @@
+{
+  "samples": [
+    {
+      "fixture": "human-speech.mp4",
+      "scope": {
+        "project_id": "653fef99-1480-498f-b22a-68c8d27242ee",
+        "assets": [
+          {
+            "id": "fae11c71-2f1f-4a5e-b414-7522628030b8",
+            "duration_ms": 11000
+          }
+        ]
+      }
+    },
+    {
+      "fixture": "labelled-speech.mp4",
+      "scope": {
+        "project_id": "6196cf6f-5640-466e-95e6-6c6ac8ddc7a1",
+        "assets": [
+          {
+            "id": "ff7e744c-d3da-46d4-a2a5-7d026629e626",
+            "duration_ms": 14044
+          }
+        ]
+      }
+    },
+    {
+      "fixture": "labelled-vision-vfr.mp4",
+      "scope": {
+        "project_id": "da31f392-767f-42cb-91a8-ce679961d423",
+        "assets": [
+          {
+            "id": "fb1c4508-97f2-46e1-b3bb-1724acd3fd6f",
+            "duration_ms": 7120
+          }
+        ]
+      }
+    },
+    {
+      "fixture": "speech-mention-only.mp4",
+      "scope": {
+        "project_id": "02caa0c3-abe5-4196-b6e0-9d3070d2dbfc",
+        "assets": [
+          {
+            "id": "f673fa0e-c448-4aa7-9bca-891e9a9b3c72",
+            "duration_ms": 4351
+          }
+        ]
+      }
+    }
+  ],
+  "origin": "Explicitly selected existing local analysed fixtures; stage3 integration-test scope IDs are not in the running application database."
+}

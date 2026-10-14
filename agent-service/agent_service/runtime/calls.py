@@ -11,6 +11,7 @@ async def invoke_model(state, runtime, phase, config):
     ctx.stop()
     execution_id = state["identity"]["execution_id"]
     context = model_context(state)
+    context["mock_tools"] = ctx.mock
     context["available_assets"] = list(ctx.assets.values())
     if hasattr(ctx.model, "prepare"):
         ctx.model.prepare(phase, context)

@@ -47,8 +47,8 @@ def fingerprint(value) -> str:
     return hashlib.sha256(encoded(value).encode()).hexdigest()
 
 
-def incomplete(reason: str, draft=None) -> dict:
-    return {"status": "INCOMPLETE", "content": reason, "evidence_ids": [], "draft": draft, "mock": True}
+def incomplete(reason: str, draft=None, *, mock=True) -> dict:
+    return {"status": "INCOMPLETE", "content": reason, "evidence_ids": [], "draft": draft, "mock": mock}
 
 
 async def await_operation(operation, ctx, execution_id):

@@ -19,6 +19,9 @@ async def understand_request(state: State, runtime: Runtime[Context], config):
         parsed = Understanding.model_validate(state["request"].get("pre_understanding") or await invoke_model(state, runtime, "understand", config))
         if parsed.relation == "NEW" and not state["request"].get("new_requirement"):
             return {"understanding": parsed.model_dump(), "outcome": {"status": "NEW_REQUIREMENT"}, "next_node": "finalize"}
+        if not ctx.mock and parsed.mode != "QUERY":
+            return {"requirements": {**state["requirements"], "mode": "UNSUPPORTED"},
+                    "outcome": {"status": "ANSWER", "content": "真实模式目前仅支持视频问答与四个读取工具；该能力尚未开放。", "evidence_ids": [], "sources": [], "mock": False}, "next_node": "finalize"}
         previous = state.get("requirements", {})
         req = previous
         if parsed.relation != "AMBIGUOUS":

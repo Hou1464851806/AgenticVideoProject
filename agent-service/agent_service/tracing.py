@@ -16,7 +16,8 @@ def mask(data, **kwargs):
 
 
 class Tracer:
-    def __init__(self, enabled=True):
+    def __init__(self, enabled=True, mock=True):
+        self.mock = mock
         self.client, self.callbacks, self.current_tool = None, [], None
         self.root = None
         self.trace_id = None
@@ -46,15 +47,15 @@ class Tracer:
             yield
             return
         from langfuse import propagate_attributes
-        with propagate_attributes(session_id=identity["session_id"], metadata=identity):
-            with self.client.start_as_current_observation(name="agent-invocation", as_type="agent", metadata=identity) as root:
+        with propagate_attributes(session_id=identity["session_id"], metadata={**identity, "mock": self.mock}):
+            with self.client.start_as_current_observation(name="agent-invocation", as_type="agent", metadata={**identity, "mock": self.mock}) as root:
                 self.trace_id = root.trace_id
                 self.root = root
                 yield
 
     def result(self, result):
         if self.root:
-            self.root.update(output=result, metadata={"final_status": result["status"], "prompt_version": "mvp-1"})
+            self.root.update(output=result, metadata={"mock": self.mock, "final_status": result["status"], "prompt_version": "mvp-1"})
 
     @contextlib.contextmanager
     def tool(self, request):
@@ -62,7 +63,7 @@ class Tracer:
             yield
             return
         with self.client.start_as_current_observation(name=request.tool_name, as_type="tool",
-                                                      input=request.model_dump(), metadata={"mock": True}) as span:
+                                                      input=request.model_dump(), metadata={"mock": self.mock, "call_id": request.call_id, "request_hash": request.request_hash}) as span:
             self.current_tool = span
             try:
                 yield

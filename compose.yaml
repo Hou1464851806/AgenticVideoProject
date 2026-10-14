@@ -53,67 +53,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
-  media-worker:
-    build:
-      context: .
-      dockerfile: backend/media-worker/Dockerfile
-    platform: linux/arm64
-    environment:
-      BUSINESS_API_URL: ${MEDIA_BUSINESS_API_URL:-http://business-api:8080}
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_USER: agentic-worker
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
-      INTERNAL_WORKER_TOKEN: ${INTERNAL_WORKER_TOKEN}
-      STORAGE_ENDPOINT: http://silo:9000
-      STORAGE_ACCESS_KEY: agentic-storage
-      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
-      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=65
-    volumes:
-      - worker_work:/work
-    depends_on:
-      business-api:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    mem_limit: 512m
-    cpus: 1
-  agent-service:
-    # Independent CLI MVP; the old Java/RabbitMQ worker contract is not enabled.
-    profiles: [agent-integration-pending]
-    build:
-      context: .
-      dockerfile: agent-service/Dockerfile
-    platform: linux/arm64
-    environment:
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_USER: agentic-worker
-      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
-      INTERNAL_WORKER_TOKEN: ${INTERNAL_WORKER_TOKEN}
-      STORAGE_ENDPOINT: http://silo:9000
-      STORAGE_ACCESS_KEY: agentic-storage
-      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
-      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
-      QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
-      DASHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/api/v1}
-      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
-      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}
-      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
-    volumes:
-      - agent_work:/work
-      - agent_state:/state
-    depends_on:
-      business-api:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    mem_limit: 512m
-    cpus: 1
-    healthcheck:
-      disable: true
   business-api:
     build:
       context: .
-      dockerfile: backend/business-api/Dockerfile
+      dockerfile: backend/Dockerfile
     platform: linux/arm64
     ports:
       - '127.0.0.1:${APP_PORT:-8080}:8080'
@@ -126,6 +69,11 @@ services:
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
       INTERNAL_WORKER_TOKEN: ${INTERNAL_WORKER_TOKEN}
       TASKS_DISPATCH_ENABLED: 'true'
+      MEDIA_WORK_DIRECTORY: /work
+      LEGACY_AGENT_ENABLED: 'false'
+      LEGACY_WORKER_ENABLED: 'false'
+      ANALYSIS_EXECUTION_ENABLED: ${ANALYSIS_EXECUTION_ENABLED:-true}
+      ANALYSIS_CONSUMER_CONCURRENCY: ${ANALYSIS_CONSUMER_CONCURRENCY:-2}
       QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
       DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY:-}
       DASHSCOPE_BASE_URL: ${DASHSCOPE_BASE_URL:-https://dashscope.aliyuncs.com/api/v1}
@@ -137,7 +85,7 @@ services:
       STORAGE_ACCESS_KEY: agentic-storage
       STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY}
       STORAGE_PART_URL_SECONDS: ${STORAGE_PART_URL_SECONDS:-300}
-      CAPACITY_PATHS: /capacity/silo,/capacity/media,/capacity/agent
+      CAPACITY_PATHS: /capacity/silo,/work
       CAPACITY_MAX_RESERVED_BYTES: ${CAPACITY_MAX_RESERVED_BYTES:-9223372036854775807}
       CAPACITY_MIN_FREE_BYTES: ${CAPACITY_MIN_FREE_BYTES:-536870912}
       UPLOAD_MAX_FILE_BYTES: ${UPLOAD_MAX_FILE_BYTES:-2147483648}
@@ -149,8 +97,7 @@ services:
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=65
     volumes:
       - silo_data:/capacity/silo:ro
-      - worker_work:/capacity/media:ro
-      - agent_work:/capacity/agent:ro
+      - worker_work:/work
     depends_on:
       postgres:
         condition: service_healthy
@@ -159,13 +106,11 @@ services:
       interval: 3s
       timeout: 3s
       retries: 30
-    mem_limit: 768m
-    cpus: 1.5
+    mem_limit: 1280m
+    cpus: 2
 volumes:
   qdrant_data:
   postgres_data:
   silo_data:
   rabbitmq_data:
   worker_work:
-  agent_work:
-  agent_state:

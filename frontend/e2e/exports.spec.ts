@@ -1,4 +1,4 @@
-import {renderSeed} from './fixtures/render-seed';
+import {renderSeed,openRenderRevision} from './fixtures/render-seed';
 import {test,expect} from '@playwright/test';
 import {mkdirSync,writeFileSync} from 'node:fs';
 import {resolve} from 'node:path';
@@ -29,14 +29,12 @@ INSERT INTO revision_asset_refs(revision_id,asset_id) VALUES ('${revision}','${s
     const download=await post(`/artifacts/${rendered.artifactId}/download-access`,{});expect(download.status()).toBe(200);
     const bytes=await page.request.get((await download.json()).data.url);expect(bytes.status()).toBe(200);
     const directory=resolve('../.scratch/export-verification');mkdirSync(directory,{recursive:true});writeFileSync(resolve(directory,`${profile}.mp4`),await bytes.body());
-    const probe=JSON.parse(execFileSync(docker,['run','--rm','--entrypoint','ffprobe','-v',`${directory}:/verification:ro`,'agenticvideo-media-worker','-v','error','-show_streams','-of','json',`/verification/${profile}.mp4`],{stdio:'pipe'}).toString());
+    const probe=JSON.parse(execFileSync(docker,['run','--rm','--entrypoint','ffprobe','-v',`${directory}:/verification:ro`,'agenticvideo-business-api','-v','error','-show_streams','-of','json',`/verification/${profile}.mp4`],{stdio:'pipe'}).toString());
     expect(probe.streams.find((stream:{codec_type:string})=>stream.codec_type==='video')).toMatchObject({codec_name:'h264',width,height});
     expect(probe.streams.find((stream:{codec_type:string})=>stream.codec_type==='audio')).toMatchObject({codec_name:'aac',sample_rate:'48000',channels:2});
-    execFileSync(docker,['run','--rm','--entrypoint','ffmpeg','-v',`${directory}:/verification:ro`,'agenticvideo-media-worker','-v','error','-i',`/verification/${profile}.mp4`,'-f','null','-'],{stdio:'pipe'});
+    execFileSync(docker,['run','--rm','--entrypoint','ffmpeg','-v',`${directory}:/verification:ro`,'agenticvideo-business-api','-v','error','-i',`/verification/${profile}.mp4`,'-f','null','-'],{stdio:'pipe'});
   }
-  await page.goto(`/?project=${seed.projectId}`);
-  await page.getByLabel('查看方案',{exact:true}).selectOption(plan);
-  await page.getByLabel('查看版本',{exact:true}).selectOption(revision);
+  await openRenderRevision(page,seed.projectId,plan,revision);
   await expect(page.getByRole('button',{name:'导出正式成片',exact:true})).toBeEnabled();
   const accepted=page.waitForResponse(response=>response.url().endsWith('/export-requests')&&response.request().method()==='POST');
   await page.getByRole('button',{name:'导出正式成片',exact:true}).click();
@@ -53,15 +51,6 @@ INSERT INTO revision_asset_refs(revision_id,asset_id) VALUES ('${revision}','${s
   await page.getByRole('button',{name:'删除成片文件',exact:true}).click();
   await expect(page.getByText('成片文件已删除，原始素材保留。',{exact:true})).toBeVisible();
   expect((await(await page.request.get(`/api/v1/render-requests/${requested.requestId}`)).json()).data.status).toBe('SUCCEEDED');
-  const session=(await(await post(`/projects/${seed.projectId}/conversations`,{title:`明确制作-${Date.now()}`,assetIds:[seed.assetId]})).json()).data;
-  const token=(await(await page.request.get('/api/v1/auth/csrf')).json()).data.csrfToken;
-  expect((await page.request.patch(`/api/v1/conversations/${session.id}/view`,{headers:{'X-XSRF-TOKEN':token},data:{planId:plan,revisionId:revision,expectedRowVersion:0}})).status()).toBe(200);
-  expect((await post(`/conversations/${session.id}/turns`,{content:'导出当前版本 1080p'})).status()).toBe(202);
-  await page.reload();
-  await page.getByLabel('制作会话',{exact:true}).selectOption(session.id);
-  await page.getByRole('button',{name:'查看正式导出',exact:true}).click({timeout:10000});
-  await page.getByRole('button',{name:'播放正式成片',exact:true}).click({timeout:60000});
-  await expect.poll(()=>page.getByLabel('正式成片播放器',{exact:true}).evaluate((video:HTMLVideoElement)=>video.videoWidth)).toBe(1080);
   expect((await(await page.request.get(`/api/v1/assets/${seed.assetId}/evidence`)).json()).data.providerCalls).toEqual(before);
 });
 
@@ -85,11 +74,11 @@ test('export keeps its confirmed input while viewing a new version and cancellat
     const download=await post(`/artifacts/${artifact}/download-access`,{});expect(download.status()).toBe(200);expect((await page.request.get((await download.json()).data.url)).status()).toBe(200);
     const source=await post(`/assets/${seed.assetId}/playback-access`,{});expect(source.status()).toBe(200);expect((await page.request.get((await source.json()).data.url)).status()).toBe(200);
   };
-  const processes=()=>execFileSync(docker,['compose','exec','-T','media-worker','sh','-c','for task_proc in /proc/[0-9]*/comm; do read -r task_name < "$task_proc"; case "$task_name" in ffmpeg-real) printf "%s\n" "$task_name";; esac; done'],{stdio:'pipe'}).toString();
-  const restore=()=>execFileSync(docker,['compose','up','-d','--no-deps','--force-recreate','--wait','media-worker'],{stdio:'pipe',timeout:60000});
+  const processes=()=>execFileSync(docker,['compose','exec','-T','business-api','sh','-c','for task_proc in /proc/[0-9]*/comm; do read -r task_name < "$task_proc"; case "$task_name" in ffmpeg-real) printf "%s\n" "$task_name";; esac; done'],{stdio:'pipe'}).toString();
+  const restore=()=>execFileSync(docker,['compose','up','-d','--no-deps','--force-recreate','--wait','business-api'],{stdio:'pipe',timeout:60000});
   try{
-    execFileSync(docker,['compose','exec','-T','--user','0','media-worker','sh','-c','mv /usr/bin/ffmpeg /usr/bin/ffmpeg-real; cat > /usr/bin/ffmpeg; chmod 755 /usr/bin/ffmpeg'],{input:'#!/bin/sh\ncase " $* " in *" -filter_complex "*) exec /usr/bin/ffmpeg-real -re "$@";; *) exec /usr/bin/ffmpeg-real "$@";; esac\n',stdio:'pipe'});
-    await page.goto(`/?project=${seed.projectId}`);await page.getByLabel('查看方案',{exact:true}).selectOption(plan);await page.getByLabel('查看版本',{exact:true}).selectOption(revision);
+    execFileSync(docker,['compose','exec','-T','--user','0','business-api','sh','-c','mv /usr/bin/ffmpeg /usr/bin/ffmpeg-real; cat > /usr/bin/ffmpeg; chmod 755 /usr/bin/ffmpeg'],{input:'#!/bin/sh\ncase " $* " in *" -filter_complex "*) exec /usr/bin/ffmpeg-real -re "$@";; *) exec /usr/bin/ffmpeg-real "$@";; esac\n',stdio:'pipe'});
+    await openRenderRevision(page,seed.projectId,plan,revision);
     const response=page.waitForResponse(item=>item.url().endsWith('/export-requests')&&item.request().method()==='POST');await page.getByRole('button',{name:'导出正式成片',exact:true}).click();const running=(await(await response).json()).data;
     await expect.poll(async()=>(await status(running.requestId)).status,{timeout:30000,intervals:[50]}).toBe('RUNNING');await expect.poll(processes,{timeout:10000,intervals:[50]}).toContain('ffmpeg-real');
     sql(`BEGIN; INSERT INTO tasks(id,project_id,type,status,input_json) VALUES ('${newTask}','${seed.projectId}','AGENT_TURN','SUCCEEDED','{}'); INSERT INTO plan_revisions(id,project_id,plan_id,revision_number,parent_revision_id,source_task_id,content_json) VALUES ('${newRevision}','${seed.projectId}','${plan}',2,'${revision}','${newTask}',convert_from(decode('${encoded}','base64'),'UTF8')::jsonb); INSERT INTO revision_asset_refs(revision_id,asset_id) VALUES ('${newRevision}','${seed.assetId}'); COMMIT;`);
@@ -98,7 +87,7 @@ test('export keeps its confirmed input while viewing a new version and cancellat
     await expect(page.getByRole('heading',{name:'正式成片 · 固定 V1',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'导出正式成片',exact:true})).toBeDisabled();await expect(page.getByRole('button',{name:'确认当前版本',exact:true})).toBeVisible();
     await page.getByRole('button',{name:'停止正式导出',exact:true}).click();
     await expect.poll(async()=>(await status(running.requestId)).status,{timeout:20000}).toBe('CANCELLED');expect(processes()).toBe('');expect((await status(running.requestId)).artifactId).toBeUndefined();await preserve();
-    execFileSync(docker,['compose','exec','-T','--user','0','media-worker','sh','-c','cat > /usr/bin/ffmpeg; chmod 755 /usr/bin/ffmpeg'],{input:'#!/bin/sh\ncase " $* " in *" -filter_complex "*) exit 73;; *) exec /usr/bin/ffmpeg-real "$@";; esac\n',stdio:'pipe'});
+    execFileSync(docker,['compose','exec','-T','--user','0','business-api','sh','-c','cat > /usr/bin/ffmpeg; chmod 755 /usr/bin/ffmpeg'],{input:'#!/bin/sh\ncase " $* " in *" -filter_complex "*) exit 73;; *) exec /usr/bin/ffmpeg-real "$@";; esac\n',stdio:'pipe'});
     const failure=(await(await post(`/revisions/${revision}/export-requests`,intent)).json()).data;
     await expect.poll(async()=>(await status(failure.requestId)).status,{timeout:30000}).toBe('FAILED');expect((await status(failure.requestId)).artifactId).toBeUndefined();await preserve();
   }finally{restore();}

@@ -15,7 +15,7 @@ def apply_input(state: State, runtime: Runtime[Context]):
     if answer.get("wait_id") != waiting["wait_id"]:
         raise ValueError("恢复输入没有关联当前等待")
     if answer.get("kind") == "CANCEL":
-        return {"waiting": None, "outcome": {"status": "CANCELLED", "content": "已取消本地执行。", "mock": True}, "next_node": "finalize"}
+        return {"waiting": None, "outcome": {"status": "CANCELLED", "content": "已取消本地执行。", "mock": runtime.context.mock}, "next_node": "finalize"}
     if waiting["kind"] == "USER_INPUT":
         if answer.get("kind") != "USER_INPUT" or not answer.get("content"):
             raise ValueError("需要用户补答，不能使用工具回执")

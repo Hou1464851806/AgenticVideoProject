@@ -10,6 +10,7 @@ from langgraph.types import Command
 from ..config import Config
 from ..model import DeepSeekModel
 from ..tools.mock import MockExecutor
+from ..tools.java import JavaToolExecutor
 from ..tools.contracts import ToolRequest, ToolResult
 from ..tracing import Tracer
 from .graph import build_graph
@@ -26,9 +27,10 @@ class Agent:
         if executor is None:
             executor = MockExecutor(self.config.scenario)
             assets = executor.assets if assets is None else assets
-        elif assets is None:
+        elif assets is None and not isinstance(executor, JavaToolExecutor):
             raise ValueError("自定义 ToolExecutor 必须显式提供 assets 素材范围")
         self.executor, self.assets = executor, assets
+        self.mock = getattr(executor, "mock", True) is not False
         if model is None:
             import os
             key = os.environ.get("DEEPSEEK_API_KEY")
@@ -50,12 +52,19 @@ class Agent:
             old = snapshot.values
         if new and old:
             thread_id, old = str(uuid.uuid4()), {}
+        if old and bool(old.get("question_scope")) == self.mock:
+            raise ValueError("不能切换已有需求的真实/Mock模式；请使用 --new")
         identity = {"session_id": session_id or old.get("identity", {}).get("session_id") or str(uuid.uuid4()),
                     "requirement_id": thread_id, "execution_id": str(uuid.uuid4()), "turn_id": str(uuid.uuid4())}
         state = {"identity": identity, "request": {"content": content, "new_requirement": not bool(old)},
                  "requirements": old.get("requirements", Requirements().model_dump()), "messages": old.get("messages", []),
                  "observations": old.get("observations", {}), "coverage": old.get("coverage", {}),
-                 "draft": old.get("draft"), "validation": old.get("validation"), "scenario": self.config.scenario}
+                 "question_scope": None, "draft": old.get("draft"), "validation": old.get("validation"), "scenario": self.config.scenario}
+        if old.get("question_scope") and not self.mock:
+            self.executor.project_id = old["question_scope"]["project_id"]
+            self.executor.asset_ids = [a["id"] for a in old["question_scope"]["assets"]]
+        if not self.mock:
+            state.update(observations={}, coverage={}, draft=None, validation=None)
         return await self._drive(thread_id, state)
 
     async def inspect(self, thread_id):
@@ -132,18 +141,35 @@ class Agent:
         except BlockingIOError:
             lock.close()
             raise ValueError("该需求正在另一个本机进程执行") from None
-        store, tracer = Store(self.path), Tracer(self.config.trace)
+        store, tracer = Store(self.path), Tracer(self.config.trace, mock=self.mock)
         def stop():
             store.check(identity["execution_id"], self.config.limits)
-        ctx = Context(self.model, self.executor, store, self.config.limits, tracer, stop, self.progress, self.assets)
+        try:
+            if isinstance(self.executor, JavaToolExecutor):
+                saved = (previous or value).get("question_scope")
+                if previous and not saved:
+                    raise ValueError("不能用真实执行器恢复 Mock 需求")
+                scope = saved if cancel else await self.executor.snapshot(saved)
+                self.assets = {asset["id"]: asset for asset in scope["assets"]}
+                if value is not None and previous is None:
+                    value["question_scope"] = scope
+            elif (previous or value).get("question_scope"):
+                raise ValueError("真实需求需要原 Java 执行器配置")
+        except BaseException:
+            store.close()
+            fcntl.flock(lock, fcntl.LOCK_UN)
+            lock.close()
+            raise
+        ctx = Context(self.model, self.executor, store, self.config.limits, tracer, stop, self.progress, self.assets, self.mock)
+        scope_id = ((previous or value).get("question_scope") or {}).get("scope_id")
         config = {"configurable": {"thread_id": thread_id}, "recursion_limit": 256,
-                  "callbacks": tracer.callbacks, "metadata": {**identity, "langfuse_session_id": identity["session_id"], "mock_tools": True}}
+                  "callbacks": tracer.callbacks, "metadata": {**identity, "langfuse_session_id": identity["session_id"], "mock_tools": self.mock, "question_scope_id": scope_id}}
         status = "FAILED"
         try:
             async with AsyncSqliteSaver.from_conn_string(str(self.path)) as saver:
                 graph = build_graph(saver)
                 if cancel:
-                    outcome = {"status": "CANCELLED", "content": "已取消本地执行；不会提交新动作。", "mock": True}
+                    outcome = {"status": "CANCELLED", "content": "已取消本地执行；不会提交新动作。", "mock": self.mock}
                     await graph.aupdate_state(config, {"outcome": outcome, "waiting": None}, as_node="finalize")
                     status = "CANCELLED"
                 else:
@@ -154,7 +180,7 @@ class Agent:
                             observed = await graph.aget_state(config)
                             tracer.result(self._view(thread_id, observed.values, bool(observed.interrupts)))
                     except (Cancelled, LimitReached, SubmissionUnknown) as error:
-                        outcome = {"status": "CANCELLED", "content": str(error), "mock": True} if isinstance(error, Cancelled) else incomplete(str(error))
+                        outcome = {"status": "CANCELLED", "content": str(error), "mock": self.mock} if isinstance(error, Cancelled) else incomplete(str(error), mock=self.mock)
                         await graph.aupdate_state(config, {"outcome": outcome, "waiting": None}, as_node="finalize")
                     snapshot = await graph.aget_state(config)
                     status = "WAITING" if snapshot.interrupts else (snapshot.values.get("outcome") or {}).get("status", "FAILED")
@@ -167,7 +193,8 @@ class Agent:
                                 "request": {"content": snapshot.values["request"]["content"], "new_requirement": True,
                                             "pre_understanding": snapshot.values["understanding"]},
                                 "requirements": Requirements().model_dump(), "messages": [], "observations": {}, "coverage": {},
-                                "draft": None, "validation": None, "scenario": self.config.scenario}
+                                "draft": None, "validation": None, "scenario": self.config.scenario,
+                                "question_scope": snapshot.values.get("question_scope")}
                     store.finish(status)
                     return await self._drive(new_thread, migrated)
                 store.finish(status)
@@ -186,4 +213,4 @@ class Agent:
     def _view(thread_id, state, waiting):
         return {"thread_id": thread_id, "identity": state["identity"], "status": "WAITING" if waiting else (state.get("outcome") or {}).get("status", "FAILED"),
                 "waiting": state.get("waiting") if waiting else None, "outcome": state.get("outcome"),
-                "requirements": state["requirements"], "pending_tool": state.get("pending_tool"), "usage": state.get("usage", {})}
+                "question_scope": state.get("question_scope"), "requirements": state["requirements"], "pending_tool": state.get("pending_tool"), "usage": state.get("usage", {})}

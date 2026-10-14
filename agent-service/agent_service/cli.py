@@ -2,6 +2,7 @@
 import argparse
 import asyncio
 import json
+import os
 from pathlib import Path
 import sys
 
@@ -9,11 +10,15 @@ from .config import Config, load_env
 from .model import ScriptedModel
 from .runtime.runner import Agent
 from .tools.contracts import ToolRequest
+from .tools.java import JavaToolExecutor
 from .tools.mock import SCENARIOS
 
 
 def parser():
-    cli = argparse.ArgumentParser(description="独立视频 Agent：DeepSeek Flash + 工具 Mock")
+    cli = argparse.ArgumentParser(description="视频 Agent：Mock 离线或 Java 真实问答")
+    cli.add_argument("--java-url", help="启用真实模式，例如 http://localhost:8080")
+    cli.add_argument("--project", help="首次真实问答的项目 UUID")
+    cli.add_argument("--asset", action="append", help="可重复指定初始素材 UUID")
     cli.add_argument("--data-dir", type=Path, default=Config().directory)
     cli.add_argument("--scenario", choices=sorted(SCENARIOS), default="normal")
     cli.add_argument("--script", type=Path, help="显式离线脚本模型；不验证真实模型能力")
@@ -47,8 +52,11 @@ async def dispatch(args):
         def understand(ctx):
             return script.get("after_clarification", script["understanding"]) if ctx["request"].get("clarification") else script["understanding"]
         model = ScriptedModel(understand, script["actions"])
+    if args.java_url and args.command in ("complete-mock", "tool-result"):
+        raise ValueError("真实模式不接收外部工具完成事件")
+    executor = JavaToolExecutor(args.java_url, os.environ.get("INTERNAL_WORKER_TOKEN"), args.project, args.asset) if args.java_url else None
     agent = Agent(Config(args.data_dir, scenario=args.scenario, trace=not args.no_trace), model=model,
-                  progress=lambda node: print(f"[{node}]", file=sys.stderr))
+                  executor=executor, progress=lambda node: print(f"[{node}]", file=sys.stderr))
     if args.command == "run":
         return await agent.send(args.message, thread_id=args.thread, new=args.new)
     if args.command == "status":

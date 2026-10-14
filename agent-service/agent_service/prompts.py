@@ -32,5 +32,12 @@ coverage._assets是已返回的素材清单，entries_by_page是已浏览的目�
 
 
 def messages(phase, context):
-    system = UNDERSTAND if phase == "understand" else DECIDE + "\n工具列表：" + json.dumps(model_tools(), ensure_ascii=False)
+    mock = context.get("mock_tools", True)
+    system = UNDERSTAND if phase == "understand" else DECIDE + "\n工具列表：" + json.dumps(model_tools(mock), ensure_ascii=False)
+    if not mock:
+        system = system.replace("当前工具数据来自开发用Mock，不代表真实项目素材。", "当前数据为 Java 固定问答快照中的真实素材和证据。")
+        system = system.replace("所有工具结果均为开发样本，任何结果都不能称为已保存版本/真实媒体产物。", "工具结果为真实原始证据；本阶段仅支持问答及四读取工具。")
+        system = system.replace("需视觉信息才inspect_video_range；PENDING由程序等待。", "视觉只能读取快照中已有采样证据，不支持按需新分析。")
+        system = system.replace("草稿先阅读相关完整语句再编排，严格满足已保存条件，保留未要求修改内容及其它输出。DRAFT会被程序强制校验，依据字段错误有限修正。", "")
+        system += "\n真实模式仅支持QUERY问答；草稿、制作、细读、保存、预览、导出和讨论模式均为UNSUPPORTED，不回退Mock。视觉POINT只有observed_at_ms，不能扩张为区间或全片结论。目录分页完成仅代表导航读完；分析覆盖和来源就绪见coverage，稀疏采样不证明全片不存在。"
     return [("system", system), ("human", json.dumps(context, ensure_ascii=False))]

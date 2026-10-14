@@ -1,0 +1,42 @@
+[
+  {
+    "result_file": "agent-service/.local/m1-stage4/final-trace-0.json",
+    "status": "ANSWER",
+    "trace_id": "b7669fae4cf9de98303740bc2bbc6750",
+    "execution_id": "a65622cd-d288-495f-967c-011d66a57c85",
+    "observations": {
+      "CHAIN": 77,
+      "GENERATION": 5,
+      "TOOL": 2,
+      "AGENT": 1
+    },
+    "generation_tokens": 20355,
+    "reused_responses": 0,
+    "tools": [
+      "read_video_range",
+      "get_video_overview"
+    ],
+    "credentials_absent": true,
+    "url": "http://localhost:3035/project/agent-mvp-project/traces?peek=7c3399cee4c64ccd&traceId=b7669fae4cf9de98303740bc2bbc6750"
+  },
+  {
+    "result_file": "agent-service/.local/m1-stage4/final-trace-1.json",
+    "status": "ANSWER",
+    "trace_id": "77b5fc4c507e9080413338afef40b4c2",
+    "execution_id": "be1c9c2e-d8bf-443b-8511-f3f540abf284",
+    "observations": {
+      "CHAIN": 77,
+      "GENERATION": 5,
+      "TOOL": 2,
+      "AGENT": 1
+    },
+    "generation_tokens": 20268,
+    "reused_responses": 0,
+    "tools": [
+      "read_video_range",
+      "get_video_overview"
+    ],
+    "credentials_absent": true,
+    "url": "http://localhost:3035/project/agent-mvp-project/traces?peek=0f58c0175cb43348&traceId=77b5fc4c507e9080413338afef40b4c2"
+  }
+]

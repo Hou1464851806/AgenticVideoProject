@@ -1,6 +1,6 @@
 # Agent 视频工作区
 
-使用 Vue 3 和 Spring Boot 提供同源浏览器入口。业务数据保存在 PostgreSQL；独立 Java 媒体 Worker 通过 RabbitMQ 领取任务，使用 FFmpeg 验证视频与提取音频；独立 Python Agent 服务调用百炼异步语音识别，并用 DeepSeek 进行有界素材查询。服务划分遵循 [架构设计](docs/architecture.md)。
+使用 Vue 3 和 Spring Boot 提供同源浏览器入口。Java 后端已收敛为 `backend/` 下的单个 Maven 应用，通过 RabbitMQ 在同一进程中执行媒体探测、音频准备、稀疏抽帧和既有预览/导出。PostgreSQL 保存权威业务状态，Silo 保存对象，Qdrant 和 RabbitMQ 保留。M1 已贯通真实上传、Java 百炼分析与索引、Python CLI 四工具问答；综合验收、故障与媒体回归及未验证边界见 [第五阶段记录](docs/verification/java-tools-m1-stage5.md)，运行方式见 [后端说明](backend/README.md)。
 
 ## 本机启动
 
@@ -18,41 +18,40 @@ PostgreSQL 使用 `postgres_data` 持久卷。`docker compose restart` 保留账
 
 上传也可取消，取消后停止后续分片并释放素材名额，真实存储残留清理完成后才释放字节占用，页面分别显示两种状态。未完成上传默认在最后合法活动后 24 小时过期，界面显示恢复期限；过期后需重新上传。可通过 `.env` 的 `UPLOAD_INACTIVITY_SECONDS` 配置期限；已发布素材不受上传取消或过期清理影响。
 
-## 语音证据
+## 分析与 Agent 当前状态
 
-在 `.env` 配置北京区域的 `DASHSCOPE_API_KEY`，重新启动后，新上传的有音轨视频验证通过即自动分析。播放器显示媒体、语音和索引阶段，语音就绪后可点击句段核查原素材时间；字词同时保留音频时间与原素材时间。无音轨明确显示不适用，缺少凭据显示未验证及原因。原文提要用于导航。
+M1 已实现并运行综合验收。当前上传执行真实媒体准备，Compose 默认开启 Java 基础分析：有音轨进行全音轨 ASR，按稀疏帧执行 VLM，并生成文档 Embedding / Qdrant 索引。需配置 `DASHSCOPE_API_KEY`；缺凭据时对应阶段明确失败，已完成的其他来源仍可用。无音轨 ASR 标为不适用；稀疏视觉不代表逐帧覆盖。权威证据和付费回执由 PostgreSQL 保存。
 
-默认原生异步模型为 `qwen3-asr-flash-filetrans`，北京接口为 `https://dashscope.aliyuncs.com/api/v1`；`DASHSCOPE_BASE_URL` 可配置完整原生 API 前缀。派生音频经官方私有临时上传传给百炼，服务保存提供方任务 ID 与用量；查询失败或执行器重启后查询原任务，提交回执丢失时标记结果不明确并停止自动重新提交。
+旧浏览器 Agent 对话执行入口明确不可用，避免创建无人消费的任务。独立 Python CLI 的离线 Mock 模式继续可用，见 [Python 说明](agent-service/README.md)；Java 问答快照与四个读取工具已实现，Python 真实模式已接入，问答／补答／恢复使用固定快照，见 [工具阶段记录](docs/verification/java-tools-m1-stage3.md)与 [Python 接入记录](docs/verification/java-tools-m1-stage4.md)。后续能力与验收以 [M1 最终设计](docs/java-tools-m1-design.md)为准。
 
-素材库提供“查找原句”：输入人名、数字或原句，查看语音证据卡、邻近原文并定位原视频。当前仅有字面查询；未命中会列出语音分析覆盖，尚未具备语义检索能力。
+## 既有方案与媒体渲染
 
-## 制作会话查询
+已有方案版本仍可从工作区查看、播放源片段、生成低清预览、确认并导出。低清预览无需正式确认；正式导出必须先确认具体版本，再选择 720p／1080p。预览和导出固定请求时的方案版本、素材及输出规格，产物可播放和下载。正式成片也可显式删除，下载本身不删除文件。
 
-在 `.env` 配置 `DEEPSEEK_API_KEY` 后重新启动。默认模型为 `deepseek-flash`。在对话区选择新会话的固定素材范围，创建制作会话；发送自然语言查询时可明确引用范围内素材。回答附语音原文与观察时间，点击引用可回看原视频。不同制作会话的公开历史、上下文和输入草稿独立，查询无需关联剪辑方案。
-
-同会话运行中可编辑草稿，完成后再发送；重复发送同一请求返回原轮次和任务。Agent 通过 Spring 授权工具读取证据，每轮最多 6 次模型请求和 12 次业务工具调用；目前只支持已有语音原文，未命中不证明原视频不存在相关内容。私有运行 checkpoint 保存在独立 `agent_state` 卷（`/state`），执行临时目录位于 `agent_work` 卷（`/work`），业务消息、引用、任务和模型用量保存在 PostgreSQL。模型调用回执不明确时停止自动重新提交。
-
-## 初始讲话方案
-
-在制作会话的“需求类型”选择“生成讲话方案”，填写主题、最短／最长秒数及横屏／竖屏画幅，在需求中说明要保留的观点。当前支持从一份已完成语音分析的视频生成一条方案；每次默认新建独立方案。Agent 核查语音原文及邻句，在最多三份候选内自检和修正，后端校验通过后只追加一个完整版本。没有证据或无法满足条件时解释原因。
-
-点击助手结果中的“查看方案 V1”，核查素材名称、原素材区间、选取依据和映射后的原文字幕；“播放源片段”在片段终点停止。可自行选择已有历史版本。勾选“基于正在查看的方案重新生成”会固定发送时的版本，同一方案编辑期间可查看历史并停止修改。任务完成保持当前查看版本；生成方案复用原有语音证据。点击“生成低清效果预览”手动合成当前版本，无需正式确认；“播放低清预览”播放带原声和中文字幕的独立低清效果预览视频。预览绑定请求时的版本，可停止执行，重复请求复用有效任务或产物。点击“确认当前版本”记录版本确认，再选择 720p／1080p 并点击“导出正式成片”。确认与导出为两个独立动作；修改后新版本须重新确认。正式成片可以播放、下载和显式删除，下载保留文件。制作会话支持明确发送“确认当前版本”和另行发送“导出当前版本 720p／1080p”，也可指定 V1 等版本；问句和歧义会先澄清。对话回执中的“查看正式导出”打开对应任务。
+M1 的 Python 真实模式只提供问答。旧浏览器 Agent 方案生成、方案修改和自然语言制作入口不可用；本次保留的是既有版本的按钮操作和媒体执行，不新增 Agent 到成片链路。
 
 ## 开发验证
 
-安装 JDK 17、Maven 3.9.9 和 Node.js 24，保持 Docker Desktop 运行：
+安装 JDK 17、Maven 3.9.9、Node.js 24，以及用于宿主媒体测试的 FFmpeg/ffprobe，保持 Docker Desktop 运行：
 
 ```bash
 mvn -B -ntp verify
 cd frontend
 npm ci
 npm run build
-npm run test:e2e
 ```
 
-Compose 镜像构建完成并配置模型凭据后，在仓库根目录运行 `node scripts/test-models.mjs`，从固定视频提取测试音频并验证真实百炼句／字词响应。测试会调用付费接口，并保留测试任务标识供重复查询。完整浏览器套件也包含真实百炼、DeepSeek 工具协议、多会话与多标签页验证，以及网络故障验证。
+Java 集成测试启动独立 PostgreSQL、Silo 和 RabbitMQ 容器，新 `LocalMediaIntegrationTest` 同时运行宿主 FFmpeg，验证真实上传、音轨偏移、稀疏帧、预览/导出、重投、有限重试、死信、取消与 broker 故障。旧协议测试通过显式 legacy 测试配置保留业务规则回归，不代表旧 Worker 运行形态仍受支持。
 
-Java 集成测试启动独立的真实 PostgreSQL、Silo 和 RabbitMQ 容器。浏览器测试使用已安装的 Google Chrome，并要求 Compose 服务先启动；它验证登录持久性、两账号项目隔离、窄屏入口、多文件直传、响应丢失恢复、真实媒体校验及 Range 播放。恢复测试会强制中断媒体 Worker，再验证任务恢复、临时目录清理、重复通知和进程取消。如果测试进程的 PATH 中没有 Docker，可通过 `DOCKER_BIN=/usr/local/bin/docker npm run test:e2e` 指定 CLI。
+完整历史浏览器测试仍包含已退役的执行链路，不能代替 M1 验收。`node scripts/test-models.mjs` 已改为 Java 第二阶段付费验收，上传四个固定视频并验证真实模型证据及可查询索引；缺凭据或测试跳过返回退出码2。该入口同时验证四工具 HTTP 读取与回执复用；Python Agent 问答、真实模式与快照恢复见 [第四阶段记录](docs/verification/java-tools-m1-stage4.md)；综合验收见 [第五阶段记录](docs/verification/java-tools-m1-stage5.md)。
+
+综合验收入口（会产生真实模型费用）：
+
+```sh
+agent-service/.venv/bin/python agent-service/scripts/verify_java_m1.py --output agent-service/.local/stage5-new
+```
+
+需配置 `DASHSCOPE_API_KEY`、`DEEPSEEK_API_KEY` 和内部凭据；缺凭据明确返回未验证，详细操作见 [Python README](agent-service/README.md)。
 
 ## 当前固定版本与资源
 
@@ -66,13 +65,13 @@ Java 集成测试启动独立的真实 PostgreSQL、Silo 和 RabbitMQ 容器。�
 | AWS S3 Java SDK / hash-wasm | 2.55.14 / 4.12.0 |
 | PostgreSQL | 18.6 Bookworm，固定 manifest digest |
 | RabbitMQ | 4.3.6-management，固定 manifest digest |
-| 媒体 Worker 的 FFmpeg / ffprobe | 6.1.1-3ubuntu5，固定 apt 包版本 |
+| 后端 FFmpeg / ffprobe | 6.1.1-3ubuntu5，固定 apt 包版本 |
 | Node 构建镜像 | Node 24 Bookworm Slim，固定 manifest digest |
 | Vue / Vite / TypeScript | 3.5.43 / 8.3.4 / 5.9.3 |
 
 镜像固定值见 Dockerfile 与 Compose；前端完整依赖固定在 `package-lock.json`。Spring Boot 的 [系统要求](https://docs.spring.io/spring-boot/3.5/system-requirements.html)支持 Java 17；PostgreSQL [官方镜像](https://hub.docker.com/_/postgres)提供 arm64 发行。镜像 manifest 和本机实际运行仍按每个切片验证。
 
-2026-10-10 实测宿主为 arm64、16 GiB 内存，Docker Linux VM 分配 8,217,341,952 字节（约 7.65 GiB），实施前 Data 卷可用约 13 GiB。当前 Compose 限制 PostgreSQL、Silo、RabbitMQ、媒体 Worker 分别为 512 MiB / 1 CPU，业务入口为 768 MiB / 1.5 CPU；后续组件加入时需重新核对总预算。宿主空闲空间与 Docker 卷余量分别测量，不能把这个初始快照当作后续上传容量保证。
+2026-10-10 实测宿主为 arm64、16 GiB 内存，Docker Linux VM 分配 8,217,341,952 字节（约 7.65 GiB），实施前 Data 卷可用约 13 GiB。当前 Compose 限制 PostgreSQL、Silo、RabbitMQ、Qdrant 分别为 512 MiB / 1 CPU，合并后的 Java 后端为 1280 MiB / 2 CPU；后续实测时需重新核对总预算。宿主空闲空间与 Docker 卷余量分别测量，不能把这个初始快照当作后续上传容量保证。
 
 当前已实现功能和推荐体验顺序见 [功能说明](docs/current-features.md)。
 

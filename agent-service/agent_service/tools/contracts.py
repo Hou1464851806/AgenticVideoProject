@@ -71,7 +71,7 @@ class ToolResult(Contract):
         if len(payload.encode("utf-8")) <= max_bytes:
             return self
         return ToolResult(call_id=self.call_id, tool_name=self.tool_name, request_hash=self.request_hash,
-                          status="ERROR", error={"code": "RESULT_TOO_LARGE", "category": "MODEL_REPAIRABLE"})
+                          status="ERROR", mock=self.mock, error={"code": "RESULT_TOO_LARGE", "category": "MODEL_REPAIRABLE"})
 
     @model_validator(mode="after")
     def status_payload(self):

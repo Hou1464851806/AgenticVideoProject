@@ -1,0 +1,983 @@
+{
+  "samples": [
+    {
+      "fixture": "labelled-speech.mp4",
+      "upload": {
+        "uploadId": "4893753d-300a-4e0d-9eaf-8291e92a05c2",
+        "reservedBytes": 103801,
+        "expectedParts": 1,
+        "filename": "labelled-speech.mp4",
+        "status": "COMPLETED",
+        "partSizeBytes": 8388608,
+        "declaredBytes": 103801,
+        "reservedSlots": 1,
+        "expiresAt": "2026-10-15T17:30:19.084380Z",
+        "confirmedBytes": 103801,
+        "assetId": "8944e9cb-8a04-462c-8c9e-fc1286d24c4c",
+        "validationTaskId": "1b50d278-d75d-4c50-a42e-98caf6e23256",
+        "validationStatus": "VALIDATING"
+      },
+      "asset": {
+        "id": "8944e9cb-8a04-462c-8c9e-fc1286d24c4c",
+        "filename": "labelled-speech.mp4",
+        "validationStatus": "VALID",
+        "byteSize": 103801,
+        "durationMs": 14044,
+        "analysis": {
+          "errors": {},
+          "mediaRetryable": false,
+          "stages": {
+            "VISION": "SUCCEEDED",
+            "EMBEDDING": "PENDING",
+            "INDEX": "NOT_STARTED",
+            "ASR": "SUCCEEDED",
+            "UNITS": "SUCCEEDED",
+            "MEDIA": "SUCCEEDED"
+          }
+        },
+        "timeMapping": {
+          "hasAudio": true,
+          "audioStartMs": 1436,
+          "videoStartMs": 0,
+          "audioTimeBase": "1/16000",
+          "formatStartMs": 0,
+          "videoTimeBase": "1/12800",
+          "audioOffsetFromVideoMs": 1436
+        },
+        "mediaInfo": {
+          "format": {
+            "size": "103801",
+            "tags": {
+              "encoder": "Lavf60.16.100",
+              "major_brand": "isom",
+              "minor_version": "512",
+              "compatible_brands": "isomiso2avc1mp41"
+            },
+            "bit_rate": "59129",
+            "duration": "14.044000",
+            "nb_streams": 2,
+            "start_time": "0.000000",
+            "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+            "nb_programs": 0,
+            "probe_score": 100,
+            "format_long_name": "QuickTime / MOV"
+          },
+          "streams": [
+            {
+              "id": "0x1",
+              "refs": 1,
+              "tags": {
+                "encoder": "Lavc60.31.102 libx264",
+                "language": "und",
+                "vendor_id": "[0][0][0][0]",
+                "handler_name": "VideoHandler"
+              },
+              "index": 0,
+              "level": 11,
+              "width": 160,
+              "height": 90,
+              "is_avc": "true",
+              "pix_fmt": "yuv420p",
+              "profile": "Constrained Baseline",
+              "bit_rate": "2410",
+              "duration": "14.000000",
+              "codec_tag": "0x31637661",
+              "nb_frames": "350",
+              "start_pts": 0,
+              "time_base": "1/12800",
+              "codec_name": "h264",
+              "codec_type": "video",
+              "film_grain": 0,
+              "start_time": "0.000000",
+              "coded_width": 160,
+              "disposition": {
+                "dub": 0,
+                "forced": 0,
+                "lyrics": 0,
+                "comment": 0,
+                "default": 1,
+                "karaoke": 0,
+                "captions": 0,
+                "metadata": 0,
+                "original": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "attached_pic": 0,
+                "descriptions": 0,
+                "non_diegetic": 0,
+                "clean_effects": 0,
+                "visual_impaired": 0,
+                "hearing_impaired": 0,
+                "timed_thumbnails": 0
+              },
+              "duration_ts": 179200,
+              "field_order": "progressive",
+              "coded_height": 90,
+              "has_b_frames": 0,
+              "r_frame_rate": "25/1",
+              "avg_frame_rate": "25/1",
+              "extradata_size": 39,
+              "chroma_location": "left",
+              "closed_captions": 0,
+              "codec_long_name": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+              "nal_length_size": "4",
+              "codec_tag_string": "avc1",
+              "bits_per_raw_sample": "8",
+              "sample_aspect_ratio": "1:1",
+              "display_aspect_ratio": "16:9"
+            },
+            {
+              "id": "0x2",
+              "tags": {
+                "language": "und",
+                "vendor_id": "[0][0][0][0]",
+                "handler_name": "SoundHandler"
+              },
+              "index": 1,
+              "profile": "LC",
+              "bit_rate": "58701",
+              "channels": 1,
+              "duration": "12.608000",
+              "codec_tag": "0x6134706d",
+              "nb_frames": "197",
+              "start_pts": 22976,
+              "time_base": "1/16000",
+              "codec_name": "aac",
+              "codec_type": "audio",
+              "sample_fmt": "fltp",
+              "start_time": "1.436000",
+              "disposition": {
+                "dub": 0,
+                "forced": 0,
+                "lyrics": 0,
+                "comment": 0,
+                "default": 1,
+                "karaoke": 0,
+                "captions": 0,
+                "metadata": 0,
+                "original": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "attached_pic": 0,
+                "descriptions": 0,
+                "non_diegetic": 0,
+                "clean_effects": 0,
+                "visual_impaired": 0,
+                "hearing_impaired": 0,
+                "timed_thumbnails": 0
+              },
+              "duration_ts": 201728,
+              "sample_rate": "16000",
+              "r_frame_rate": "0/0",
+              "avg_frame_rate": "0/0",
+              "channel_layout": "mono",
+              "extradata_size": 5,
+              "bits_per_sample": 0,
+              "codec_long_name": "AAC (Advanced Audio Coding)",
+              "initial_padding": 0,
+              "codec_tag_string": "mp4a"
+            }
+          ]
+        }
+      },
+      "index": {
+        "publishedGeneration": {
+          "id": "efeb6d50-7cc1-4d23-a36e-bec2a96e3811",
+          "model": "text-embedding-v4",
+          "dimension": 1024,
+          "collection": "evidence_qwen_v4_1024_bm25_v1",
+          "status": "PUBLISHED",
+          "unitCount": 7,
+          "publishedAt": "2026-10-14T17:30:26.130+00:00"
+        },
+        "generations": [
+          {
+            "id": "fe64d1e9-b4ec-4eac-89bd-b9e1b040cf9a",
+            "model": "text-embedding-v4",
+            "dimension": 1024,
+            "collection": "evidence_qwen_v4_1024_bm25_v1",
+            "status": "BUILDING",
+            "taskId": "5cd535d6-4b75-47d1-a417-a9a280e105b0",
+            "taskStatus": "PENDING"
+          },
+          {
+            "id": "efeb6d50-7cc1-4d23-a36e-bec2a96e3811",
+            "model": "text-embedding-v4",
+            "dimension": 1024,
+            "collection": "evidence_qwen_v4_1024_bm25_v1",
+            "status": "PUBLISHED",
+            "taskId": "4d38bf41-7e75-44f8-bf2b-906a603fb1fb",
+            "taskStatus": "SUCCEEDED"
+          }
+        ]
+      },
+      "scope": {
+        "scope_id": "5d9aa47f-81a0-4e81-971f-c3776678156d",
+        "assets": [
+          {
+            "id": "8944e9cb-8a04-462c-8c9e-fc1286d24c4c",
+            "filename": "labelled-speech.mp4",
+            "source_sha256": "1eef2b3ae2095123326816ebb3cf1955071639d6a4fec18f8dc86b5339416a9f",
+            "validation_status": "VALID",
+            "duration_ms": 14044,
+            "analysis_version": "e12594aa-fee3-4997-9ccd-c3ef7a17ea61",
+            "index_generation": "efeb6d50-7cc1-4d23-a36e-bec2a96e3811",
+            "sources": {
+              "SPEECH": "SUCCEEDED",
+              "VISUAL": "SUCCEEDED",
+              "VISIBLE_TEXT": "SUCCEEDED"
+            },
+            "source_kinds": [
+              "SPEECH",
+              "VISUAL",
+              "VISIBLE_TEXT"
+            ],
+            "coverage": {
+              "speech_processed_ranges": [
+                {
+                  "start_ms": 1436,
+                  "end_ms": 14044
+                }
+              ],
+              "sampling": {
+                "kind": "SPARSE_FRAMES",
+                "rule": "real-pts-window-v1",
+                "endMs": 14044,
+                "startMs": 0,
+                "complete": false,
+                "maxFrames": 25,
+                "intervalMs": 2000
+              },
+              "visual_complete": false,
+              "sampled_at_ms": [
+                0,
+                2000,
+                4000,
+                6000,
+                8000,
+                10000,
+                12000
+              ]
+            }
+          }
+        ],
+        "mock": false,
+        "project_id": "71516826-c977-44c5-b682-668a7483a0ac"
+      }
+    },
+    {
+      "fixture": "human-speech.mp4",
+      "upload": {
+        "uploadId": "f7bae158-1d93-4033-a458-9ab86100220f",
+        "reservedBytes": 82658,
+        "expectedParts": 1,
+        "filename": "human-speech.mp4",
+        "status": "COMPLETED",
+        "partSizeBytes": 8388608,
+        "declaredBytes": 82658,
+        "reservedSlots": 1,
+        "expiresAt": "2026-10-15T17:30:30.334927Z",
+        "confirmedBytes": 82658,
+        "assetId": "d212ba2e-cca1-4787-9655-cbe53fac1ba0",
+        "validationTaskId": "b8692582-c44d-411a-b7b6-3db9d7e27b2b",
+        "validationStatus": "VALIDATING"
+      },
+      "asset": {
+        "id": "d212ba2e-cca1-4787-9655-cbe53fac1ba0",
+        "filename": "human-speech.mp4",
+        "validationStatus": "VALID",
+        "byteSize": 82658,
+        "durationMs": 11000,
+        "analysis": {
+          "errors": {},
+          "mediaRetryable": false,
+          "stages": {
+            "VISION": "SUCCEEDED",
+            "EMBEDDING": "SUCCEEDED",
+            "INDEX": "RUNNING",
+            "ASR": "SUCCEEDED",
+            "UNITS": "SUCCEEDED",
+            "MEDIA": "SUCCEEDED"
+          }
+        },
+        "timeMapping": {
+          "hasAudio": true,
+          "audioStartMs": 0,
+          "videoStartMs": 0,
+          "audioTimeBase": "1/16000",
+          "formatStartMs": 0,
+          "videoTimeBase": "1/12800",
+          "audioOffsetFromVideoMs": 0
+        },
+        "mediaInfo": {
+          "format": {
+            "size": "82658",
+            "tags": {
+              "encoder": "Lavf60.16.100",
+              "major_brand": "isom",
+              "minor_version": "512",
+              "compatible_brands": "isomiso2avc1mp41"
+            },
+            "bit_rate": "60114",
+            "duration": "11.000000",
+            "nb_streams": 2,
+            "start_time": "0.000000",
+            "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+            "nb_programs": 0,
+            "probe_score": 100,
+            "format_long_name": "QuickTime / MOV"
+          },
+          "streams": [
+            {
+              "id": "0x1",
+              "refs": 1,
+              "tags": {
+                "encoder": "Lavc60.31.102 libx264",
+                "language": "und",
+                "vendor_id": "[0][0][0][0]",
+                "handler_name": "VideoHandler"
+              },
+              "index": 0,
+              "level": 11,
+              "width": 160,
+              "height": 90,
+              "is_avc": "true",
+              "pix_fmt": "yuv420p",
+              "profile": "Constrained Baseline",
+              "bit_rate": "2522",
+              "duration": "11.000000",
+              "codec_tag": "0x31637661",
+              "nb_frames": "275",
+              "start_pts": 0,
+              "time_base": "1/12800",
+              "codec_name": "h264",
+              "codec_type": "video",
+              "film_grain": 0,
+              "start_time": "0.000000",
+              "coded_width": 160,
+              "disposition": {
+                "dub": 0,
+                "forced": 0,
+                "lyrics": 0,
+                "comment": 0,
+                "default": 1,
+                "karaoke": 0,
+                "captions": 0,
+                "metadata": 0,
+                "original": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "attached_pic": 0,
+                "descriptions": 0,
+                "non_diegetic": 0,
+                "clean_effects": 0,
+                "visual_impaired": 0,
+                "hearing_impaired": 0,
+                "timed_thumbnails": 0
+              },
+              "duration_ts": 140800,
+              "field_order": "progressive",
+              "coded_height": 90,
+              "has_b_frames": 0,
+              "r_frame_rate": "25/1",
+              "avg_frame_rate": "25/1",
+              "extradata_size": 39,
+              "chroma_location": "left",
+              "closed_captions": 0,
+              "codec_long_name": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+              "nal_length_size": "4",
+              "codec_tag_string": "avc1",
+              "bits_per_raw_sample": "8",
+              "sample_aspect_ratio": "1:1",
+              "display_aspect_ratio": "16:9"
+            },
+            {
+              "id": "0x2",
+              "tags": {
+                "language": "und",
+                "vendor_id": "[0][0][0][0]",
+                "handler_name": "SoundHandler"
+              },
+              "index": 1,
+              "profile": "LC",
+              "bit_rate": "56027",
+              "channels": 1,
+              "duration": "10.380000",
+              "codec_tag": "0x6134706d",
+              "nb_frames": "164",
+              "start_pts": 0,
+              "time_base": "1/16000",
+              "codec_name": "aac",
+              "codec_type": "audio",
+              "sample_fmt": "fltp",
+              "start_time": "0.000000",
+              "disposition": {
+                "dub": 0,
+                "forced": 0,
+                "lyrics": 0,
+                "comment": 0,
+                "default": 1,
+                "karaoke": 0,
+                "captions": 0,
+                "metadata": 0,
+                "original": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "attached_pic": 0,
+                "descriptions": 0,
+                "non_diegetic": 0,
+                "clean_effects": 0,
+                "visual_impaired": 0,
+                "hearing_impaired": 0,
+                "timed_thumbnails": 0
+              },
+              "duration_ts": 166080,
+              "sample_rate": "16000",
+              "r_frame_rate": "0/0",
+              "avg_frame_rate": "0/0",
+              "channel_layout": "mono",
+              "extradata_size": 5,
+              "bits_per_sample": 0,
+              "codec_long_name": "AAC (Advanced Audio Coding)",
+              "initial_padding": 0,
+              "codec_tag_string": "mp4a"
+            }
+          ]
+        }
+      },
+      "index": {
+        "publishedGeneration": {
+          "id": "54ba2ac7-4e6d-4240-be0f-b7bd94565fdf",
+          "model": "text-embedding-v4",
+          "dimension": 1024,
+          "collection": "evidence_qwen_v4_1024_bm25_v1",
+          "status": "PUBLISHED",
+          "unitCount": 6,
+          "publishedAt": "2026-10-14T17:30:34.921+00:00"
+        },
+        "generations": [
+          {
+            "id": "7cfb038c-0792-4e96-9a04-c7cf6f787e5b",
+            "model": "text-embedding-v4",
+            "dimension": 1024,
+            "collection": "evidence_qwen_v4_1024_bm25_v1",
+            "status": "BUILDING",
+            "taskId": "5d991dc6-0ea6-4de8-9936-209d642ac72a",
+            "taskStatus": "RUNNING"
+          },
+          {
+            "id": "54ba2ac7-4e6d-4240-be0f-b7bd94565fdf",
+            "model": "text-embedding-v4",
+            "dimension": 1024,
+            "collection": "evidence_qwen_v4_1024_bm25_v1",
+            "status": "PUBLISHED",
+            "taskId": "49862004-613e-4c49-a3ba-94384ff7968e",
+            "taskStatus": "SUCCEEDED"
+          }
+        ]
+      },
+      "scope": {
+        "scope_id": "95b1fc6c-c993-46dd-b360-f04b5dcf2233",
+        "assets": [
+          {
+            "id": "d212ba2e-cca1-4787-9655-cbe53fac1ba0",
+            "filename": "human-speech.mp4",
+            "source_sha256": "d23fbd05ef147aa5ecbb297c045fec49f77a644f0172a172107330f5c1680a52",
+            "validation_status": "VALID",
+            "duration_ms": 11000,
+            "analysis_version": "ba70edac-c88d-4422-9b26-98c34ca34a33",
+            "index_generation": "54ba2ac7-4e6d-4240-be0f-b7bd94565fdf",
+            "sources": {
+              "SPEECH": "SUCCEEDED",
+              "VISUAL": "SUCCEEDED",
+              "VISIBLE_TEXT": "SUCCEEDED"
+            },
+            "source_kinds": [
+              "SPEECH",
+              "VISUAL",
+              "VISIBLE_TEXT"
+            ],
+            "coverage": {
+              "speech_processed_ranges": [
+                {
+                  "start_ms": 0,
+                  "end_ms": 10380
+                }
+              ],
+              "sampling": {
+                "kind": "SPARSE_FRAMES",
+                "rule": "real-pts-window-v1",
+                "endMs": 11000,
+                "startMs": 0,
+                "complete": false,
+                "maxFrames": 25,
+                "intervalMs": 2000
+              },
+              "visual_complete": false,
+              "sampled_at_ms": [
+                0,
+                2000,
+                4000,
+                6000,
+                8000,
+                10000
+              ]
+            }
+          }
+        ],
+        "mock": false,
+        "project_id": "71516826-c977-44c5-b682-668a7483a0ac"
+      }
+    },
+    {
+      "fixture": "labelled-vision-vfr.mp4",
+      "upload": {
+        "uploadId": "12e691b8-a8a3-494e-9b5c-b3546d7bf66c",
+        "reservedBytes": 14113,
+        "expectedParts": 1,
+        "filename": "labelled-vision-vfr.mp4",
+        "status": "COMPLETED",
+        "partSizeBytes": 8388608,
+        "declaredBytes": 14113,
+        "reservedSlots": 1,
+        "expiresAt": "2026-10-15T17:30:41.095008Z",
+        "confirmedBytes": 14113,
+        "assetId": "5215eef8-f5f4-429a-aca8-2a57629d4538",
+        "validationTaskId": "7952e61e-05fe-4946-8a4b-7ee238bd4f6f",
+        "validationStatus": "VALIDATING"
+      },
+      "asset": {
+        "id": "5215eef8-f5f4-429a-aca8-2a57629d4538",
+        "filename": "labelled-vision-vfr.mp4",
+        "validationStatus": "VALID",
+        "byteSize": 14113,
+        "durationMs": 7120,
+        "analysis": {
+          "errors": {},
+          "mediaRetryable": false,
+          "stages": {
+            "VISION": "SUCCEEDED",
+            "EMBEDDING": "SUCCEEDED",
+            "INDEX": "SUCCEEDED",
+            "ASR": "NOT_APPLICABLE",
+            "UNITS": "NOT_APPLICABLE",
+            "MEDIA": "SUCCEEDED"
+          }
+        },
+        "timeMapping": {
+          "hasAudio": false,
+          "videoStartMs": 0,
+          "formatStartMs": 0,
+          "videoTimeBase": "1/12800"
+        },
+        "mediaInfo": {
+          "format": {
+            "size": "14113",
+            "tags": {
+              "encoder": "Lavf60.16.100",
+              "major_brand": "isom",
+              "minor_version": "512",
+              "compatible_brands": "isomiso2avc1mp41"
+            },
+            "bit_rate": "15857",
+            "duration": "7.120000",
+            "nb_streams": 1,
+            "start_time": "0.000000",
+            "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+            "nb_programs": 0,
+            "probe_score": 100,
+            "format_long_name": "QuickTime / MOV"
+          },
+          "streams": [
+            {
+              "id": "0x1",
+              "refs": 1,
+              "tags": {
+                "encoder": "Lavc60.31.102 libx264",
+                "language": "und",
+                "vendor_id": "[0][0][0][0]",
+                "handler_name": "VideoHandler"
+              },
+              "index": 0,
+              "level": 30,
+              "width": 640,
+              "height": 360,
+              "is_avc": "true",
+              "pix_fmt": "yuv420p",
+              "profile": "High 4:4:4 Predictive",
+              "bit_rate": "14867",
+              "duration": "7.120000",
+              "codec_tag": "0x31637661",
+              "nb_frames": "4",
+              "start_pts": 0,
+              "time_base": "1/12800",
+              "codec_name": "h264",
+              "codec_type": "video",
+              "film_grain": 0,
+              "start_time": "0.000000",
+              "coded_width": 640,
+              "disposition": {
+                "dub": 0,
+                "forced": 0,
+                "lyrics": 0,
+                "comment": 0,
+                "default": 1,
+                "karaoke": 0,
+                "captions": 0,
+                "metadata": 0,
+                "original": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "attached_pic": 0,
+                "descriptions": 0,
+                "non_diegetic": 0,
+                "clean_effects": 0,
+                "visual_impaired": 0,
+                "hearing_impaired": 0,
+                "timed_thumbnails": 0
+              },
+              "duration_ts": 91136,
+              "field_order": "progressive",
+              "coded_height": 360,
+              "has_b_frames": 0,
+              "r_frame_rate": "25/1",
+              "avg_frame_rate": "50/89",
+              "extradata_size": 44,
+              "chroma_location": "left",
+              "closed_captions": 0,
+              "codec_long_name": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+              "nal_length_size": "4",
+              "codec_tag_string": "avc1",
+              "bits_per_raw_sample": "8"
+            }
+          ]
+        }
+      },
+      "index": {
+        "publishedGeneration": {
+          "id": "64ecfb23-1376-4c95-a512-964a042a06ff",
+          "model": "text-embedding-v4",
+          "dimension": 1024,
+          "collection": "evidence_qwen_v4_1024_bm25_v1",
+          "status": "PUBLISHED",
+          "unitCount": 8,
+          "publishedAt": "2026-10-14T17:30:47.079+00:00"
+        },
+        "generations": [
+          {
+            "id": "64ecfb23-1376-4c95-a512-964a042a06ff",
+            "model": "text-embedding-v4",
+            "dimension": 1024,
+            "collection": "evidence_qwen_v4_1024_bm25_v1",
+            "status": "PUBLISHED",
+            "taskId": "0dddc60f-900a-428f-9907-9a77d3f7c687",
+            "taskStatus": "SUCCEEDED"
+          }
+        ]
+      },
+      "scope": {
+        "scope_id": "4d5b3de9-5d38-43ee-bee3-082730859ef5",
+        "assets": [
+          {
+            "id": "5215eef8-f5f4-429a-aca8-2a57629d4538",
+            "filename": "labelled-vision-vfr.mp4",
+            "source_sha256": "ab00c235ed6324ae0ade047ae882d9499aaf2724d53daddc3c0b8feb594b773c",
+            "validation_status": "VALID",
+            "duration_ms": 7120,
+            "analysis_version": "6bb4ac59-d224-4448-917d-2e1571443dd3",
+            "index_generation": "64ecfb23-1376-4c95-a512-964a042a06ff",
+            "sources": {
+              "SPEECH": "NOT_APPLICABLE",
+              "VISUAL": "SUCCEEDED",
+              "VISIBLE_TEXT": "SUCCEEDED"
+            },
+            "source_kinds": [
+              "VISUAL",
+              "VISIBLE_TEXT"
+            ],
+            "coverage": {
+              "speech_processed_ranges": [],
+              "sampling": {
+                "kind": "SPARSE_FRAMES",
+                "rule": "real-pts-window-v1",
+                "endMs": 7120,
+                "startMs": 0,
+                "complete": false,
+                "maxFrames": 25,
+                "intervalMs": 2000
+              },
+              "visual_complete": false,
+              "sampled_at_ms": [
+                0,
+                2320,
+                4760,
+                7080
+              ]
+            }
+          }
+        ],
+        "mock": false,
+        "project_id": "71516826-c977-44c5-b682-668a7483a0ac"
+      }
+    },
+    {
+      "fixture": "speech-mention-only.mp4",
+      "upload": {
+        "uploadId": "7cba67b0-a18a-42dc-9623-b95fd02f5bd1",
+        "reservedBytes": 145980,
+        "expectedParts": 1,
+        "filename": "speech-mention-only.mp4",
+        "status": "COMPLETED",
+        "partSizeBytes": 8388608,
+        "declaredBytes": 145980,
+        "reservedSlots": 1,
+        "expiresAt": "2026-10-15T17:30:47.585366Z",
+        "confirmedBytes": 145980,
+        "assetId": "0282467c-bed3-4f3f-b827-97d3402ff2db",
+        "validationTaskId": "b1ac9ae9-b0f1-4b99-bb47-7c7cf92c42f7",
+        "validationStatus": "VALIDATING"
+      },
+      "asset": {
+        "id": "0282467c-bed3-4f3f-b827-97d3402ff2db",
+        "filename": "speech-mention-only.mp4",
+        "validationStatus": "VALID",
+        "byteSize": 145980,
+        "durationMs": 4351,
+        "analysis": {
+          "errors": {},
+          "mediaRetryable": false,
+          "stages": {
+            "VISION": "SUCCEEDED",
+            "EMBEDDING": "PENDING",
+            "INDEX": "NOT_STARTED",
+            "ASR": "SUCCEEDED",
+            "UNITS": "SUCCEEDED",
+            "MEDIA": "SUCCEEDED"
+          }
+        },
+        "timeMapping": {
+          "hasAudio": true,
+          "audioStartMs": 0,
+          "videoStartMs": 0,
+          "audioTimeBase": "1/16000",
+          "formatStartMs": 0,
+          "videoTimeBase": "1/12800",
+          "audioOffsetFromVideoMs": 0
+        },
+        "mediaInfo": {
+          "format": {
+            "size": "145980",
+            "tags": {
+              "encoder": "Lavf60.16.100",
+              "major_brand": "isom",
+              "minor_version": "512",
+              "compatible_brands": "isomiso2avc1mp41"
+            },
+            "bit_rate": "268407",
+            "duration": "4.351000",
+            "nb_streams": 2,
+            "start_time": "0.000000",
+            "format_name": "mov,mp4,m4a,3gp,3g2,mj2",
+            "nb_programs": 0,
+            "probe_score": 100,
+            "format_long_name": "QuickTime / MOV"
+          },
+          "streams": [
+            {
+              "id": "0x1",
+              "refs": 1,
+              "tags": {
+                "encoder": "Lavc60.31.102 libx264",
+                "language": "und",
+                "vendor_id": "[0][0][0][0]",
+                "handler_name": "VideoHandler"
+              },
+              "index": 0,
+              "level": 30,
+              "width": 640,
+              "height": 360,
+              "is_avc": "true",
+              "pix_fmt": "yuv420p",
+              "profile": "High 4:4:4 Predictive",
+              "bit_rate": "198037",
+              "duration": "4.320000",
+              "codec_tag": "0x31637661",
+              "nb_frames": "108",
+              "start_pts": 0,
+              "time_base": "1/12800",
+              "codec_name": "h264",
+              "codec_type": "video",
+              "film_grain": 0,
+              "start_time": "0.000000",
+              "coded_width": 640,
+              "disposition": {
+                "dub": 0,
+                "forced": 0,
+                "lyrics": 0,
+                "comment": 0,
+                "default": 1,
+                "karaoke": 0,
+                "captions": 0,
+                "metadata": 0,
+                "original": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "attached_pic": 0,
+                "descriptions": 0,
+                "non_diegetic": 0,
+                "clean_effects": 0,
+                "visual_impaired": 0,
+                "hearing_impaired": 0,
+                "timed_thumbnails": 0
+              },
+              "duration_ts": 55296,
+              "field_order": "progressive",
+              "coded_height": 360,
+              "has_b_frames": 0,
+              "r_frame_rate": "25/1",
+              "avg_frame_rate": "25/1",
+              "extradata_size": 44,
+              "chroma_location": "left",
+              "closed_captions": 0,
+              "codec_long_name": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+              "nal_length_size": "4",
+              "codec_tag_string": "avc1",
+              "bits_per_raw_sample": "8"
+            },
+            {
+              "id": "0x2",
+              "tags": {
+                "language": "und",
+                "vendor_id": "[0][0][0][0]",
+                "handler_name": "SoundHandler"
+              },
+              "index": 1,
+              "profile": "LC",
+              "bit_rate": "64779",
+              "channels": 1,
+              "duration": "4.351000",
+              "codec_tag": "0x6134706d",
+              "nb_frames": "69",
+              "start_pts": 0,
+              "time_base": "1/16000",
+              "codec_name": "aac",
+              "codec_type": "audio",
+              "sample_fmt": "fltp",
+              "start_time": "0.000000",
+              "disposition": {
+                "dub": 0,
+                "forced": 0,
+                "lyrics": 0,
+                "comment": 0,
+                "default": 1,
+                "karaoke": 0,
+                "captions": 0,
+                "metadata": 0,
+                "original": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "attached_pic": 0,
+                "descriptions": 0,
+                "non_diegetic": 0,
+                "clean_effects": 0,
+                "visual_impaired": 0,
+                "hearing_impaired": 0,
+                "timed_thumbnails": 0
+              },
+              "duration_ts": 69616,
+              "sample_rate": "16000",
+              "r_frame_rate": "0/0",
+              "avg_frame_rate": "0/0",
+              "channel_layout": "mono",
+              "extradata_size": 5,
+              "bits_per_sample": 0,
+              "codec_long_name": "AAC (Advanced Audio Coding)",
+              "initial_padding": 0,
+              "codec_tag_string": "mp4a"
+            }
+          ]
+        }
+      },
+      "index": {
+        "publishedGeneration": {
+          "id": "10963729-7c7d-47f3-9d25-356c8029b4fd",
+          "model": "text-embedding-v4",
+          "dimension": 1024,
+          "collection": "evidence_qwen_v4_1024_bm25_v1",
+          "status": "PUBLISHED",
+          "unitCount": 6,
+          "publishedAt": "2026-10-14T17:30:51.471+00:00"
+        },
+        "generations": [
+          {
+            "id": "68b8ef9f-4c7a-4876-9a88-540f345f9add",
+            "model": "text-embedding-v4",
+            "dimension": 1024,
+            "collection": "evidence_qwen_v4_1024_bm25_v1",
+            "status": "BUILDING",
+            "taskId": "20338c94-cca1-4be3-b67c-d08df701095f",
+            "taskStatus": "PENDING"
+          },
+          {
+            "id": "10963729-7c7d-47f3-9d25-356c8029b4fd",
+            "model": "text-embedding-v4",
+            "dimension": 1024,
+            "collection": "evidence_qwen_v4_1024_bm25_v1",
+            "status": "PUBLISHED",
+            "taskId": "3ec98585-0d2a-4fc7-95b3-0666e705aa2e",
+            "taskStatus": "SUCCEEDED"
+          }
+        ]
+      },
+      "scope": {
+        "scope_id": "9b815018-fd5c-4bb0-874a-84d05cd45b0c",
+        "assets": [
+          {
+            "id": "0282467c-bed3-4f3f-b827-97d3402ff2db",
+            "filename": "speech-mention-only.mp4",
+            "source_sha256": "a5c5668fa7ae3a7c12c8ac3672d098a9ba3a74d7dfdc066b715184d05b36a551",
+            "validation_status": "VALID",
+            "duration_ms": 4351,
+            "analysis_version": "966c1dd2-fe35-4ce2-bc71-b4db04ca287b",
+            "index_generation": "10963729-7c7d-47f3-9d25-356c8029b4fd",
+            "sources": {
+              "SPEECH": "SUCCEEDED",
+              "VISUAL": "SUCCEEDED",
+              "VISIBLE_TEXT": "SUCCEEDED"
+            },
+            "source_kinds": [
+              "SPEECH",
+              "VISUAL",
+              "VISIBLE_TEXT"
+            ],
+            "coverage": {
+              "speech_processed_ranges": [
+                {
+                  "start_ms": 0,
+                  "end_ms": 4351
+                }
+              ],
+              "sampling": {
+                "kind": "SPARSE_FRAMES",
+                "rule": "real-pts-window-v1",
+                "endMs": 4351,
+                "startMs": 0,
+                "complete": false,
+                "maxFrames": 25,
+                "intervalMs": 2000
+              },
+              "visual_complete": false,
+              "sampled_at_ms": [
+                0,
+                2000,
+                4000
+              ]
+            }
+          }
+        ],
+        "mock": false,
+        "project_id": "71516826-c977-44c5-b682-668a7483a0ac"
+      }
+    }
+  ]
+}
