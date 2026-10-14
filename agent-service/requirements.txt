@@ -1,8 +1,9 @@
-requests==2.34.2
-httpx==0.28.1
-fastapi==0.143.0
-uvicorn==0.54.0
-pika==1.4.4
-boto3==1.43.111
 langgraph==1.2.14
 langgraph-checkpoint-sqlite==3.1.1
+langchain-deepseek==1.1.1
+langchain==1.4.5
+langfuse==4.18.0
+python-dotenv==1.2.2
+# Isolated analysis capabilities; the MVP does not import these clients.
+requests==2.34.2
+boto3==1.43.111

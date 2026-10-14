@@ -1,0 +1,913 @@
+{
+  "observed-query2": {
+    "thread_id": "18127140-f6a8-43f2-bfc3-1eb38c674b54",
+    "identity": {
+      "session_id": "a2473e2d-622d-48e1-b595-20e28de8e1c1",
+      "requirement_id": "18127140-f6a8-43f2-bfc3-1eb38c674b54",
+      "execution_id": "878e370a-8bf9-4db6-8a85-d016558c377b",
+      "turn_id": "13536a9a-411b-49d9-aca6-06f5c069872a"
+    },
+    "status": "ANSWER",
+    "waiting": null,
+    "outcome": {
+      "status": "ANSWER",
+      "content": "固定Mock素材lecture中，缓存读取流程的原始语音为（15.0s–45.0s）：「先查缓存，命中就直接返回；未命中再查数据库，将结果写入缓存。缓存要设置过期时间，避免旧数据一直存在。这就是缓存的基本读取流程。」据此，流程为：1) 先查询缓存；2) 若命中则直接返回结果；3) 若未命中则查询数据库，并将结果写回缓存；4) 缓存需设置过期时间（TTL），避免旧数据长期滞留。该素材仅包含SPEECH来源，无视觉证据可供引用。",
+      "evidence_ids": [
+        "speech-cache"
+      ],
+      "sources": [
+        {
+          "id": "speech-cache",
+          "asset_id": "lecture",
+          "source_kind": "SPEECH",
+          "start_ms": 15000,
+          "end_ms": 45000,
+          "analysis_version": "sample-v1",
+          "text": "先查缓存，命中就直接返回；未命中再查数据库，将结果写入缓存。缓存要设置过期时间，避免旧数据一直存在。这就是缓存的基本读取流程。"
+        }
+      ],
+      "mock": true
+    },
+    "requirements": {
+      "mode": "QUERY",
+      "topic": "固定Mock素材lecture中缓存读取流程是什么（读取原始语音并引用证据）",
+      "duration_min_ms": null,
+      "duration_max_ms": null,
+      "output_count": 1,
+      "asset_ids": [
+        "lecture"
+      ],
+      "forbidden_content": [],
+      "sources": {
+        "topic": "13536a9a-411b-49d9-aca6-06f5c069872a",
+        "output_count": "13536a9a-411b-49d9-aca6-06f5c069872a",
+        "asset_ids": "13536a9a-411b-49d9-aca6-06f5c069872a",
+        "forbidden_content": "13536a9a-411b-49d9-aca6-06f5c069872a"
+      }
+    },
+    "pending_tool": null,
+    "usage": {
+      "tools": 4,
+      "repairs": 0,
+      "no_progress": 0,
+      "decisions": 5,
+      "model_calls": 6,
+      "active_seconds": 7.601769875007449,
+      "status": "ANSWER"
+    },
+    "trace_id": "f3b5e8695c3dab5d83582583bcb4c22f"
+  },
+  "observed-draft2": {
+    "thread_id": "6001857b-820a-4166-b32b-7b45846af285",
+    "identity": {
+      "session_id": "543da76f-7990-4b33-8a00-ae4eb9056856",
+      "requirement_id": "6001857b-820a-4166-b32b-7b45846af285",
+      "execution_id": "55615cd3-7c8a-4a07-96e3-7b657326921b",
+      "turn_id": "0481d4df-ae8a-41bf-ade3-5529945813f3"
+    },
+    "status": "DRAFT_READY",
+    "waiting": null,
+    "outcome": {
+      "status": "DRAFT_READY",
+      "content": "Mock 样本剪辑草稿已通过模拟校验；尚未保存或渲染。",
+      "draft": {
+        "title": "缓存读取流程",
+        "outputs": [
+          {
+            "title": "缓存读取流程（30秒）",
+            "clips": [
+              {
+                "asset_id": "lecture",
+                "source_in_ms": 15000,
+                "source_out_ms": 45000,
+                "evidence_ids": [
+                  "speech-cache"
+                ],
+                "reason": "完整讲解缓存读取流程：先查缓存，命中直接返回；未命中再查数据库并回写缓存；并说明需设置过期时间避免旧数据；结尾总结基本读取流程。整段严格30秒。"
+              }
+            ]
+          }
+        ]
+      },
+      "validation": {
+        "valid": true,
+        "issues": [],
+        "durations_ms": [
+          30000
+        ],
+        "draft_hash": "326dccd8b4bcd5a44bbef824bb08fff393ea91a983dc60cafe0de555f7e270fb",
+        "requirements_hash": "15267250f5419236d5c7cc3bc5192d356fbe984785fb7b6f44ce598d434143f3"
+      },
+      "mock": true
+    },
+    "requirements": {
+      "mode": "DRAFT",
+      "topic": "缓存读取流程",
+      "duration_min_ms": 30000,
+      "duration_max_ms": 30000,
+      "output_count": 1,
+      "asset_ids": [
+        "lecture"
+      ],
+      "forbidden_content": [],
+      "sources": {
+        "topic": "0481d4df-ae8a-41bf-ade3-5529945813f3",
+        "duration_min_ms": "0481d4df-ae8a-41bf-ade3-5529945813f3",
+        "duration_max_ms": "0481d4df-ae8a-41bf-ade3-5529945813f3",
+        "output_count": "0481d4df-ae8a-41bf-ade3-5529945813f3",
+        "asset_ids": "0481d4df-ae8a-41bf-ade3-5529945813f3"
+      }
+    },
+    "pending_tool": null,
+    "usage": {
+      "tools": 4,
+      "repairs": 0,
+      "no_progress": 0,
+      "decisions": 4,
+      "model_calls": 5,
+      "active_seconds": 5.856680334007251,
+      "status": "DRAFT_READY"
+    },
+    "trace_id": "048778c17e992428e8214953ee0e8ef2"
+  },
+  "observed-clarify": {
+    "thread_id": "e050b644-10cb-4d4e-b84d-80c434ab2da0",
+    "identity": {
+      "session_id": "3063b53a-785b-4c46-9d9b-a095b85c6828",
+      "requirement_id": "e050b644-10cb-4d4e-b84d-80c434ab2da0",
+      "execution_id": "5c89ad29-0f26-4271-9c8f-0e01fea3c8c7",
+      "turn_id": "3cb25504-33de-4ea0-897d-3bcd2d09b8c0"
+    },
+    "status": "WAITING",
+    "waiting": {
+      "kind": "USER_INPUT",
+      "wait_id": "8a9bb9f924b57076c86609c231ca7ae240cf70e6e20696c67e7ee50797898ba1",
+      "question": "时长条件冲突：要求\"严格30秒\"同时\"总长不超过20秒\"，二者不可同时满足。请确认按哪个时长为准？"
+    },
+    "outcome": null,
+    "requirements": {
+      "mode": "QUERY",
+      "topic": "",
+      "duration_min_ms": null,
+      "duration_max_ms": null,
+      "output_count": 1,
+      "asset_ids": null,
+      "forbidden_content": [],
+      "sources": {}
+    },
+    "pending_tool": null,
+    "usage": {
+      "tools": 0,
+      "repairs": 0,
+      "no_progress": 0,
+      "decisions": 0,
+      "model_calls": 1,
+      "active_seconds": 1.2285909170022933,
+      "status": "WAITING"
+    },
+    "trace_id": "42d0f422c69201c55842bf95e7d9ed13"
+  },
+  "observed-clarify-resumed": {
+    "thread_id": "e050b644-10cb-4d4e-b84d-80c434ab2da0",
+    "identity": {
+      "session_id": "3063b53a-785b-4c46-9d9b-a095b85c6828",
+      "requirement_id": "e050b644-10cb-4d4e-b84d-80c434ab2da0",
+      "execution_id": "5c89ad29-0f26-4271-9c8f-0e01fea3c8c7",
+      "turn_id": "3cb25504-33de-4ea0-897d-3bcd2d09b8c0"
+    },
+    "status": "WAITING",
+    "waiting": {
+      "kind": "USER_INPUT",
+      "wait_id": "c404a061875fbb86ad83a2cd092ebf280f7c67d2f0127cb1c67029990fa4e2ef",
+      "question": "已确认按严格30秒为准（取消20秒上限）。但需注意：素材lecture总时长仅60000ms，且当前只浏览了前45000ms（还有一页未读完）。请确认——是否允许我继续读取lecture剩余区间，并仅使用其中与\"缓存读取流程\"相关的片段凑满严格30秒？"
+    },
+    "outcome": null,
+    "requirements": {
+      "mode": "DRAFT",
+      "topic": "固定Mock素材lecture的缓存流程",
+      "duration_min_ms": 30000,
+      "duration_max_ms": 30000,
+      "output_count": 1,
+      "asset_ids": [
+        "lecture"
+      ],
+      "forbidden_content": [],
+      "sources": {
+        "topic": "3cb25504-33de-4ea0-897d-3bcd2d09b8c0",
+        "duration_min_ms": "3cb25504-33de-4ea0-897d-3bcd2d09b8c0",
+        "duration_max_ms": "3cb25504-33de-4ea0-897d-3bcd2d09b8c0",
+        "output_count": "3cb25504-33de-4ea0-897d-3bcd2d09b8c0",
+        "asset_ids": "3cb25504-33de-4ea0-897d-3bcd2d09b8c0"
+      }
+    },
+    "pending_tool": null,
+    "usage": {
+      "tools": 1,
+      "repairs": 0,
+      "no_progress": 0,
+      "decisions": 2,
+      "model_calls": 4,
+      "active_seconds": 4.283325625001453,
+      "status": "WAITING"
+    },
+    "trace_id": "f10444c561e739c9a7edd4c702d11fef"
+  },
+  "observed-clarify-final": {
+    "thread_id": "e050b644-10cb-4d4e-b84d-80c434ab2da0",
+    "identity": {
+      "session_id": "3063b53a-785b-4c46-9d9b-a095b85c6828",
+      "requirement_id": "e050b644-10cb-4d4e-b84d-80c434ab2da0",
+      "execution_id": "5c89ad29-0f26-4271-9c8f-0e01fea3c8c7",
+      "turn_id": "3cb25504-33de-4ea0-897d-3bcd2d09b8c0"
+    },
+    "status": "DRAFT_READY",
+    "waiting": null,
+    "outcome": {
+      "status": "DRAFT_READY",
+      "content": "Mock 样本剪辑草稿已通过模拟校验；尚未保存或渲染。",
+      "draft": {
+        "title": "缓存读取流程讲解（严格30秒）",
+        "outputs": [
+          {
+            "title": "缓存读取流程",
+            "clips": [
+              {
+                "asset_id": "lecture",
+                "source_in_ms": 15000,
+                "source_out_ms": 45000,
+                "evidence_ids": [
+                  "speech-cache"
+                ],
+                "reason": "完整覆盖缓存基本读取流程：先查缓存、命中返回、未命中查库并写回缓存，以及设置过期时间避免旧数据。"
+              }
+            ]
+          }
+        ]
+      },
+      "validation": {
+        "valid": true,
+        "issues": [],
+        "durations_ms": [
+          30000
+        ],
+        "draft_hash": "9eff8018a2e063706d0b86e9b6059c0f21023417b552504771e95a0ee5b0827e",
+        "requirements_hash": "3f1f58f7bc47b2a108aeb5d225f81bfcf27d6219881ffc8f8380740087f6a637"
+      },
+      "mock": true
+    },
+    "requirements": {
+      "mode": "DRAFT",
+      "topic": "固定Mock素材lecture的缓存流程",
+      "duration_min_ms": 30000,
+      "duration_max_ms": 30000,
+      "output_count": 1,
+      "asset_ids": [
+        "lecture"
+      ],
+      "forbidden_content": [],
+      "sources": {
+        "topic": "3cb25504-33de-4ea0-897d-3bcd2d09b8c0",
+        "duration_min_ms": "3cb25504-33de-4ea0-897d-3bcd2d09b8c0",
+        "duration_max_ms": "3cb25504-33de-4ea0-897d-3bcd2d09b8c0",
+        "output_count": "3cb25504-33de-4ea0-897d-3bcd2d09b8c0",
+        "asset_ids": "3cb25504-33de-4ea0-897d-3bcd2d09b8c0",
+        "forbidden_content": "3cb25504-33de-4ea0-897d-3bcd2d09b8c0"
+      }
+    },
+    "pending_tool": null,
+    "usage": {
+      "tools": 7,
+      "repairs": 2,
+      "no_progress": 0,
+      "decisions": 8,
+      "model_calls": 12,
+      "active_seconds": 14.1703645420057,
+      "status": "DRAFT_READY"
+    },
+    "trace_id": "5b80663a234b5896fcb1c13c4052f663"
+  },
+  "observed-pending": {
+    "thread_id": "61f9bd2b-1d85-4421-9696-2466bc2a9b08",
+    "identity": {
+      "session_id": "ac35f3d8-a0f8-4c25-96f0-a2da64668e3b",
+      "requirement_id": "61f9bd2b-1d85-4421-9696-2466bc2a9b08",
+      "execution_id": "2af06982-3b2d-45c5-8b02-229bba63b80e",
+      "turn_id": "702b6182-907d-4fe2-8c2f-f8d102bd3bd0"
+    },
+    "status": "WAITING",
+    "waiting": {
+      "kind": "TOOL_RESULT",
+      "wait_id": "d82e3840c74419be99b2c940d7372a2b9e5849f931340ffe8fd0629d2b19c9f3",
+      "call_id": "2af06982-3b2d-45c5-8b02-229bba63b80e:tool:0",
+      "dependency": {
+        "task_id": "mock-2af06982-3b2d-45c5-8b02-229bba63b80e:tool:0",
+        "kind": "INSPECTION"
+      }
+    },
+    "outcome": null,
+    "requirements": {
+      "mode": "QUERY",
+      "topic": "查看画面",
+      "duration_min_ms": null,
+      "duration_max_ms": null,
+      "output_count": 1,
+      "asset_ids": null,
+      "forbidden_content": [],
+      "sources": {
+        "topic": "702b6182-907d-4fe2-8c2f-f8d102bd3bd0"
+      }
+    },
+    "pending_tool": {
+      "call_id": "2af06982-3b2d-45c5-8b02-229bba63b80e:tool:0",
+      "tool_name": "inspect_video_range",
+      "arguments": {
+        "cursor": 0,
+        "asset_id": "demo",
+        "start_ms": 20000,
+        "end_ms": 21000,
+        "goal": "核查缓存结果面板"
+      },
+      "request_hash": "f8083c04bfedc02bd862348ba720a7537ff03defc846d0165a9503dd149ed553"
+    },
+    "usage": {
+      "tools": 1,
+      "repairs": 0,
+      "no_progress": 0,
+      "decisions": 1,
+      "model_calls": 2,
+      "active_seconds": 0.023648500005947426,
+      "status": "WAITING"
+    },
+    "trace_id": "6b04a5ac32b2f5be071e2ea73f4d0a28"
+  },
+  "observed-pending-resumed": {
+    "thread_id": "61f9bd2b-1d85-4421-9696-2466bc2a9b08",
+    "identity": {
+      "session_id": "ac35f3d8-a0f8-4c25-96f0-a2da64668e3b",
+      "requirement_id": "61f9bd2b-1d85-4421-9696-2466bc2a9b08",
+      "execution_id": "2af06982-3b2d-45c5-8b02-229bba63b80e",
+      "turn_id": "702b6182-907d-4fe2-8c2f-f8d102bd3bd0"
+    },
+    "status": "ANSWER",
+    "waiting": null,
+    "outcome": {
+      "status": "ANSWER",
+      "content": "Mock 观察表明样本帧展示结果面板，覆盖有限，无法判断全程。",
+      "evidence_ids": [],
+      "sources": [],
+      "mock": true
+    },
+    "requirements": {
+      "mode": "QUERY",
+      "topic": "查看画面",
+      "duration_min_ms": null,
+      "duration_max_ms": null,
+      "output_count": 1,
+      "asset_ids": null,
+      "forbidden_content": [],
+      "sources": {
+        "topic": "702b6182-907d-4fe2-8c2f-f8d102bd3bd0"
+      }
+    },
+    "pending_tool": null,
+    "usage": {
+      "tools": 1,
+      "repairs": 0,
+      "no_progress": 0,
+      "decisions": 2,
+      "model_calls": 3,
+      "active_seconds": 0.04726129201299045,
+      "status": "ANSWER"
+    },
+    "trace_id": "534c4f1872816609f35f0a8e0f64c341"
+  },
+  "observed-outage": {
+    "thread_id": "30ce18ab-5d67-4e68-adc7-79a8ed4e9aa7",
+    "identity": {
+      "session_id": "310e7162-8a27-447e-b131-39d3d7eb1d54",
+      "requirement_id": "30ce18ab-5d67-4e68-adc7-79a8ed4e9aa7",
+      "execution_id": "00520159-8106-4f3e-866c-c49ab8f17961",
+      "turn_id": "13b04d37-c64f-4da0-a051-b3b99a499a98"
+    },
+    "status": "ANSWER",
+    "waiting": null,
+    "outcome": {
+      "status": "ANSWER",
+      "content": "已读取 lecture 15000–45000 毫秒区间的原始记录。该区间仅返回一条语音记录（speech-cache，15000–45000ms），内容为缓存读取流程：先查缓存，命中则直接返回；未命中再查数据库，并将结果写回缓存；同时需为缓存设置过期时间，避免旧数据长期存在。\n\n即缓存读取流程可归纳为：1) 查询缓存；2) 命中→直接返回；3) 未命中→查询数据库；4) 将结果写入缓存；5) 设置过期时间防止旧数据滞留。\n\n引用原始记录：evidence_ids 为 [\"speech-cache\"]。注意该区间 visual_complete=false，仅有语音来源，无画面记录，故以上仅为语音所述内容，不代表画面演示。",
+      "evidence_ids": [
+        "speech-cache"
+      ],
+      "sources": [
+        {
+          "id": "speech-cache",
+          "asset_id": "lecture",
+          "source_kind": "SPEECH",
+          "start_ms": 15000,
+          "end_ms": 45000,
+          "analysis_version": "sample-v1",
+          "text": "先查缓存，命中就直接返回；未命中再查数据库，将结果写入缓存。缓存要设置过期时间，避免旧数据一直存在。这就是缓存的基本读取流程。"
+        }
+      ],
+      "mock": true
+    },
+    "requirements": {
+      "mode": "QUERY",
+      "topic": "缓存读取流程（引用原始记录）",
+      "duration_min_ms": 15000,
+      "duration_max_ms": 45000,
+      "output_count": 1,
+      "asset_ids": [
+        "lecture"
+      ],
+      "forbidden_content": [],
+      "sources": {
+        "topic": "13b04d37-c64f-4da0-a051-b3b99a499a98",
+        "duration_min_ms": "13b04d37-c64f-4da0-a051-b3b99a499a98",
+        "duration_max_ms": "13b04d37-c64f-4da0-a051-b3b99a499a98",
+        "asset_ids": "13b04d37-c64f-4da0-a051-b3b99a499a98"
+      }
+    },
+    "pending_tool": null,
+    "usage": {
+      "tools": 1,
+      "repairs": 1,
+      "no_progress": 0,
+      "decisions": 2,
+      "model_calls": 4,
+      "active_seconds": 5.196801874990342,
+      "status": "ANSWER"
+    }
+  },
+  "observed-reuse": {
+    "thread_id": "receipt-reuse",
+    "identity": {
+      "session_id": "e928e02e-7c5c-48df-a791-da0ac562e388",
+      "requirement_id": "receipt-reuse",
+      "execution_id": "89a95879-64eb-4c2b-87fa-01326dffe4cc",
+      "turn_id": "84580d04-f3f3-4956-999b-aaa5a0cb6c01"
+    },
+    "status": "ANSWER",
+    "waiting": null,
+    "outcome": {
+      "status": "ANSWER",
+      "content": "离线回执复用验证。",
+      "evidence_ids": [],
+      "sources": [],
+      "mock": true
+    },
+    "requirements": {
+      "mode": "DISCUSS",
+      "topic": "缓存讨论",
+      "duration_min_ms": null,
+      "duration_max_ms": null,
+      "output_count": 1,
+      "asset_ids": null,
+      "forbidden_content": [],
+      "sources": {
+        "topic": "84580d04-f3f3-4956-999b-aaa5a0cb6c01"
+      }
+    },
+    "pending_tool": null,
+    "usage": {
+      "tools": 0,
+      "repairs": 0,
+      "no_progress": 0,
+      "decisions": 1,
+      "model_calls": 2,
+      "active_seconds": 0.03590949899808038,
+      "status": "ANSWER"
+    },
+    "trace_id": "de7a3c19d26bc355e8e0b575880cfb16"
+  },
+  "review-query": {
+    "thread_id": "4458a09c-1e90-4f2c-a6f1-356da858ef9a",
+    "identity": {
+      "session_id": "c3043817-9878-4aa4-a72b-55cd820ab072",
+      "requirement_id": "4458a09c-1e90-4f2c-a6f1-356da858ef9a",
+      "execution_id": "b0eb5947-5ade-41ac-a498-35a39100d3a5",
+      "turn_id": "762875cb-13b2-4e57-862d-a84bd2e75b54"
+    },
+    "status": "ANSWER",
+    "waiting": null,
+    "outcome": {
+      "status": "ANSWER",
+      "content": "根据 Mock 素材 lecture 的原始语音记录，缓存读取流程如下：\n\n1. 缓存的作用（00:00–00:15）：重复读取数据库会增加延迟，缓存可以减少重复查询。\n2. 基本读取流程（00:15–00:45）：先查缓存，命中就直接返回；未命中再查数据库，将结果写入缓存。同时缓存要设置过期时间，避免旧数据一直存在。\n3. 总结（00:45–01:00）：缓存提高读取效率，但必须兼顾过期策略与数据一致性。\n\n说明：以上均来自语音（SPEECH）证据，素材 lecture 无视觉/文字源，故仅反映讲解内容，不能证明画面呈现。该结果为开发样本观察，非已保存版本或真实媒体产物。",
+      "evidence_ids": [
+        "speech-intro",
+        "speech-cache",
+        "speech-end"
+      ],
+      "sources": [
+        {
+          "id": "speech-intro",
+          "asset_id": "lecture",
+          "source_kind": "SPEECH",
+          "start_ms": 0,
+          "end_ms": 15000,
+          "analysis_version": "sample-v1",
+          "text": "今天介绍缓存。重复读取数据库会增加延迟，缓存可以减少重复查询。"
+        },
+        {
+          "id": "speech-cache",
+          "asset_id": "lecture",
+          "source_kind": "SPEECH",
+          "start_ms": 15000,
+          "end_ms": 45000,
+          "analysis_version": "sample-v1",
+          "text": "先查缓存，命中就直接返回；未命中再查数据库，将结果写入缓存。缓存要设置过期时间，避免旧数据一直存在。这就是缓存的基本读取流程。"
+        },
+        {
+          "id": "speech-end",
+          "asset_id": "lecture",
+          "source_kind": "SPEECH",
+          "start_ms": 45000,
+          "end_ms": 60000,
+          "analysis_version": "sample-v1",
+          "text": "总结：缓存提高读取效率，但必须兼顾过期策略与数据一致性。"
+        }
+      ],
+      "mock": true
+    },
+    "requirements": {
+      "mode": "QUERY",
+      "topic": "固定Mock素材lecture中的缓存读取流程",
+      "duration_min_ms": null,
+      "duration_max_ms": null,
+      "output_count": 1,
+      "asset_ids": [
+        "lecture"
+      ],
+      "forbidden_content": [],
+      "sources": {
+        "topic": "762875cb-13b2-4e57-862d-a84bd2e75b54",
+        "output_count": "762875cb-13b2-4e57-862d-a84bd2e75b54",
+        "asset_ids": "762875cb-13b2-4e57-862d-a84bd2e75b54"
+      }
+    },
+    "pending_tool": null,
+    "usage": {
+      "tools": 1,
+      "repairs": 1,
+      "no_progress": 0,
+      "decisions": 2,
+      "model_calls": 4,
+      "active_seconds": 4.41157199999725,
+      "status": "ANSWER"
+    },
+    "trace_id": "f9f398ef90eef2b833d7bbdf8f5951e4"
+  },
+  "review-draft": {
+    "thread_id": "f79f0a75-49cf-417d-8a73-6bb563fa431d",
+    "identity": {
+      "session_id": "31218b67-d12f-4089-b203-31f3abb63f79",
+      "requirement_id": "f79f0a75-49cf-417d-8a73-6bb563fa431d",
+      "execution_id": "7fed863d-ecaa-4bad-be72-3800ac821a00",
+      "turn_id": "c3e208e8-d981-43b6-9096-151da18dd887"
+    },
+    "status": "DRAFT_READY",
+    "waiting": null,
+    "outcome": {
+      "status": "DRAFT_READY",
+      "content": "Mock 样本剪辑草稿已通过模拟校验；尚未保存或渲染。",
+      "draft": {
+        "title": "缓存读取流程（30秒剪辑）",
+        "outputs": [
+          {
+            "title": "缓存读取流程",
+            "clips": [
+              {
+                "asset_id": "lecture",
+                "source_in_ms": 15000,
+                "source_out_ms": 45000,
+                "evidence_ids": [
+                  "speech-cache"
+                ],
+                "reason": "完整讲解缓存读取流程：先查缓存，命中直接返回；未命中查数据库并写回缓存，且需设置过期时间，正好覆盖主题核心步骤。"
+              }
+            ]
+          }
+        ]
+      },
+      "validation": {
+        "valid": true,
+        "issues": [],
+        "durations_ms": [
+          30000
+        ],
+        "draft_hash": "6fe4af4eb4472916ae9263978edc2076ca1a8f3c3517f570586aab17dc4d6b0e",
+        "requirements_hash": "639b03d20bc00fe458d867d34601452b732bd924a24fcbb9d7e97f4255e5702d"
+      },
+      "mock": true
+    },
+    "requirements": {
+      "mode": "DRAFT",
+      "topic": "缓存读取流程",
+      "duration_min_ms": 30000,
+      "duration_max_ms": 30000,
+      "output_count": 1,
+      "asset_ids": [
+        "lecture"
+      ],
+      "forbidden_content": [],
+      "sources": {
+        "topic": "c3e208e8-d981-43b6-9096-151da18dd887",
+        "duration_min_ms": "c3e208e8-d981-43b6-9096-151da18dd887",
+        "duration_max_ms": "c3e208e8-d981-43b6-9096-151da18dd887",
+        "output_count": "c3e208e8-d981-43b6-9096-151da18dd887",
+        "asset_ids": "c3e208e8-d981-43b6-9096-151da18dd887"
+      }
+    },
+    "pending_tool": null,
+    "usage": {
+      "tools": 4,
+      "repairs": 0,
+      "no_progress": 0,
+      "decisions": 4,
+      "model_calls": 5,
+      "active_seconds": 5.315680541985785,
+      "status": "DRAFT_READY"
+    },
+    "trace_id": "539b3e58a8e504804fdeb4005a539505"
+  },
+  "review-clarify": {
+    "thread_id": "565619c7-91f4-4129-a472-ec434db17458",
+    "identity": {
+      "session_id": "6bd0c095-6c36-4cfd-8e0d-166c26175fef",
+      "requirement_id": "565619c7-91f4-4129-a472-ec434db17458",
+      "execution_id": "32cea040-665b-4a31-809f-8b9c06edfb70",
+      "turn_id": "eeb68c78-e571-4ed6-b8df-11ac62b46edc"
+    },
+    "status": "WAITING",
+    "waiting": {
+      "kind": "USER_INPUT",
+      "wait_id": "6bb60f4e594955d2da52aa318a9e69ea02d9d946417cf1279e0090f6e05555ac",
+      "question": "时长条件冲突：要求严格30秒且不超过20秒无法同时满足，请确认制作时长以哪个为准？"
+    },
+    "outcome": null,
+    "requirements": {
+      "mode": "DRAFT",
+      "topic": "缓存流程",
+      "duration_min_ms": null,
+      "duration_max_ms": null,
+      "output_count": 1,
+      "asset_ids": null,
+      "forbidden_content": [],
+      "sources": {
+        "topic": "eeb68c78-e571-4ed6-b8df-11ac62b46edc"
+      }
+    },
+    "pending_tool": null,
+    "usage": {
+      "tools": 0,
+      "repairs": 0,
+      "no_progress": 0,
+      "decisions": 0,
+      "model_calls": 1,
+      "active_seconds": 1.289553499998874,
+      "status": "WAITING"
+    },
+    "trace_id": "709f6d03e6d44a2aa9a6ca09dd2af3e5"
+  },
+  "review-clarify-final": {
+    "thread_id": "565619c7-91f4-4129-a472-ec434db17458",
+    "identity": {
+      "session_id": "6bd0c095-6c36-4cfd-8e0d-166c26175fef",
+      "requirement_id": "565619c7-91f4-4129-a472-ec434db17458",
+      "execution_id": "32cea040-665b-4a31-809f-8b9c06edfb70",
+      "turn_id": "eeb68c78-e571-4ed6-b8df-11ac62b46edc"
+    },
+    "status": "DRAFT_READY",
+    "waiting": null,
+    "outcome": {
+      "status": "DRAFT_READY",
+      "content": "Mock 样本剪辑草稿已通过模拟校验；尚未保存或渲染。",
+      "draft": {
+        "title": "缓存流程",
+        "outputs": [
+          {
+            "title": "缓存流程讲解",
+            "clips": [
+              {
+                "asset_id": "lecture",
+                "source_in_ms": 15000,
+                "source_out_ms": 45000,
+                "evidence_ids": [
+                  "speech-cache"
+                ],
+                "reason": "完整讲解缓存基本读取流程：先查缓存、命中返回、未命中查库并回写缓存、设置过期时间，恰好30秒，紧扣主题。"
+              }
+            ]
+          }
+        ]
+      },
+      "validation": {
+        "valid": true,
+        "issues": [],
+        "durations_ms": [
+          30000
+        ],
+        "draft_hash": "37ba64d2c44d11afd4c9d18e97ce9a295180f4d46d7eef9d6258b9766983744c",
+        "requirements_hash": "b7b8377f829741927a48a955fd0d52c83fac402d650ba9ca96d001418d5a0d5f"
+      },
+      "mock": true
+    },
+    "requirements": {
+      "mode": "DRAFT",
+      "topic": "缓存流程",
+      "duration_min_ms": 30000,
+      "duration_max_ms": 30000,
+      "output_count": 1,
+      "asset_ids": [
+        "lecture"
+      ],
+      "forbidden_content": [],
+      "sources": {
+        "topic": "eeb68c78-e571-4ed6-b8df-11ac62b46edc",
+        "duration_min_ms": "eeb68c78-e571-4ed6-b8df-11ac62b46edc",
+        "duration_max_ms": "eeb68c78-e571-4ed6-b8df-11ac62b46edc",
+        "output_count": "eeb68c78-e571-4ed6-b8df-11ac62b46edc",
+        "asset_ids": "eeb68c78-e571-4ed6-b8df-11ac62b46edc",
+        "forbidden_content": "eeb68c78-e571-4ed6-b8df-11ac62b46edc"
+      }
+    },
+    "pending_tool": null,
+    "usage": {
+      "tools": 5,
+      "repairs": 0,
+      "no_progress": 0,
+      "decisions": 5,
+      "model_calls": 7,
+      "active_seconds": 7.619963124991045,
+      "status": "DRAFT_READY"
+    },
+    "trace_id": "e972f560fbf6c26e324b2f90aa5a3628"
+  },
+  "review-final-draft": {
+    "thread_id": "7c64fda6-980a-4684-9e91-ebe2682c05bd",
+    "identity": {
+      "session_id": "af8921a1-211d-452f-8f31-82d46b0da5df",
+      "requirement_id": "7c64fda6-980a-4684-9e91-ebe2682c05bd",
+      "execution_id": "063f4ba2-5050-4705-8918-1a9da5614a58",
+      "turn_id": "6b2c124b-93d9-4727-8139-8db906a91b3e"
+    },
+    "status": "DRAFT_READY",
+    "waiting": null,
+    "outcome": {
+      "status": "DRAFT_READY",
+      "content": "Mock 样本剪辑草稿已通过模拟校验；尚未保存或渲染。",
+      "draft": {
+        "title": "缓存读取流程讲解 30秒",
+        "outputs": [
+          {
+            "title": "缓存基本读取流程（严格30秒）",
+            "clips": [
+              {
+                "asset_id": "lecture",
+                "source_in_ms": 15000,
+                "source_out_ms": 45000,
+                "evidence_ids": [
+                  "speech-cache"
+                ],
+                "reason": "覆盖要求区间15000-45000ms的原始语音，讲述先查缓存命中即返回、未命中查库并回写缓存、设置过期时间，完整构成缓存基本读取流程，时长严格30秒。"
+              }
+            ]
+          }
+        ]
+      },
+      "validation": {
+        "valid": true,
+        "issues": [],
+        "durations_ms": [
+          30000
+        ],
+        "draft_hash": "e2b9f0158f358ac59c82ea69db4f07a50cb90a09780cc116d1f5e2846c2fff67",
+        "requirements_hash": "08fb4bf63c86d0daf3d1062bd9ca83c612931e534cba939003657f82b641f61c"
+      },
+      "mock": true
+    },
+    "requirements": {
+      "mode": "DRAFT",
+      "topic": "基于lecture素材15000至45000毫秒原始语音生成严格30秒缓存流程剪辑草稿并引用证据",
+      "duration_min_ms": 30000,
+      "duration_max_ms": 30000,
+      "output_count": 1,
+      "asset_ids": [
+        "lecture"
+      ],
+      "forbidden_content": [],
+      "sources": {
+        "topic": "6b2c124b-93d9-4727-8139-8db906a91b3e",
+        "duration_min_ms": "6b2c124b-93d9-4727-8139-8db906a91b3e",
+        "duration_max_ms": "6b2c124b-93d9-4727-8139-8db906a91b3e",
+        "output_count": "6b2c124b-93d9-4727-8139-8db906a91b3e",
+        "asset_ids": "6b2c124b-93d9-4727-8139-8db906a91b3e"
+      }
+    },
+    "pending_tool": null,
+    "usage": {
+      "tools": 2,
+      "repairs": 0,
+      "no_progress": 0,
+      "decisions": 2,
+      "model_calls": 3,
+      "active_seconds": 4.201631292002276,
+      "status": "DRAFT_READY"
+    },
+    "trace_id": "05e8774b7bf533a396227db18539f298"
+  },
+  "review-final-pending": {
+    "thread_id": "2b7a64d6-36da-48cc-b00e-7b13babe761d",
+    "identity": {
+      "session_id": "ac906c5f-5c59-4ce2-9f7a-3b263ff294ef",
+      "requirement_id": "2b7a64d6-36da-48cc-b00e-7b13babe761d",
+      "execution_id": "553dead7-fc81-4ee2-8d89-9695273b7da4",
+      "turn_id": "3b19f7c1-b653-4c7a-95d3-f2fec6d1a382"
+    },
+    "status": "WAITING",
+    "waiting": {
+      "kind": "TOOL_RESULT",
+      "wait_id": "271055f04528aa9ab27f60b1601cf6ae304ed2f6157b5a9644b8e53263d458b7",
+      "call_id": "553dead7-fc81-4ee2-8d89-9695273b7da4:tool:0",
+      "dependency": {
+        "task_id": "mock-553dead7-fc81-4ee2-8d89-9695273b7da4:tool:0",
+        "kind": "INSPECTION"
+      }
+    },
+    "outcome": null,
+    "requirements": {
+      "mode": "QUERY",
+      "topic": "查看画面",
+      "duration_min_ms": null,
+      "duration_max_ms": null,
+      "output_count": 1,
+      "asset_ids": null,
+      "forbidden_content": [],
+      "sources": {
+        "topic": "3b19f7c1-b653-4c7a-95d3-f2fec6d1a382"
+      }
+    },
+    "pending_tool": {
+      "call_id": "553dead7-fc81-4ee2-8d89-9695273b7da4:tool:0",
+      "tool_name": "inspect_video_range",
+      "arguments": {
+        "cursor": 0,
+        "asset_id": "demo",
+        "start_ms": 20000,
+        "end_ms": 21000,
+        "goal": "核查缓存结果面板"
+      },
+      "request_hash": "f8083c04bfedc02bd862348ba720a7537ff03defc846d0165a9503dd149ed553"
+    },
+    "usage": {
+      "tools": 1,
+      "repairs": 0,
+      "no_progress": 0,
+      "decisions": 1,
+      "model_calls": 2,
+      "active_seconds": 0.02055149999796413,
+      "status": "WAITING"
+    },
+    "trace_id": "88e97d7fedeb9f2f083dd203f716dd91"
+  },
+  "review-final-pending-resumed": {
+    "thread_id": "2b7a64d6-36da-48cc-b00e-7b13babe761d",
+    "identity": {
+      "session_id": "ac906c5f-5c59-4ce2-9f7a-3b263ff294ef",
+      "requirement_id": "2b7a64d6-36da-48cc-b00e-7b13babe761d",
+      "execution_id": "553dead7-fc81-4ee2-8d89-9695273b7da4",
+      "turn_id": "3b19f7c1-b653-4c7a-95d3-f2fec6d1a382"
+    },
+    "status": "ANSWER",
+    "waiting": null,
+    "outcome": {
+      "status": "ANSWER",
+      "content": "Mock 观察表明样本帧展示结果面板，覆盖有限，无法判断全程。",
+      "evidence_ids": [],
+      "sources": [],
+      "mock": true
+    },
+    "requirements": {
+      "mode": "QUERY",
+      "topic": "查看画面",
+      "duration_min_ms": null,
+      "duration_max_ms": null,
+      "output_count": 1,
+      "asset_ids": null,
+      "forbidden_content": [],
+      "sources": {
+        "topic": "3b19f7c1-b653-4c7a-95d3-f2fec6d1a382"
+      }
+    },
+    "pending_tool": null,
+    "usage": {
+      "tools": 1,
+      "repairs": 0,
+      "no_progress": 0,
+      "decisions": 2,
+      "model_calls": 3,
+      "active_seconds": 0.042782750009791926,
+      "status": "ANSWER"
+    },
+    "trace_id": "ca6060afca312e16abeabaea5ae648b2"
+  }
+}

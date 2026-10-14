@@ -2,9 +2,9 @@ FROM python:3.13-slim@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
 COPY agent-service/requirements.lock ./requirements.lock
-RUN pip install --no-cache-dir -r requirements.lock && useradd --uid 10001 --create-home agent && mkdir /work && chown agent:agent /work
-RUN mkdir /state && chown agent:agent /state
+RUN pip install --no-cache-dir -r requirements.lock && useradd --uid 10001 --create-home agent && mkdir /state && chown agent:agent /state
 COPY agent-service/agent_service ./agent_service
 USER agent
-EXPOSE 8082
-CMD ["python", "-m", "uvicorn", "agent_service.app:app", "--host", "0.0.0.0", "--port", "8082", "--no-access-log"]
+ENV AGENT_DATA_DIRECTORY=/state
+ENTRYPOINT ["python", "-m", "agent_service"]
+CMD ["--help"]

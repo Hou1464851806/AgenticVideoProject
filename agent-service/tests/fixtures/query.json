@@ -1,0 +1,7 @@
+{
+  "understanding": {"relation": "CONTINUE", "mode": "QUERY", "topic": "缓存读取流程"},
+  "actions": [
+    {"kind": "TOOL", "tool_name": "read_video_range", "arguments": {"asset_id": "lecture", "start_ms": 15000, "end_ms": 45000}},
+    {"kind": "ANSWER", "content": "Mock 样本先查缓存；未命中则查询数据库并写入缓存，同时设置过期时间。", "evidence_ids": ["speech-cache"]}
+  ]
+}

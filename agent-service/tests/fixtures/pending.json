@@ -1,0 +1,7 @@
+{
+  "understanding": {"relation": "CONTINUE", "mode": "QUERY", "topic": "查看画面"},
+  "actions": [
+    {"kind": "TOOL", "tool_name": "inspect_video_range", "arguments": {"asset_id": "demo", "start_ms": 20000, "end_ms": 21000, "goal": "核查缓存结果面板"}},
+    {"kind": "ANSWER", "content": "Mock 观察表明样本帧展示结果面板，覆盖有限，无法判断全程。", "evidence_ids": []}
+  ]
+}

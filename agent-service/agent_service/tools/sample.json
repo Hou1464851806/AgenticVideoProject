@@ -1,0 +1,14 @@
+{
+  "assets": [
+    {"id": "lecture", "name": "缓存讲解", "duration_ms": 60000, "analysis_version": "sample-v1", "source_kinds": ["SPEECH"]},
+    {"id": "demo", "name": "实验演示", "duration_ms": 45000, "analysis_version": "sample-v1", "source_kinds": ["SPEECH", "VISUAL", "VISIBLE_TEXT"]}
+  ],
+  "records": [
+    {"id": "speech-intro", "asset_id": "lecture", "source_kind": "SPEECH", "start_ms": 0, "end_ms": 15000, "analysis_version": "sample-v1", "text": "今天介绍缓存。重复读取数据库会增加延迟，缓存可以减少重复查询。"},
+    {"id": "speech-cache", "asset_id": "lecture", "source_kind": "SPEECH", "start_ms": 15000, "end_ms": 45000, "analysis_version": "sample-v1", "text": "先查缓存，命中就直接返回；未命中再查数据库，将结果写入缓存。缓存要设置过期时间，避免旧数据一直存在。这就是缓存的基本读取流程。"},
+    {"id": "speech-end", "asset_id": "lecture", "source_kind": "SPEECH", "start_ms": 45000, "end_ms": 60000, "analysis_version": "sample-v1", "text": "总结：缓存提高读取效率，但必须兼顾过期策略与数据一致性。"},
+    {"id": "demo-speech", "asset_id": "demo", "source_kind": "SPEECH", "start_ms": 0, "end_ms": 20000, "analysis_version": "sample-v1", "text": "本实验分别比较第一次未命中和第二次命中缓存的响应时间，第二次不再查询数据库。"},
+    {"id": "demo-frame", "asset_id": "demo", "source_kind": "VISUAL", "start_ms": 20000, "end_ms": 20001, "analysis_version": "sample-v1", "text": "代表帧中显示缓存命中结果面板。单帧不能证明整个视频的持续状态。"},
+    {"id": "demo-text", "asset_id": "demo", "source_kind": "VISIBLE_TEXT", "start_ms": 20000, "end_ms": 20001, "analysis_version": "sample-v1", "text": "缓存命中：12 ms；数据库查询：85 ms"}
+  ]
+}

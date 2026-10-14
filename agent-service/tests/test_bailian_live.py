@@ -6,10 +6,10 @@ import time
 import unittest
 from pathlib import Path
 
-from agent_service.bailian import BailianAsr
+from agent_service.analysis.bailian import BailianAsr
 
 
-@unittest.skipUnless(os.environ.get("DASHSCOPE_API_KEY"), "UNVERIFIED: DASHSCOPE_API_KEY missing")
+@unittest.skipUnless(os.environ.get("RUN_LIVE_ASR") == "1" and os.environ.get("DASHSCOPE_API_KEY"), "Explicit RUN_LIVE_ASR=1 and credentials required")
 class BailianLiveTest(unittest.TestCase):
     def test_real_local_audio_returns_sentence_and_word_timestamps(self):
         audio = Path(os.environ["ASR_TEST_AUDIO"])

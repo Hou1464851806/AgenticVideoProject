@@ -6,6 +6,10 @@
 **/test-results/
 **/playwright-report/
 **/.venv/
+agent-service/.local/
+agent-service/.env
+agent-service/.env.langfuse
+**/.pytest_cache/
 **/__pycache__/
 .scratch/asr-fixture/
 .scratch/preview-diagnosis/
