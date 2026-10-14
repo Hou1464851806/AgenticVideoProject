@@ -12,7 +12,13 @@ Q58 已确认首期 MVP 整体设计；2026-10-12 补充确认统一自然语言
 | 目标、服务与完整链路 | [系统架构](architecture.md) |
 | 术语与决定依据 | [领域术语](../GLOSSARY.md)、[访谈记录](design-interview.md)、[ADR](adr/) |
 | Agent自治、工具与智能验收 | [Agent设计](agent-design.md) |
+| LangGraph 节点、状态、错误恢复、共享预算与事件等待的具体设计 | [Agent 运行设计](langgraph-agent-runtime-design.md)、[官方运行语义核对](research/langgraph-runtime-semantics.md) |
+| 完整改进目标、用户故事、实现决定与验收 | [视频理解与 Agent 改进规格](video-understanding-agent-improvement-spec.md)、[改进总 Issue #43](https://github.com/Hou1464851806/AgenticVideoProject/issues/43) |
 | 分析、时间证据与混合检索 | [视频理解与检索](video-understanding-retrieval.md) |
+| VideoRAG 实现、成本与本项目接入取舍 | [VideoRAG 研究评估](research/videorag-evaluation.md) |
+| VideoAgent 论文／源码、时间记忆与受控工具循环的借鉴设计 | [VideoAgent 研究与设计](research/videoagent-evaluation.md) |
+| 百炼分析模型与 DeepSeek Flash 推理的视频理解、补查与评测设计草案 | [视频理解设计](research/bailian-video-understanding-design.md) |
+| 面向用户目标的 Agent 循环、统一时间线、工具与完成判断草案 | [视频 Agent 与时间线设计](research/goal-driven-video-agent-design.md) |
 | 分片、恢复、限额与清理 | [上传设计](upload-design.md) |
 | 对话、上下文与工作区 | [对话与前端](conversation-design.md) |
 | 方案内容、字幕与渲染约束 | [方案契约](edit-plan-contract.md) |
