@@ -14,6 +14,8 @@ Q58 已确认首期 MVP 整体设计；2026-10-12 补充确认统一自然语言
 | Agent自治、工具与智能验收 | [Agent设计](agent-design.md) |
 | LangGraph 节点、状态、错误恢复、共享预算与事件等待的具体设计 | [Agent 运行设计](langgraph-agent-runtime-design.md)、[官方运行语义核对](research/langgraph-runtime-semantics.md) |
 | Python Agent 独立重写的最终设计、边界与 MVP 验收标准 | [Agent MVP 设计](agent-mvp-design.md) |
+| Java 单体基础分析、四个真实读取工具、Python 接入与验收计划（已确认，暂缓实施） | [Java 工具 M1 设计](java-tools-m1-design.md) |
+| Java 后端结构、模型与运行说明（随 M1 实施维护） | [后端 README](../backend/README.md) |
 | 独立 Agent CLI、重启恢复、真实 DeepSeek 与本机 Langfuse 的验收证据 | [运行说明](../agent-service/README.md)、[MVP 验收记录](verification/agent-mvp.md) |
 | DeepSeek Flash 模型名称、OpenAI 兼容请求与 LangChain 客户端核对 | [Flash 适配核验](research/deepseek-flash-adapter-verification.md) |
 | 完整改进目标、用户故事、实现决定与验收 | [视频理解与 Agent 改进规格](video-understanding-agent-improvement-spec.md)、[改进总 Issue #43](https://github.com/Hou1464851806/AgenticVideoProject/issues/43) |
