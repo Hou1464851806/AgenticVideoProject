@@ -1,6 +1,6 @@
 # Agent 视频工作区
 
-M4 步骤 1～3 已接通内部预览与 CLI；步骤 4 的真实视频／故障自动验收及用户完整观看试听均已通过，步骤 1～4 完成。阶段全量和最终打包留在步骤 5，整个 M4 尚未收尾。范围、证据与未完成项见 [M4 实施记录](docs/verification/java-tools-m4.md)。
+M4 步骤 1～5 已完成：内部预览与 CLI、真实视频／故障验收、用户完整观看试听、阶段两轴审查、Java/Python 完整非付费回归及后端打包均已通过。范围、证据与验证限制见 [M4 实施记录](docs/verification/java-tools-m4.md)。
 
 
 使用 Vue 3 和 Spring Boot 提供同源浏览器入口。Java 后端已收敛为 `backend/` 下的单个 Maven 应用，通过 RabbitMQ 在同一进程中执行媒体探测、音频准备、稀疏抽帧和既有预览/导出。PostgreSQL 保存权威业务状态，Silo 保存对象，Qdrant 和 RabbitMQ 保留。M1 已贯通真实上传、Java 百炼分析与索引、Python CLI 四工具问答；综合验收、故障与媒体回归及未验证边界见 [第五阶段记录](docs/verification/java-tools-m1-stage5.md)，运行方式见 [后端说明](backend/README.md)。

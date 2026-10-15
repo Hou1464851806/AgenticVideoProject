@@ -1,6 +1,6 @@
 # M4 实施与验证记录
 
-当前已完成步骤 1～4：步骤 4 的真实视频／故障自动验收通过，用户已完整观看试听五条视频并确认没有问题；阶段全量及最终打包留在步骤 5。最新范围、验证和下一步见本文末尾。
+M4 步骤 1～5 已完成：真实视频／故障及用户完整观看试听验收通过；阶段两轴审查无未解决问题，最终 Java/Python 完整非付费回归与后端打包通过。最新阶段结论与验证限制见本文末尾。
 
 日期：2026-10-15（Asia/Shanghai）。本轮仅实施 [最终设计](../java-tools-m4-design.md)的步骤 1，不是整个 M4 阶段交付。基准 `2aca5d1`，分支 `main`，起始工作区干净。已核对系统临时目录中的 M4 设计交接。
 
@@ -256,3 +256,78 @@ agent-service/.venv/bin/python -m pytest agent-service/tests/test_preview_client
 用户已完整观看试听五条视频并确认无问题，步骤 4 的 A04 余项关闭。下一步从步骤 5 继续：对 Q1～Q13 做阶段收尾审查，执行 Java／Python 完整非付费回归与后端最终打包。
 
 未运行：步骤 5 Java／Python 完整非付费回归及后端最终打包、付费模型、前端／浏览器回归（没有前端改动）。本次仅补充用户验收结果及同步文档／证据状态，按 AGENTS.md 检查内容、链接、JSON 与差异，不重跑应用测试。原模型回执累计保持 ASR 3、VLM 5、素材 Embedding 10，分析 head 和保存版本一致；本轮未发生模型提交。
+
+## 步骤 5：阶段审查与收尾
+
+日期：2026-10-15（Asia/Shanghai）。实施基准 `3fbbdb1ccb80b1d86c451f60f9cd825b7885a6ed`，分支 `main`，起始工作区干净。依据最终设计和本文末尾的步骤 4 交接执行阶段收尾；系统临时目录的设计／步骤 1 交接仅作历史补充。步骤 4 的五条真实视频和用户完整观看试听结论沿用已提交证据，不重新上传、分析、保存或调用付费模型。
+
+### 范围与验收对照
+
+本步不增加业务功能、抽象或测试入口。对照 Q1～Q13 及协议审查整个 M4 增量，随后运行阶段全量非付费回归、后端打包与 Python 语法编译，并同步文档。测试范围依据根 AGENTS.md 的完整阶段退出要求；前端无改动，不运行退役浏览器 Agent 链路。
+
+| 已确认决定 | 验收与证据 | 本步核对结论 |
+| --- | --- | --- |
+| Q1、Q2、Q8 | A01、A02；共用契约、InternalPreviewApiIntegrationTest、test_preview_cli.py；步骤 4 五条预览 | 五命令按 THREAD／REQUEST_ID 分工，Java 绑定权威保存版本，单输出自动选择、多输出指定 output_key；未保存拒绝，列表可找回请求 |
+| Q3 | A02、A03；步骤 4 CLI 回执、Outbox／MQ／执行尝试 | 提交返回身份，CLI 不等待、不常驻，退出不取消；查询不创建任务 |
+| Q4、Q10（真实媒体） | A03、A04；[步骤 4 JSON](java-tools-m4-step4.json)、三张抽帧、用户完整观看试听确认；LocalMediaIntegrationTest | 五条视频规格、选段／顺序、音画／字幕和 100ms 时长容差通过；受控无音轨静音回归单列，未增加响度归一化 |
+| Q5 | A08；步骤 4 签名过期／刷新证据及详情集成测试 | 按访问签名 300 秒地址，过期后刷新仍为同一产物；CLI 不自动播放或下载，不将 URL 写入 checkpoint |
+| Q6、Q11 | A05、A06；内部并发／历史／固定后继集成测试及步骤 4 响应丢失实验 | 普通提交复用任务／可用产物，失败／取消／失效须显式重试；retry(A) 重放固定 B，B 再失败需 retry(B) |
+| Q7 | A07；内部取消、LocalMedia、步骤 4 排队／运行／取消中重启证据 | 运行中先 CANCEL_REQUESTED，执行者退出后 CANCELLED；排队不执行，终态不删产物，共享任务影响如实提示 |
+| Q9 | A11；CLI 只读恢复测试、步骤 4 inspect／分析 head／模型回执对照 | 不进 Agent 图、不改 SAVED／预算／保存版本；REQUEST_ID 不依赖 thread／SQLite／模型凭据，未新增模型调用 |
+| Q12 | A08、A09；存储超时／403／500、文件缺失／大小不符集成测试及步骤 4 停机／失效实验 | 历史 SUCCEEDED 与产物状态独立；确认失效才 UNAVAILABLE／可重试，依赖异常明确 503；PREVIEW 入口隔离 EXPORT，网络中断不伪造任务失败 |
+| Q13 | A10；步骤 4 真 Java 中断、恢复耗尽、取消中重启和明确失败证据 | 中断恢复保留原 request／task，最多 3 次尝试；取消恢复不重启渲染，明确失败／恢复耗尽等待显式重试 |
+| Q10（阶段收尾） | A12；下述两轴审查、阶段全量与打包 | 以本步最终检查记录为准，不将步骤 1～4 的局部回归当作阶段全量 |
+
+### 代码审查
+
+按 code-review 技能以 `git diff 2aca5d1...3fbbdb1` 为固定范围，由两个独立子代理审查整个 M4 主代码、测试、验收脚本及证据；提交列表为 `131bf1b`、`072267f`、`cca3232`、`78fd283`、`3fbbdb1`。规范来源为根 AGENTS.md、GLOSSARY.md、相关 ADR（尤其 0006、0016、0017）及模块约定；设计来源为最终设计、HTTP 协议、Q1～Q13、A01～A12 和步骤 4 最新交接。审查仅静态读取，没有运行测试或修改文件。
+
+#### Standards
+
+0 项可操作发现。文档规范硬违反 0，启发式气味 0。Java 接纳、事务任务／Outbox、产物访问及 Python 只读传输职责符合现有分层；没有新增推测性抽象，边界校验及错误处理有实际故障场景。证据区分局部回归、真实媒体、人工确认和待执行阶段检查。
+
+#### Spec
+
+0 项可操作发现。已核对全部 Q1～Q13、HTTP 契约及 A01～A12；未发现需求遗漏、越界功能或可具体复现的实现错误。步骤 4 人工观看试听已由用户确认，阶段全量与打包由本步执行。
+
+两轴最终各 0 项未解决问题，无审查后业务／测试代码修正。
+
+### 最终检查
+
+最终完整 Java 检查于 2026-10-15 23:37:57（Asia/Shanghai）完成，`BUILD SUCCESS`，耗时 9 分 33 秒。以下为实际执行批次，首轮失败与最终通过分别记录。
+
+首轮 Java 全量中 `ProjectUsageApiIntegrationTest` 在进入业务测试前，Silo Testcontainers 的 `/minio/health/ready` 探测在 60 秒后超时，异常末因记录 HTTP 404；容器日志显示进程已启动。该轮日志保留，不据此判定业务缺陷，也不计为全量通过。
+
+首轮最终结果：201 项，196 通过、1 项类级容器启动错误（该类 4 条业务测试未执行）、4 项付费门控跳过，0 断言失败，`BUILD FAILURE`，没有完成该轮打包。随后原样独立运行 `ProjectUsageApiIntegrationTest`，4 项通过，0 失败／错误／跳过；实测宿主机和容器内健康端点均为 200。未复现启动错误，尚不能证明其具体根因；没有修改夹具／业务代码、增加自动重试或放宽断言。独立复验日志：`/tmp/agenticvideo-m4-step5-usage-recheck.log`。之后重新执行一次完整 `verify`，不将独立复验拼接为全量成功。
+
+| 检查 | 最终结果与代码对应关系 |
+| --- | --- |
+| Java 最终完整 `RUN_LIVE_JAVA_ANALYSIS=0 mvn -B -ntp verify` | 204 项：200 通过、4 项 JavaAnalysisLiveTest 付费门控跳过，0 失败／错误；Java 编译与 Spring Boot JAR 打包成功，53 条数据库迁移在集成夹具通过；审查后业务／测试代码未改 |
+| Python 全量 `pytest agent-service/tests -q` | 153 项通过，0 失败／跳过，27.45 秒；审查后业务／测试／脚本代码未改 |
+| Python `compileall` | 核心代码、全部测试及验收脚本通过；沿用项目检查方式，未引入新的静态类型检查器 |
+| 最终文档／证据／差异 | 8 份 Markdown 的 180 个本地链接可解析，步骤 4 证据 JSON 可解析，`git diff --check` 通过；Surefire XML 合计与最终日志一致，打包 JAR 存在 |
+
+执行命令（仓库根目录）：
+
+```sh
+RUN_LIVE_JAVA_ANALYSIS=0 mvn -B -ntp verify
+agent-service/.venv/bin/python -m pytest agent-service/tests -q
+agent-service/.venv/bin/python -m compileall -q agent-service/agent_service agent-service/tests agent-service/scripts
+git diff --check
+```
+
+失败后的独立复验命令（没有修改代码）：
+
+```sh
+RUN_LIVE_JAVA_ANALYSIS=0 mvn -B -ntp -pl backend -am test '-Dtest=ProjectUsageApiIntegrationTest' -Dsurefire.failIfNoSpecifiedTests=false
+```
+
+完整原始日志保存在本机 `/tmp/agenticvideo-m4-step5-java-verify.log`（首轮）、`/tmp/agenticvideo-m4-step5-java-final.log`（最终完整通过）和 `/tmp/agenticvideo-m4-step5-python.log`，不提交大量运行日志。Java 由现有 Testcontainers 夹具运行 PostgreSQL／Silo／RabbitMQ／Qdrant 及媒体集成，不操作步骤 4 保存方案；真实媒体与故障验收仍单列于步骤 4，非付费全量不能替代该证据。
+
+最终打包产物：`backend/target/backend-0.1.0-SNAPSHOT.jar`。完整回归通过之后仅更新状态及验证文档，没有业务、脚本或测试代码收尾改动；按纯文档范围检查内容、本地链接、证据 JSON 与差异，不重复应用测试。
+
+最终 8 份文档又由原两轴子代理独立复核，Standards／Spec 均为 0 项可操作发现；构建日志、通过／跳过分类、历史基线和当前完成声明一致。复核后仅补记本文检查结果，没有代码变更。
+
+最终失败／错误：0；跳过：仅上述 4 项 Java 付费门控测试。未运行：本步新增付费模型验收、重跑步骤 4 的破坏性故障实验、前端类型检查／构建及浏览器回归（无前端改动）。步骤 4 的真实媒体与故障证据及用户确认已独立通过，不由非付费全量替代。首轮 Silo 探测错误未复现，具体根因未证实，此限制保留。
+
+阶段结论：Q1～Q13、A01～A12 在 M4 已确认范围内全部闭合，步骤 1～5 完成。M3 按需细读、已保存版本派生编辑、新 Agent 正式确认／导出、浏览器自然语言制作等仍属后续范围，不因 M4 收尾而开放。
