@@ -12321,7 +12321,19 @@
     "same_artifact": true,
     "expires_in_seconds": 300
   },
-  "manual_full_audiovisual_review": "NOT_RUN; frame inspection and signal matching are separate evidence",
+  "manual_full_audiovisual_review": {
+    "status": "PASSED",
+    "reviewer": "user",
+    "scope": "All five videos watched and listened to in full",
+    "confirmation": "那这五条视频我都完整观看试听了，没有发现问题。",
+    "note": "User confirmed after the low-volume blue-background source audio was explained; no loudness normalization added.",
+    "audio_observation_db": {
+      "selected_original_mean": -45.4,
+      "preview_blue_mean": -48.4,
+      "preview_green_mean": -24.9,
+      "blue_below_green": 23.5
+    }
+  },
   "unchanged_baseline_before_after_faults": {
     "calls": 3,
     "vision": 5,
