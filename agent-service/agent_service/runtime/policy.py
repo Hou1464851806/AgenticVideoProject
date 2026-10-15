@@ -14,8 +14,8 @@ class Limits:
     attempts: int = 2
     no_progress: int = 3
     active_seconds: float = 300
-    output_tokens: int = 2048
-    prompt_bytes: int = 65536
+    output_tokens: int = 8192
+    prompt_bytes: int = 1024 * 1024
     tool_bytes: int = 32768
 
 
