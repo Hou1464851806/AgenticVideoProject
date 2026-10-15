@@ -8,12 +8,12 @@
 
 新增 `verify_java_m2.py`，每个场景显式执行真实 CLI 制作、status、save、重复save及跨进程resume，导出权威回执；新输出目录避免误覆盖付费运行。模型是 deepseek-flash，关闭thinking，不回退脚本或Mock。模型SQLite回执与Java工具回执关联原条件、草稿、哈希、校验、scope、保存来源和永久输出身份；原始stdout/stderr及SQLite保留在本机 `.local/m2-stage5-*`。
 
-真实联调暴露并最小修正了两个问题：
+真实联调暴露并最小修正了两个状态／反馈问题：
 
 - 多素材请求一轮返回两个 Action。SDK的解析器只取第一条，但适配器拒绝了整轮；旧反馈未说明数量和串行修正方式。现在提供数量及单步指导，拒绝时不再返回被SDK截取的value，提示词明确每轮只调用一次。没有接受额外调用或增加重试上限。
 - 原始证据累积后，模型缺少已完成范围读取的记录，反复读取直到无进展停止。coverage增加 `_range_reads` 的请求范围、已消费页和连续分页进度；新页或推进连续链计为进展，重复页不计。跳页不能宣称完成，分页消费不冒充分析覆盖；Java仍独立使用数据库回执核验上下文，不信Python摘要。
 
-补充提示词说明：仅说“生成剪辑”时可以先读已固定素材再选内容；素材start/end已经包含音轨偏移，不能使用audio坐标选段；重排移动完整输出对象，不能重编号output_key。保留原有模型和工具预算、3次修正、内部错误上抛以及显式保存边界。
+补充提示词说明：仅说“生成剪辑”时可以先读已固定素材再选内容；素材start/end已经包含音轨偏移，不能使用audio坐标选段；重排移动完整输出对象，不能重编号output_key。补读不会更新旧validation issues，完成补读后需重新提交DRAFT；因此补读可原样重交草稿。保留原有模型和工具预算、3次修正、内部错误上抛以及显式保存边界。
 
 两条新增测试均先失败后实现通过：协议测试先因反馈没有调用数失败；Agent公共入口分页测试先因缺少范围消费记录失败。随后直接相关Python模块61/61通过；Java校验、契约及schema模块32/32通过。Python未配置静态类型检查器，compileall是编译检查，不报告为类型检查。
 
@@ -25,10 +25,12 @@
 | --- | --- |
 | 单素材／单输出，仅“生成剪辑” | DRAFT_READY，默认横屏、字幕开启、无硬时长；8160ms；显式保存方案 `705cdf88-419c-4479-b63c-c90e7a0dbc68`、版本 `21a23388-d415-4105-a816-74afaf7c55c8` |
 | 多素材／多输出及多轮修改 | 初稿9440／8160ms；第二条缩为严格4000ms、改名并排前，第一条完整对象不变；同scope、新校验。保存方案 `7d91fe7c-7fdf-4e19-875b-5b70410dd7e2`、版本 `d1ead956-1120-4361-b4d0-25f4cd97d90e`；输出键顺序out-2／out-1 |
-| 单素材／多输出、多素材／单输出 | 本轮独立场景运行证据收集中；最终结果以本记录收尾更新为准 |
+| 单素材／多输出、 多素材／单输出 | 分别6800／3360ms及9440ms，均保存并重复恢复；版本 `4ed1278d-77cc-47fe-9df1-eedd6114c430`、`da38d61b-5a17-45bd-a998-eab1fbe793ee` |
 | 视觉POINT／竖屏／字幕关闭 | 3000ms，真实红／蓝矩形及可见文字观察；PORTRAIT_720，cues为空。保存方案 `9cf7726b-6df0-48dc-9ab4-26cddd26db88`、版本 `3cc6e1e5-55d5-49c1-b044-31f10536df16` |
 | 14.044秒素材要求严格60秒 | INCOMPLETE，60000ms条件保持，无版本；模型在草稿前说明不足，未制造Java校验回执 |
 | 试跑中的严格6秒多轮修改 | 模型错误计算区间总和，Java拒绝，修正预算耗尽后INCOMPLETE，没有保存。4秒场景使用已知完整上传／核查语句验证可满足修改；未把6秒失败隐藏或计为成功 |
+
+多素材单输出的失败试跑（需求 `9c95f8fd-f1af-4e23-a6e2-b3c51405572e`）经历search命中草稿→Java拒绝未读上下文→补读后仍重复读取→模型额度耗尽，没有通过或保存。正式成功需求 `ae80d0c3-42f7-43d9-94e7-fdc6835c72ac` 经两素材目录、一次越界读取被拒、合法补读及一次通过校验后保存；没有将两次制作拼成一条成功修正轨迹。六个正式场景共有32次已收到的DeepSeek调用；四素材问答另有16次DeepSeek、2次查询Embedding提交，身份与用量见JSON。试跑及一次诊断探针费用另记在失败证据，未将失败计入正式成功率。
 
 各成功制作均先返回DRAFT_READY，之后才由验收命令显式运行CLI save；重复save及新进程resume得到相同plan/revision/output身份。读取数据库版本包含完整render/clips/subtitles和制作来源，保存结束该制作。
 
@@ -55,7 +57,7 @@
 | A11 | failureAfterRevisionAndReferenceWritesRollsBack、concurrentSaves、pythonAgentRepairsRealValidationThenExplicitCliSaves；Python保存响应丢失夹具；真实重复保存／resume |
 | A12 | savedRevisionExposesItsSource、explicitSavePublishesAllOutputs；真实保存版本及来源；Python已保存只读／新制作测试 |
 | A13 | savedRevisionExposesItsSourceAndFeedsTheExistingPreviewAssembler及LocalMediaIntegrationTest实际FFmpeg回归；不宣称新Agent已接通预览／导出 |
-| A14 | 本轮四素材真实DeepSeek问答另行记录；ReadToolsIntegrationTest、PythonM1／快照／协议与媒体回归，阶段收尾完整检查见下表 |
+| A14 | [本轮四素材真实DeepSeek问答](java-tools-m2-stage5-qa.json)：4/4 ANSWER，区分语音、视觉POINT及稀疏覆盖；ReadToolsIntegrationTest、PythonM1／快照／协议与媒体回归，阶段收尾完整检查见下表 |
 
 ## 审查与最终检查
 

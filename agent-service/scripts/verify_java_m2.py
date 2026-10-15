@@ -54,15 +54,25 @@ def main(args):
     }[args.case]
     commands = [['run', prompt]]
     runs = []
+    invocations = []
     try:
         for index, command in enumerate(commands):
             process = subprocess.run(base + command, cwd=root / 'agent-service', capture_output=True, text=True)
-            (args.output / f'{index}-stderr.log').write_text(process.stderr)
-            result = json.loads(process.stdout)
+            stdout_path, stderr_path = args.output / f'{index}-stdout.json', args.output / f'{index}-stderr.log'
+            stdout_path.write_text(process.stdout)
+            stderr_path.write_text(process.stderr)
+            invocations.append({'command': base + command, 'exit_code': process.returncode,
+                                'stdout': str(stdout_path), 'stderr': str(stderr_path)})
+            (args.output / 'invocations.json').write_text(json.dumps(invocations, ensure_ascii=False, indent=2))
+            try:
+                result = json.loads(process.stdout)
+            except json.JSONDecodeError as error:
+                raise RuntimeError(f'CLI未返回合法JSON（退出码 {process.returncode}）；原始输出：{stdout_path}，错误日志：{stderr_path}') from error
             runs.append({'command': command, 'exit_code': process.returncode, 'result': result})
             (args.output / 'runs.json').write_text(json.dumps(runs, ensure_ascii=False, indent=2))
             print(json.dumps({'case': args.case, 'step': index, 'status': result['status'],
                               'thread_id': result.get('thread_id')}, ensure_ascii=False), flush=True)
+            assert process.returncode == (1 if args.case == 'impossible' else 0), invocations[-1]
             if index == 0:
                 assert result['status'] in ('DRAFT_READY', 'INCOMPLETE'), result
                 assert result['outcome']['mock'] is False, result
@@ -100,6 +110,11 @@ def main(args):
                 assert result['status'] == 'SAVED', result
                 saved = [run['result']['saved_result'] for run in runs if run['command'][0] == 'save']
                 assert all(value == result['saved_result'] for value in saved)
+            elif command[0] == 'status':
+                assert result['status'] == 'DRAFT_READY', result
+                previous = runs[-2]['result']
+                for key in ('draft', 'requirements', 'validation', 'question_scope'):
+                    assert result[key] == previous[key], key
     finally:
         if runs and runs[0]['result'].get('question_scope'):
             scope = str(UUID(runs[0]['result']['question_scope']['scope_id']))
