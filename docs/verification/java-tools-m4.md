@@ -1,6 +1,6 @@
 # M4 实施与验证记录
 
-当前已完成步骤 1、2；最新范围、验证和下一步见本文末尾的步骤 2 记录。
+当前已完成步骤 1～3；最新范围、验证和下一步见本文末尾的步骤 3 记录。
 
 日期：2026-10-15（Asia/Shanghai）。本轮仅实施 [最终设计](../java-tools-m4-design.md)的步骤 1，不是整个 M4 阶段交付。基准 `2aca5d1`，分支 `main`，起始工作区干净。已核对系统临时目录中的 M4 设计交接。
 
@@ -99,3 +99,65 @@ mvn -B -ntp -pl backend -am test \
 从步骤 3 继续实现 Python 具体 HTTP 客户端、五个 CLI 命令和只读保存身份恢复。Python 目前仍只有步骤 1 的传输模型；CLI 尚不能调用预览。重试回执按 `request_json.retry_of` 查询，不再按 `idempotency_key='retry:A'` 查询；新客户端不需要管理这个内部关联。
 
 未运行：Java／Python 整体非付费全量、后端打包、前端／浏览器、付费模型、M4 CLI 经真实 M2 保存素材到视频的端到端验收、真实 Java 进程终止恢复验收。前两项属于步骤 5 阶段收尾；CLI 和真实视频／故障联调属于步骤 3、4。本步的真实 PostgreSQL／Silo HTTP 夹具与既有 MQ／FFmpeg 回归不能替代 M4 真实素材及人工观看验收。
+
+
+## 步骤 3：Python 客户端与 CLI
+
+日期：2026-10-15（Asia/Shanghai）。实施基准 `072267f920f175e5c5b09ad2865071bbeff3eb3f`，分支 `main`，起始工作区干净。依据最终设计及本文步骤 2 后续交接，仅交付步骤 3，不是完整 M4 阶段交付。
+
+### 范围与成功标准
+
+- `preview.py` 实现具体 `PreviewClient`，沿用 httpx、内部 Bearer 认证及既有 snake_case 模型，直接调用五个预览端点；恢复保存身份时只读现有 M2 保存结果端点。URL 身份按 UUID 验证，选择沿用 M2 可接受的 output_key，不接收版本、输出 UUID 或渲染参数替换。
+- CLI 新增 `preview THREAD [--output KEY]`、`preview-list THREAD`、`preview-status/cancel/retry REQUEST_ID`。THREAD 命令使用现有 inspect 的 production 关联；保存响应未写回时，只对已提交的 save_request 查询服务端保存结果，不调用 save／resume，不回写 checkpoint。
+- 必要的小范围调整：`Agent._view` 只读返回已有 `save_request`，以区分未保存草稿与保存待核对；未改图节点、执行、保存流程、工具目录、模型、预算或哈希。REQUEST_ID 命令在 Agent／脚本模型构造前分派，不创建 data-dir、不打开 SQLite，不要求模型凭据。
+- JSON 保留 Java 的 task_status、独立产物状态和播放链接；提示写入 stderr，不等待、不下载、不自动播放。普通失败／取消／产物失效要求显式重试；合法取消退出 0，其余提交／详情／重试的失败终态或不可用产物退出 1。旧命令退出码保持。
+- HTTP／网络／协议错误明确非零，使用命令级 error 而非伪造任务失败。HTTP 传输不跟随重定向；提交／取消／重试 POST 不自动重试，响应丢失提示按列表／原请求核对。取消提示如实说明共享任务影响及 CANCEL_REQUESTED 尚未确认停止。
+
+### 分层验证
+
+测试边界沿用设计已约定的客户端 HTTP 与 CLI。客户端通过 httpx 系统边界注入故障；CLI 使用本机真实 HTTP 服务与经 Agent 公共 send／save 生成的 SQLite 制作记录。保存丢响应由外部 HTTP 边界模拟；通过 inspect 前后相等核对 SAVED、waiting、制作信息与预算未变化。未 mock Agent、预览客户端或图内协作者。
+
+范围依据：新增 Python 传输与 CLI，另对共享只读视图增加一个字段。运行预览模块、M2 契约／制作／Java 执行器，以及原 Agent 场景、恢复／预算、审查回归、验收退出码；Java 运行共用预览契约、内部接口及直接受影响的 M2 HTTP／Python CLI 校验保存闭环。未改 Java 业务实现、共享任务、MQ、认证或数据库，不扩大到整个服务全量。Python 语法编译沿用现有方式，无新增类型检查体系。
+
+TDD：客户端首次提交测试因缺少 PreviewClient 失败，网络／协议／HTTP 错误测试因缺少错误类型失败；实现后通过。CLI REQUEST_ID 首测因命令不存在失败，随后通过且未创建 data-dir；THREAD 首测因命令不存在失败，随后实现只读制作绑定使其通过。
+
+首轮相关回归：Python 137 项通过，0 失败／跳过；Java 42 项通过，0 失败／错误／跳过（PreviewContracts 2、InternalPreviewApi 15、DraftValidation 25），含真实 PostgreSQL 的既有 M2→Python CLI 保存集成。Python compileall 和 git diff --check 通过。此后仅整理本轮测试的导入／未使用参数与文档，最终审查及补跑结果在下文记录。
+
+相关回归命令（仓库根目录）：
+
+```sh
+agent-service/.venv/bin/python -m pytest agent-service/tests/test_preview_client.py agent-service/tests/test_preview_cli.py agent-service/tests/test_real_production.py agent-service/tests/test_java_executor.py agent-service/tests/test_editing_contracts.py agent-service/tests/test_agent_scenarios.py agent-service/tests/test_resume_and_limits.py agent-service/tests/test_review_regressions.py agent-service/tests/test_live_acceptance_report.py -q
+mvn -B -ntp -pl backend -am test '-Dtest=PreviewContractsTest,InternalPreviewApiIntegrationTest,DraftValidationIntegrationTest' -Dsurefire.failIfNoSpecifiedTests=false
+agent-service/.venv/bin/python -m compileall -q agent-service/agent_service/preview.py agent-service/agent_service/cli.py agent-service/agent_service/runtime/runner.py
+```
+
+### 代码审查与最终结果
+
+按 code-review 技能，以固定基准 `git diff 072267f920f175e5c5b09ad2865071bbeff3eb3f` 审查本轮未提交变更（新测试以 intent-to-add 纳入差异），由两个独立子代理分别完成：
+
+#### Standards
+
+0 项需修正问题。符合 AGENTS.md 的边界校验、最小实现、分层验证要求及 ADR-0017 的职责分界；未发现 GLOSSARY.md 术语偏差。端点方法的少量相似边界处理无需新增抽象。审查未另行运行测试。
+
+#### Spec
+
+0 项可操作发现。五命令路径、认证、选择、只读保存身份恢复、REQUEST_ID 独立性、错误与退出码符合步骤 3；`save_request` 的只读展示为恢复所需，没有扩展图执行或保存行为。真实媒体、进程恢复及阶段全量按步骤 4／5 验收。审查为静态审查。
+
+两轴各 0 项未解决问题，无审查后主代码修正。最终检查：
+
+| 检查 | 最终结果与代码对应关系 |
+| --- | --- |
+| Python 相关模块／原 CLI 与 M2 调用链 | 137 项通过，0 失败／跳过；此后没有主代码变更，仅整理本轮测试导入／未使用参数及文档 |
+| Java 预览契约、内部接口、M2 校验保存 | 42 项通过，0 失败／错误／跳过；此后无主代码变更 |
+| 最终 `test_preview_client.py test_preview_cli.py` | 53 项通过，0 失败／跳过；覆盖整理后的最终测试代码 |
+| 最终 compileall | 三个修改的 Python 主代码文件通过；不新增类型检查体系 |
+| CLI 子进程 `--help`、git diff --check | 通过；五命令可由真实模块入口解析 |
+| 修改文档的本地链接检查 | 94 个链接可解析；结合差异检查内容及步骤边界 |
+
+最终失败项：无。最终跳过项：0。预期 TDD 红测已修正为通过。最终测试后只更新本验证记录，不改主代码；未将上述相关回归称为阶段全量。
+
+### 步骤 3 后续交接
+
+从步骤 4 继续，复用 M2 已分析素材及真实保存方案，通过新 CLI 执行真实视频与响应丢失、取消、文件失效、Java 进程重启恢复验收。现有测试不替代真实 CLI→MQ→FFmpeg 的媒体验收或人工观看；步骤 5 再对 Q1～Q13 做阶段收尾、最终 Java／Python 完整非付费回归与后端打包。
+
+未运行：整个 Java／Python 非付费全量、后端打包（步骤 5）；M4 真实视频／故障与进程重启端到端验收（步骤 4）；付费模型；前端类型检查／构建与浏览器回归（本步无前端变更）。Python 客户端不管理 retry_of 或 Java 重试回执，不新增本地预览任务库。

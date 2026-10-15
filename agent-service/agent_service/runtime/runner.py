@@ -278,4 +278,4 @@ class Agent:
         return {"thread_id": thread_id, "identity": state["identity"], "status": "WAITING" if waiting else (outcome or {}).get("status", "FAILED"),
                 "waiting": state.get("waiting") if waiting else None, "outcome": outcome,
                 "production": state.get("production"), "draft": state.get("draft"), "validation": state.get("validation"),
-                "saved_result": state.get("saved_result"), "question_scope": state.get("question_scope"), "requirements": state["requirements"], "pending_tool": state.get("pending_tool"), "usage": state.get("usage", {})}
+                "save_request": state.get("save_request"), "saved_result": state.get("saved_result"), "question_scope": state.get("question_scope"), "requirements": state["requirements"], "pending_tool": state.get("pending_tool"), "usage": state.get("usage", {})}

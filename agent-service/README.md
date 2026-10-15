@@ -1,6 +1,6 @@
 # Independent Python Agent MVP
 
-M4 步骤 1 已增加独立的 `agent_service.preview` 传输模型，与 Java 共用契约样例；HTTP 客户端和五个预览命令尚未接入，现阶段不能通过 CLI 预览。进度见 [M4 实施记录](../docs/verification/java-tools-m4.md)。
+M4 步骤 1～3 已接通独立的 `agent_service.preview` HTTP 客户端和五个 CLI 预览命令；Java/Python 共用契约样例。真实视频与故障验收、阶段全量及打包待步骤 4、5。进度见 [M4 实施记录](../docs/verification/java-tools-m4.md)。
 
 
 本目录只负责 LangGraph 决策、条件、证据、草稿、等待、预算和恢复。工具通过 `ToolExecutor` 执行；可使用固定样本 Mock 或 `JavaToolExecutor` 的真实问答／剪辑草稿模式。ASR/VLM/Embedding 与索引由 Java 后端负责，旧 Python 分析适配器已删除。
@@ -37,7 +37,7 @@ cp .env.example .env
 
 全局选项放在子命令前；`--asset` 可以重复，首次省略表示冻结该项目当前素材范围。checkpoint 保存 `question_scope`（范围身份及原元数据），补答和故障恢复 GET 原快照并核对一致性，恢复时无需重新指定项目或素材。纯问答的普通后续消息在原素材范围创建新快照，清除旧观察及覆盖后再回答。进入制作后，同需求的未保存草稿修改、补答和恢复沿用固定快照及已读证据；明确新需求建立新快照，依赖失效停止。真实需求不能切换到 Mock 恢复；有意开始不同模式使用 `--new`。
 
-真实模式向模型开放 `list_assets/get_video_overview/search_evidence/read_video_range`，支持问答和 DRAFT 制作。DRAFT 由图强制调用 Java `validate_edit_draft`，完整结构化问题进入下一次决策；修正最多 3 次，无进展或预算耗尽返回 INCOMPLETE，保留最新草稿及问题。按需细读和新 Agent 预览／导出尚未接入。`--script` 可与 `--java-url` 组合，表示脚本决策读取真实证据，不能称为真实模型验收。不会创建后台等待任务或接受 `complete-mock/tool-result`。
+真实模式向模型开放 `list_assets/get_video_overview/search_evidence/read_video_range`，支持问答和 DRAFT 制作。DRAFT 由图强制调用 Java `validate_edit_draft`，完整结构化问题进入下一次决策；修正最多 3 次，无进展或预算耗尽返回 INCOMPLETE，保留最新草稿及问题。按需细读和新 Agent 正式导出尚未接入；保存后可使用下文的显式预览命令。`--script` 可与 `--java-url` 组合，表示脚本决策读取真实证据，不能称为真实模型验收。不会创建后台等待任务或接受 `complete-mock/tool-result`。
 
 语音引用保留原区间、音轨时间和上下文；视觉引用保留 `POINT/observed_at_ms`，不会制造1ms区间。素材分页累积前页，目录读完与分析覆盖分别保存。来源未就绪、权限、依赖失效和执行不确定直接收尾；只有参数错误进入有限修正。工具传输中断不自动重试，明确输出 `INCOMPLETE`，不能当作空结果。
 
@@ -186,3 +186,33 @@ agent-service/.venv/bin/python agent-service/scripts/verify_java_m2.py --case mu
 每轮使用真实 CLI 子进程，保存完整结果、stderr、SQLite 模型回执及 PostgreSQL 工具／校验／版本来源到 `evidence.json`。生成后不自动保存是 Agent 的行为；本验收命令代替用户显式运行 CLI save，并核对重复保存和跨进程 resume 的同一版本身份。生产使用时请先查看草稿再运行 save。`impossible` 必须未完成且无版本；模型可能在提出草稿前说明不可满足，此时不会伪造 Java 校验回执。
 
 读取进度中的 `_range_reads.complete` 只表示固定范围的已有记录分页已完整消费，与稀疏分析覆盖不同。修正反馈会明确拒绝多个结构化调用，模型仍可能用尽预算或算错时长；失败保留且不能保存。本轮成功和失败样本、确定性边界验证及媒体回归分别见阶段5记录。
+
+
+## 显式预览已保存方案（M4 步骤 3）
+
+在仓库根目录运行；只需 Java 服务和 `INTERNAL_WORKER_TOKEN`，不需要 DeepSeek 凭据。先设置模块路径：
+
+```sh
+export PYTHONPATH=agent-service
+```
+
+```sh
+agent-service/.venv/bin/python -m agent_service --java-url http://localhost:8080 --data-dir agent-service/.local/java preview THREAD_ID
+agent-service/.venv/bin/python -m agent_service --java-url http://localhost:8080 --data-dir agent-service/.local/java preview THREAD_ID --output out-1
+agent-service/.venv/bin/python -m agent_service --java-url http://localhost:8080 --data-dir agent-service/.local/java preview-list THREAD_ID
+agent-service/.venv/bin/python -m agent_service --java-url http://localhost:8080 preview-status REQUEST_ID
+agent-service/.venv/bin/python -m agent_service --java-url http://localhost:8080 preview-cancel REQUEST_ID
+agent-service/.venv/bin/python -m agent_service --java-url http://localhost:8080 preview-retry REQUEST_ID
+```
+
+也可进入 `agent-service` 后使用 `.venv/bin/python` 和相应 data-dir。全局参数放在子命令前。
+
+`preview` 和 `preview-list` 使用原制作的 data-dir／THREAD_ID。只有一条输出时可省略 `--output`，多条时指定保存结果中的 `output_key`；选择由 Java 权威保存结果校验。未提交保存的草稿不能预览。保存已经提交但本地丢失响应时，命令只读查询 Java 保存结果，不自动保存、不写回 checkpoint。Mock／无真实制作身份的 thread 被拒绝。
+
+`preview-status/cancel/retry` 直接使用 REQUEST_ID，不创建 Agent、不读取本地 SQLite。提交立即返回 request／task 身份，不等待渲染；列表找回服务器已接纳请求，详情返回实际任务状态、独立产物状态及有效期 300 秒的播放链接。链接到期后重新查询，不重新渲染；命令不自动下载或打开播放器。
+
+普通重复提交复用原请求／任务或可用产物；失败、取消或产物失效需显式 `preview-retry`。重复 retry(A) 总是核对同一后继 B，B 再失败则 retry(B)。通信中断不自动重试 POST、不伪造 Java 任务失败；普通提交用 `preview-list THREAD_ID` 找回，重试可再次对原 REQUEST_ID 执行 retry 核对固定后继。
+
+取消影响共享的实际渲染任务及所有复用请求，`CANCEL_REQUESTED` 仅表示已请求停止，`CANCELLED` 才表示确认取消；成功终态取消不会删除文件。预览命令不进入模型决策、不改变 SAVED／waiting／预算；退出 CLI 不取消 Java 任务。
+
+stdout 输出协议 JSON，提示写入 stderr。成功接纳、运行中查询、列表及合法取消退出 0；提交／查询／重试取得 FAILED、CANCELLED 或 UNAVAILABLE／REMOVED 产物退出 1；参数／认证／HTTP／网络／协议错误非零，Ctrl-C 为 130。预览访问错误输出 `error`，不伪装成 Java 的任务状态；原有制作命令退出码保持。

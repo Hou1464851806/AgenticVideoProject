@@ -1,6 +1,6 @@
 # Java 后端
 
-M4 步骤 1 提供 `POST /internal/v1/productions/{requirement_id}/previews`（JSON `{}` 或 `{"output_key":"out-1"}`）及同路径 GET 列表，使用现有 `INTERNAL_WORKER_TOKEN` Bearer 认证。仅接受已保存制作，由服务端解析版本与输出，新建 202、复用 200。步骤 2 已增加 `GET /internal/v1/previews/{request_id}`、`POST /internal/v1/previews/{request_id}/cancel` 和 `/retry`。详情实时核对产物并生成 300 秒播放链接；普通提交不会自动重做失败／取消／失效的预览，显式重试始终返回原请求的固定后继。存储异常返回 503，不改写为文件失效。完整范围和验证见 [M4 实施记录](../docs/verification/java-tools-m4.md)。
+M4 步骤 1 提供 `POST /internal/v1/productions/{requirement_id}/previews`（JSON `{}` 或 `{"output_key":"out-1"}`）及同路径 GET 列表，使用现有 `INTERNAL_WORKER_TOKEN` Bearer 认证。仅接受已保存制作，由服务端解析版本与输出，新建 202、复用 200。步骤 2 已增加 `GET /internal/v1/previews/{request_id}`、`POST /internal/v1/previews/{request_id}/cancel` 和 `/retry`。详情实时核对产物并生成 300 秒播放链接；普通提交不会自动重做失败／取消／失效的预览，显式重试始终返回原请求的固定后继。存储异常返回 503，不改写为文件失效。步骤 3 已接通 [Python CLI 五个预览命令](../agent-service/README.md#显式预览已保存方案m4-步骤-3)，不使用模型；真实媒体／故障端到端验收待步骤 4。完整范围和验证见 [M4 实施记录](../docs/verification/java-tools-m4.md)。
 
 
 M1 已落地单体媒体执行、Java 百炼基础分析与索引，以及第三阶段问答快照、四个真实读取工具、稳定分页和独立通道降级。Python `JavaToolExecutor` 已在第四阶段接入；真实上传到问答、故障与媒体回归见[第五阶段综合记录](../docs/verification/java-tools-m1-stage5.md)，未运行项目单独列明。完整范围见 [最终设计](../docs/java-tools-m1-design.md)，媒体阶段验证见 [记录](../docs/verification/java-tools-m1-stage1.md)，分析阶段见 [记录](../docs/verification/java-tools-m1-stage2.md)，工具阶段见 [记录](../docs/verification/java-tools-m1-stage3.md)。

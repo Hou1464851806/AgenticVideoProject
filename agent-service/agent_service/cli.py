@@ -8,6 +8,7 @@ import sys
 
 from .config import Config, load_env
 from .model import ScriptedModel
+from .preview import PreviewClient, PreviewClientError
 from .runtime.runner import Agent
 from .tools.contracts import ToolRequest
 from .tools.java import JavaToolExecutor
@@ -38,7 +39,33 @@ def parser():
     result.add_argument("thread")
     result.add_argument("file", type=Path)
     result.add_argument("--wait-id")
+    preview = commands.add_parser("preview")
+    preview.add_argument("thread")
+    preview.add_argument("--output", help="保存结果中的 output_key；多输出时必填")
+    commands.add_parser("preview-list").add_argument("thread")
+    for name in ("preview-status", "preview-cancel", "preview-retry"):
+        commands.add_parser(name).add_argument("request_id")
     return cli
+
+
+async def preview_dispatch(args):
+    client = PreviewClient(args.java_url, os.environ.get("INTERNAL_WORKER_TOKEN"))
+    if args.command == "preview-status":
+        return (await client.status(args.request_id)).model_dump()
+    if args.command == "preview-cancel":
+        return (await client.cancel(args.request_id)).model_dump()
+    if args.command == "preview-retry":
+        return (await client.retry(args.request_id)).model_dump()
+    state = await Agent(Config(args.data_dir, trace=False)).inspect(args.thread)
+    production = state["production"]
+    if not production:
+        raise ValueError("该 thread 没有真实制作身份，不能预览")
+    if not state["saved_result"]:
+        if not state["save_request"] or await client.saved(production["requirement_id"]) is None:
+            raise ValueError("请先完成显式保存，再请求预览")
+    if args.command == "preview-list":
+        return (await client.list(production["requirement_id"])).model_dump()
+    return (await client.submit(production["requirement_id"], args.output)).model_dump()
 
 
 async def dispatch(args):
@@ -46,6 +73,8 @@ async def dispatch(args):
     load_env(root.parent / ".env")
     load_env(root / ".env.langfuse")
     load_env(root / ".env")
+    if args.command.startswith("preview"):
+        return await preview_dispatch(args)
     model = None
     if args.script:
         script = json.loads(args.script.read_text())
@@ -84,11 +113,28 @@ def main():
     try:
         result = asyncio.run(dispatch(args))
         print(json.dumps(result, ensure_ascii=False, indent=2))
+        if args.command.startswith("preview"):
+            if args.command == "preview-list":
+                return 0
+            if args.command == "preview-cancel":
+                print("取消作用于实际任务，会影响复用该任务的所有请求；CANCEL_REQUESTED 表示尚未确认停止。", file=sys.stderr)
+                return 0
+            print(f"使用 preview-status {result['request_id']} 查询当前状态和有效播放链接。", file=sys.stderr)
+            if result["retry_allowed"]:
+                print(f"需要显式重试：preview-retry {result['request_id']}", file=sys.stderr)
+            return int(result["task_status"] in ("FAILED", "CANCELLED") or
+                       (result["artifact"] is not None and result["artifact"]["state"] != "AVAILABLE"))
         return 1 if result["status"] in ("FAILED", "INCOMPLETE") else 0
     except KeyboardInterrupt:
-        print("本地请求已中断；恢复前会核对模型回执，不能保证远端费用撤回。", file=sys.stderr)
+        message = "本地请求已中断；提交结果尚未确定，请通过 preview-list／原请求身份核对。" if args.command.startswith("preview") else "本地请求已中断；恢复前会核对模型回执，不能保证远端费用撤回。"
+        print(message, file=sys.stderr)
         return 130
     except Exception as error:
+        if args.command.startswith("preview"):
+            code = error.code if isinstance(error, PreviewClientError) else "PREVIEW_COMMAND_ERROR"
+            message = str(error) if isinstance(error, ValueError) else "预览命令执行异常，请核查原请求。"
+            print(json.dumps({"error": {"code": code, "message": message}, "error_type": type(error).__name__}, ensure_ascii=False), file=sys.stderr)
+            return 1
         message = str(error) if isinstance(error, ValueError) else "执行异常，checkpoint 已保留；请核查后使用 resume。"
         print(json.dumps({"status": "FAILED", "error_type": type(error).__name__, "message": message}, ensure_ascii=False), file=sys.stderr)
         return 1
