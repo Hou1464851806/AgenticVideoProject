@@ -8,6 +8,7 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.types import Command
 
 from ..config import Config
+from ..editing import SaveRequest
 from ..model import DeepSeekModel
 from ..tools.mock import MockExecutor
 from ..tools.java import JavaToolExecutor
@@ -15,7 +16,7 @@ from ..tools.contracts import ToolRequest, ToolResult
 from ..tracing import Tracer
 from .graph import build_graph
 from .persistence import Store
-from .policy import Cancelled, LimitReached, SubmissionUnknown, incomplete
+from .policy import Cancelled, LimitReached, SubmissionUnknown, fingerprint, incomplete
 from .state import Context, Requirements
 
 
@@ -31,12 +32,6 @@ class Agent:
             raise ValueError("自定义 ToolExecutor 必须显式提供 assets 素材范围")
         self.executor, self.assets = executor, assets
         self.mock = getattr(executor, "mock", True) is not False
-        if model is None:
-            import os
-            key = os.environ.get("DEEPSEEK_API_KEY")
-            if not key:
-                raise ValueError("请配置 DEEPSEEK_API_KEY；离线场景请显式选择 scripted 模式")
-            model = DeepSeekModel(key, self.config.limits, os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com"))
         self.model = model
         self.progress = progress or (lambda node: None)
 
@@ -50,8 +45,11 @@ class Agent:
             if snapshot.next:
                 raise ValueError("该需求尚未结束，请补答、恢复或取消")
             old = snapshot.values
+            checkpoint = snapshot.config["configurable"].get("checkpoint_id")
         if new and old:
-            thread_id, old = str(uuid.uuid4()), {}
+            thread_id, old, checkpoint = str(uuid.uuid4()), {}, None
+        if old.get("save_request") and not old.get("saved_result"):
+            raise ValueError("上次保存结果尚未核对；请先执行 save 恢复，再开始修改")
         if old and bool(old.get("question_scope")) == self.mock:
             raise ValueError("不能切换已有需求的真实/Mock模式；请使用 --new")
         identity = {"session_id": session_id or old.get("identity", {}).get("session_id") or str(uuid.uuid4()),
@@ -59,13 +57,16 @@ class Agent:
         state = {"identity": identity, "request": {"content": content, "new_requirement": not bool(old)},
                  "requirements": old.get("requirements", Requirements().model_dump()), "messages": old.get("messages", []),
                  "observations": old.get("observations", {}), "coverage": old.get("coverage", {}),
-                 "question_scope": None, "draft": old.get("draft"), "validation": old.get("validation"), "scenario": self.config.scenario}
+                 "question_scope": old.get("question_scope") if old.get("production") else None,
+                 "production": old.get("production"), "previous_validation": None,
+                 "save_request": old.get("save_request"), "saved_result": old.get("saved_result"),
+                 "draft": old.get("draft"), "validation": None, "scenario": self.config.scenario}
         if old.get("question_scope") and not self.mock:
             self.executor.project_id = old["question_scope"]["project_id"]
             self.executor.asset_ids = [a["id"] for a in old["question_scope"]["assets"]]
-        if not self.mock:
+        if not self.mock and not old.get("production"):
             state.update(observations={}, coverage={}, draft=None, validation=None)
-        return await self._drive(thread_id, state)
+        return await self._drive(thread_id, state, expected_checkpoint=checkpoint)
 
     async def inspect(self, thread_id):
         async with AsyncSqliteSaver.from_conn_string(str(self.path)) as saver:
@@ -133,7 +134,59 @@ class Agent:
             return await self._drive(thread_id, None, snapshot.values, cancel=True)
         return {"thread_id": thread_id, "status": "CANCELLED", "content": "本地取消已记录，停止新动作；远端费用不能保证撤回。"}
 
-    async def _drive(self, thread_id, value, previous=None, cancel=False):
+    async def save(self, thread_id):
+        if not isinstance(self.executor, JavaToolExecutor):
+            raise ValueError("save 只支持 Java 真实制作")
+        lock = open(self.config.directory / (thread_id + ".lock"), "a")
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            async with AsyncSqliteSaver.from_conn_string(str(self.path)) as saver:
+                graph = build_graph(saver)
+                config = {"configurable": {"thread_id": thread_id}}
+                snapshot = await graph.aget_state(config)
+                state = snapshot.values
+                if not state or not state.get("production"):
+                    raise ValueError("没有可保存的真实制作需求")
+                production = state["production"]
+                if self.executor.project_id and self.executor.project_id != production["project_id"]:
+                    raise ValueError("保存项目与原制作不匹配")
+                if snapshot.next:
+                    raise ValueError("请先完成当前执行到 DRAFT_READY")
+                if not state.get("save_request"):
+                    validation = state.get("validation") or {}
+                    requirements = Requirements.model_validate(state["requirements"]).production(
+                        sorted(a["id"] for a in state["question_scope"]["assets"]))
+                    if (state.get("outcome") or {}).get("status") != "DRAFT_READY" or not validation.get("valid"):
+                        raise ValueError("只有 DRAFT_READY 的当前草稿可以保存")
+                    if validation["draft_hash"] != fingerprint(state["draft"]) or validation["requirements_hash"] != fingerprint(requirements):
+                        raise ValueError("草稿或条件已改变，请重新校验到 DRAFT_READY")
+                    request = {**production, "validation_id": validation["validation_id"],
+                               "draft_hash": validation["draft_hash"], "requirements_hash": validation["requirements_hash"],
+                               "requirements_sources": state["requirements"]["sources"]}
+                    request = SaveRequest.model_validate(request).model_dump()
+                    await graph.aupdate_state(config, {"save_request": request}, as_node="finalize")
+                else:
+                    request = state["save_request"]
+                # Query the authoritative result before any retry; do not require live scope dependencies.
+                saved = await self.executor.saved(production["requirement_id"])
+                if saved is None:
+                    saved = await self.executor.save(request)
+                await graph.aupdate_state(config, {"saved_result": saved,
+                    "outcome": {"status": "SAVED", "content": "方案已保存，当前制作结束。", "saved_result": saved, "mock": False}}, as_node="finalize")
+                final = await graph.aget_state(config)
+                return self._view(thread_id, final.values, False)
+        except BlockingIOError:
+            raise ValueError("该需求正在另一个本机进程执行") from None
+        finally:
+            lock.close()
+
+    async def _drive(self, thread_id, value, previous=None, cancel=False, expected_checkpoint=False):
+        if self.model is None and not cancel:
+            import os
+            key = os.environ.get("DEEPSEEK_API_KEY")
+            if not key:
+                raise ValueError("请配置 DEEPSEEK_API_KEY；离线场景请显式选择 scripted 模式")
+            self.model = DeepSeekModel(key, self.config.limits, os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com"))
         identity = (previous or value)["identity"]
         lock = open(self.config.directory / (thread_id+".lock"), "a")
         try:
@@ -145,12 +198,18 @@ class Agent:
         def stop():
             store.check(identity["execution_id"], self.config.limits)
         try:
+            if expected_checkpoint is not False:
+                async with AsyncSqliteSaver.from_conn_string(str(self.path)) as saver:
+                    latest = await build_graph(saver).aget_state({"configurable": {"thread_id": thread_id}})
+                if latest.config["configurable"].get("checkpoint_id") != expected_checkpoint:
+                    raise ValueError("需求已被另一个本机操作更新，请重新查看后重试")
             if isinstance(self.executor, JavaToolExecutor):
                 saved = (previous or value).get("question_scope")
                 if previous and not saved:
                     raise ValueError("不能用真实执行器恢复 Mock 需求")
                 scope = saved if cancel else await self.executor.snapshot(saved)
                 self.assets = {asset["id"]: asset for asset in scope["assets"]}
+                self.executor.requirement_id = ((previous or value).get("production") or {}).get("requirement_id")
                 if value is not None and previous is None:
                     value["question_scope"] = scope
             elif (previous or value).get("question_scope"):
@@ -194,7 +253,7 @@ class Agent:
                                             "pre_understanding": snapshot.values["understanding"]},
                                 "requirements": Requirements().model_dump(), "messages": [], "observations": {}, "coverage": {},
                                 "draft": None, "validation": None, "scenario": self.config.scenario,
-                                "question_scope": snapshot.values.get("question_scope")}
+                                "question_scope": None, "production": None, "previous_validation": None, "save_request": None, "saved_result": None}
                     store.finish(status)
                     return await self._drive(new_thread, migrated)
                 store.finish(status)
@@ -213,4 +272,5 @@ class Agent:
     def _view(thread_id, state, waiting):
         return {"thread_id": thread_id, "identity": state["identity"], "status": "WAITING" if waiting else (state.get("outcome") or {}).get("status", "FAILED"),
                 "waiting": state.get("waiting") if waiting else None, "outcome": state.get("outcome"),
-                "question_scope": state.get("question_scope"), "requirements": state["requirements"], "pending_tool": state.get("pending_tool"), "usage": state.get("usage", {})}
+                "production": state.get("production"), "draft": state.get("draft"), "validation": state.get("validation"),
+                "saved_result": state.get("saved_result"), "question_scope": state.get("question_scope"), "requirements": state["requirements"], "pending_tool": state.get("pending_tool"), "usage": state.get("usage", {})}

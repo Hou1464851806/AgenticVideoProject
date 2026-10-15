@@ -1,6 +1,6 @@
 # Independent Python Agent MVP
 
-本目录只负责 LangGraph 决策、条件、证据、草稿、等待、预算和恢复。工具通过 `ToolExecutor` 执行；可使用固定样本 Mock 或 `JavaToolExecutor` 的真实问答模式。ASR/VLM/Embedding 与索引由 Java 后端负责，旧 Python 分析适配器已删除。
+本目录只负责 LangGraph 决策、条件、证据、草稿、等待、预算和恢复。工具通过 `ToolExecutor` 执行；可使用固定样本 Mock 或 `JavaToolExecutor` 的真实问答／剪辑草稿模式。ASR/VLM/Embedding 与索引由 Java 后端负责，旧 Python 分析适配器已删除。
 
 ## 安装与运行
 
@@ -19,9 +19,9 @@ cp .env.example .env
 .venv/bin/python -m agent_service run '只用lecture素材生成严格30秒的缓存流程剪辑草稿'
 ```
 
-进度输出到 stderr，结果 JSON 输出到 stdout。Mock 模式结果带 `mock: true`，Java 真实模式带 `mock: false`。`DRAFT_READY` 仅代表模拟校验通过，没有保存或渲染。`WAITING` 正常退出；`INCOMPLETE` / `FAILED` 退出码 1。`--no-trace` 显式禁用观测。
+进度输出到 stderr，结果 JSON 输出到 stdout。Mock 模式结果带 `mock: true`，Java 真实模式带 `mock: false`。`DRAFT_READY` 表示当前全部输出通过校验（Mock 模式为模拟校验，真实模式为 Java 校验），尚未保存或渲染；`SAVED` 表示显式保存完成。`WAITING` 正常退出；`INCOMPLETE` / `FAILED` 退出码 1。`--no-trace` 显式禁用观测。
 
-## Java 真实问答（M1 第四阶段）
+## Java 真实问答与制作（M2 阶段 4）
 
 先按 [后端说明](../backend/README.md)启动 Java 与基础设施，并上传素材完成所需来源分析。根 `.env` 配置 `INTERNAL_WORKER_TOKEN` 与 `DEEPSEEK_API_KEY`，凭据仅留在传输层。项目和素材 UUID 可从现有项目 API 取得；未探测／未就绪状态由真实反馈说明。
 
@@ -32,9 +32,9 @@ cp .env.example .env
 .venv/bin/python -m agent_service --java-url http://localhost:8080 --data-dir .local/java run '继续问另一个问题' --thread THREAD_ID
 ```
 
-全局选项放在子命令前；`--asset` 可以重复，首次省略表示冻结该项目当前素材范围。checkpoint 保存 `question_scope`（范围身份及原元数据），补答和故障恢复 GET 原快照并核对一致性，恢复时无需重新指定项目或素材。普通后续消息在原素材范围创建新快照，清除旧观察及覆盖后再回答。真实需求不能切换到 Mock 恢复；有意开始不同模式使用 `--new`。
+全局选项放在子命令前；`--asset` 可以重复，首次省略表示冻结该项目当前素材范围。checkpoint 保存 `question_scope`（范围身份及原元数据），补答和故障恢复 GET 原快照并核对一致性，恢复时无需重新指定项目或素材。纯问答的普通后续消息在原素材范围创建新快照，清除旧观察及覆盖后再回答。进入制作后，同需求的未保存草稿修改、补答和恢复沿用固定快照及已读证据；明确新需求建立新快照，依赖失效停止。真实需求不能切换到 Mock 恢复；有意开始不同模式使用 `--new`。
 
-真实模式仅开放 `list_assets/get_video_overview/search_evidence/read_video_range` 与问答；细读、草稿和制作明确不可用。`--script` 可与 `--java-url` 组合，表示脚本决策读取真实证据，不能称为真实模型验收。不会创建后台等待任务或接受 `complete-mock/tool-result`。
+真实模式向模型开放 `list_assets/get_video_overview/search_evidence/read_video_range`，支持问答和 DRAFT 制作。DRAFT 由图强制调用 Java `validate_edit_draft`，完整结构化问题进入下一次决策；修正最多 3 次，无进展或预算耗尽返回 INCOMPLETE，保留最新草稿及问题。按需细读和新 Agent 预览／导出尚未接入。`--script` 可与 `--java-url` 组合，表示脚本决策读取真实证据，不能称为真实模型验收。不会创建后台等待任务或接受 `complete-mock/tool-result`。
 
 语音引用保留原区间、音轨时间和上下文；视觉引用保留 `POINT/observed_at_ms`，不会制造1ms区间。素材分页累积前页，目录读完与分析覆盖分别保存。来源未就绪、权限、依赖失效和执行不确定直接收尾；只有参数错误进入有限修正。工具传输中断不自动重试，明确输出 `INCOMPLETE`，不能当作空结果。
 
@@ -144,10 +144,28 @@ agent-service/.venv/bin/python agent-service/scripts/verify_java_crash.py
 
 ## M2 阶段 1：制作数据契约
 
-已落实 [M2 设计](../docs/java-tools-m2-design.md) 的契约与制作条件，真实模式仍只开放 M1 问答和四读取工具。Java 真实校验、保存命令、固定制作快照与修正闭环在后续阶段接入。
+已落实 [M2 设计](../docs/java-tools-m2-design.md) 的契约与制作条件；阶段 2～3 实现 Java 校验和原子保存，阶段 4 接通 Python 真实制作、修正、固定快照和显式保存。受控验证见 [阶段 4 记录](../docs/verification/java-tools-m2-stage4.md)，付费真实 Agent 验收属于阶段 5。
 
 `agent_service/editing.py` 定义独立的草稿、逐输出条件、校验输入／问题／结果、制作身份和保存请求／结果。`runtime/state.py` 将理解增量合并为完整条件：程序生成 `out-1` 等稳定 `output_key`，单输出修改按键定位；标题和草稿顺序不影响条件关联。默认单输出、横屏、字幕开启、不强求完整字幕，不增加默认硬时长。`requirements.sources` 记录默认值或用户消息身份及原文，随 checkpoint 持久保存，CLI/status 可查看。
 
-调用 Java 时只传规范化条件，不包含运行模式和条件来源；未显式限定素材时，由程序展开固定素材上下文。`validate_edit_draft` 的参数只有 `draft/requirements/draft_hash/requirements_hash`；不再携带 `read_ids/read_records`。模型只能提出编排，不能携带项目／需求／scope 等可信身份，不能提出字幕或业务标识。保存请求已定义类型，尚无可执行保存命令。
+调用 Java 时只传规范化条件，不包含运行模式和条件来源；未显式限定素材时，由程序展开固定素材上下文。`validate_edit_draft` 的参数只有 `draft/requirements/draft_hash/requirements_hash`；不再携带 `read_ids/read_records`。模型只能提出编排，不能携带项目／需求／scope 等可信身份，不能提出字幕或业务标识。保存请求使用独立的 CLI `save` 命令提交，不暴露给模型。
 
 跨语言样例位于 `backend/src/test/resources/contracts/m2-editing.json`，两侧均验证中文、换行、emoji 的紧凑 UTF-8 键排序 SHA256，以及严格类型、输出键对应、数量、时长和大小限制。阶段记录见 [M2 阶段 1](../docs/verification/java-tools-m2-stage1.md)。
+
+## 显式保存当前制作
+
+```sh
+.venv/bin/python -m agent_service --java-url http://localhost:8080 --project PROJECT_UUID --asset ASSET_UUID --data-dir .local/java run '生成剪辑草稿'
+.venv/bin/python -m agent_service --java-url http://localhost:8080 --data-dir .local/java run '第二条改为20秒' --thread THREAD_ID
+.venv/bin/python -m agent_service --java-url http://localhost:8080 --data-dir .local/java save THREAD_ID
+.venv/bin/python -m agent_service --java-url http://localhost:8080 --data-dir .local/java status THREAD_ID
+.venv/bin/python -m agent_service --java-url http://localhost:8080 --project PROJECT_UUID --data-dir .local/java run '开始新制作' --thread THREAD_ID --new
+```
+
+修改示例适用于已有多输出草稿。默认一个输出、横屏 720p、30fps、字幕开启；未指定时长不增加硬时长。JSON 的 `requirements.sources` 展示用户原文与默认来源，`validation.durations_ms` 按草稿输出顺序展示实际区间总时长，`validation.warnings` 披露字幕缺口等限制；`draft/validation` 在未完成时仍可检查。
+
+只有当前 DRAFT_READY 可以保存。草稿或条件修改后必须重新校验；所有输出整体保存，不能只保存成功部分。保存命令不调用模型，不要求 DeepSeek 凭据，返回 `saved_result` 中的 `plan_id/revision_id/outputs[].output_id`。保存不触发确认、预览或渲染。
+
+保存前先将当前校验和来源绑定持久化。HTTP 断开或提交结果未知时，保留失败并停止；再次执行相同 `save THREAD_ID`，先查询 Java 的权威保存结果，已经提交则恢复同一版本，不依赖原素材仍可用。结果未核对前拒绝继续编辑，请先运行 save。已保存制作只读，重复 save 返回原结果；明确新制作使用 --new 创建新方案，不派生旧版本。
+
+跨语言受控闭环由 `DraftValidationIntegrationTest#pythonAgentRepairsRealValidationThenExplicitCliSaves` 自动启动隔离 PostgreSQL 与真实 Java HTTP，再调用本机 `agent-service/.venv/bin/python`。此用例覆盖错误草稿、补读、修正、校验发布后的进程故障恢复、多输出局部编辑与显式 CLI 保存；输出证据位于 `backend/target/m2-stage4-controlled.json`，不调用付费模型。

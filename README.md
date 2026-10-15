@@ -22,13 +22,13 @@ PostgreSQL 使用 `postgres_data` 持久卷。`docker compose restart` 保留账
 
 M1 已实现并运行综合验收。当前上传执行真实媒体准备，Compose 默认开启 Java 基础分析：有音轨进行全音轨 ASR，按稀疏帧执行 VLM，并生成文档 Embedding / Qdrant 索引。需配置 `DASHSCOPE_API_KEY`；缺凭据时对应阶段明确失败，已完成的其他来源仍可用。无音轨 ASR 标为不适用；稀疏视觉不代表逐帧覆盖。权威证据和付费回执由 PostgreSQL 保存。
 
-旧浏览器 Agent 对话执行入口明确不可用，避免创建无人消费的任务。独立 Python CLI 的离线 Mock 模式继续可用，见 [Python 说明](agent-service/README.md)；Java 问答快照与四个读取工具已实现，Python 真实模式已接入，问答／补答／恢复使用固定快照，见 [工具阶段记录](docs/verification/java-tools-m1-stage3.md)与 [Python 接入记录](docs/verification/java-tools-m1-stage4.md)。后续能力与验收以 [M1 最终设计](docs/java-tools-m1-design.md)为准。
+旧浏览器 Agent 对话执行入口明确不可用，避免创建无人消费的任务。独立 Python CLI 的离线 Mock 模式继续可用，见 [Python 说明](agent-service/README.md)；Java 问答快照与四个读取工具已实现，Python 真实模式已接入，问答／补答／恢复使用固定快照，见 [工具阶段记录](docs/verification/java-tools-m1-stage3.md)与 [Python 接入记录](docs/verification/java-tools-m1-stage4.md)。M2 已接通真实草稿、Java 校验及显式 CLI 保存，受控闭环见 [M2 阶段 4 记录](docs/verification/java-tools-m2-stage4.md)，付费真实模型制作验收留待阶段 5。
 
 ## 既有方案与媒体渲染
 
 已有方案版本仍可从工作区查看、播放源片段、生成低清预览、确认并导出。低清预览无需正式确认；正式导出必须先确认具体版本，再选择 720p／1080p。预览和导出固定请求时的方案版本、素材及输出规格，产物可播放和下载。正式成片也可显式删除，下载本身不删除文件。
 
-M1 的 Python 真实模式只提供问答。旧浏览器 Agent 方案生成、方案修改和自然语言制作入口不可用；本次保留的是既有版本的按钮操作和媒体执行，不新增 Agent 到成片链路。
+Python 真实模式支持问答和待保存草稿制作，显式 CLI save 保存方案版本。旧浏览器 Agent 方案生成、方案修改和自然语言制作入口不可用；本次保留的是既有版本的按钮操作和媒体执行，不新增 Agent 到成片链路。
 
 ## 开发验证
 

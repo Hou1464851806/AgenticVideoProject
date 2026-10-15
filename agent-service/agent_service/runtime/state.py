@@ -82,6 +82,10 @@ class State(TypedDict, total=False):
     next_node: str
     stop_reason: str | None
     scenario: str
+    production: dict | None
+    previous_validation: dict | None
+    save_request: dict | None
+    saved_result: dict | None
     question_scope: dict | None
 
 

@@ -87,6 +87,31 @@ class DraftValidationIntegrationTest {
             .put("validation_id",validation.path("data").path("validation_id").asText()).put("draft_hash",input.path("draft_hash").asText()).put("requirements_hash",input.path("requirements_hash").asText());
         request.set("requirements_sources",JSON.valueToTree(Map.of("topic",Map.of("kind","USER","message_id","m1","text","剪辑上传核查"),"profile",Map.of("kind","DEFAULT","value","LANDSCAPE_720"))));return request;
     }
+    @Test void pythonAgentRepairsRealValidationThenExplicitCliSaves() throws Exception {
+        var a=fixture(null);var b=fixture(a.project);
+        var first=speech(a,0,2000,6000,"上传核查",word(2000,4000,"上传"),word(4000,6000,"核查"));
+        var second=speech(b,0,3000,5000,"完成");
+        var root=java.nio.file.Path.of("").toAbsolutePath();
+        if(root.getFileName().toString().equals("backend"))root=root.getParent();
+        var log=java.nio.file.Files.createTempFile("m2-python-", ".log");
+        try {
+            var process=new ProcessBuilder(root.resolve("agent-service/.venv/bin/python").toString(),
+                root.resolve("agent-service/tests/java_production_scenario.py").toString())
+                .redirectErrorStream(true).redirectOutput(log.toFile()).start();
+            try(var input=process.getOutputStream()) {
+                JSON.writeValue(input,Map.of("url","http://localhost:"+port,"token","draft-integration-internal-token",
+                    "project",a.project,"assets",List.of(Map.of("id",a.id,"evidence",first),Map.of("id",b.id,"evidence",second))));
+            }
+            assertTrue(process.waitFor(90,java.util.concurrent.TimeUnit.SECONDS),"Python scenario timed out");
+            String output=java.nio.file.Files.readString(log);assertEquals(0,process.exitValue(),output);
+            var evidence=JSON.readTree(output);
+            assertEquals("SAVED",evidence.path("saved").path("status").asText());
+            assertEquals(2,evidence.path("saved").path("saved_result").path("outputs").size());
+            var target=root.resolve("backend/target/m2-stage4-controlled.json");
+            java.nio.file.Files.writeString(target,JSON.writerWithDefaultPrettyPrinter().writeValueAsString(evidence));
+        } finally {java.nio.file.Files.deleteIfExists(log);}
+    }
+
     @Test void explicitSavePublishesAllOutputsAndRecoversTheSameVersion() throws Exception {
         var a=fixture(null);var b=fixture(a.project);var first=speech(a,0,2000,6000,"上传");var second=speech(b,0,3000,5000,"核查");
         var p=production(a,b);read(p,a,2000,6000,0);read(p,b,3000,5000,0);

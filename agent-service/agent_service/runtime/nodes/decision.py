@@ -49,7 +49,7 @@ def check_action(state: State, runtime: Runtime[Context]):
             if not action.content:
                 raise ValueError("ANSWER requires content")
             return {"next_node": "check_result"}
-        if not ctx.mock and (action.kind == "DRAFT" or (action.kind == "TOOL" and action.tool_name not in READ_TOOLS)):
+        if not ctx.mock and action.kind == "TOOL" and action.tool_name not in READ_TOOLS:
             return {"stop_reason": "真实模式所请求能力尚未开放", "next_node": "check_result"}
         changes = {}
         if action.kind == "DRAFT":

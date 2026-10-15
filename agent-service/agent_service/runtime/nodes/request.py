@@ -19,9 +19,12 @@ async def understand_request(state: State, runtime: Runtime[Context], config):
         parsed = Understanding.model_validate(state["request"].get("pre_understanding") or await invoke_model(state, runtime, "understand", config))
         if parsed.relation == "NEW" and not state["request"].get("new_requirement"):
             return {"understanding": parsed.model_dump(), "outcome": {"status": "NEW_REQUIREMENT"}, "next_node": "finalize"}
-        if not ctx.mock and parsed.mode != "QUERY":
+        if not ctx.mock and parsed.mode not in ("QUERY", "DRAFT"):
             return {"requirements": {**state["requirements"], "mode": "UNSUPPORTED"},
-                    "outcome": {"status": "ANSWER", "content": "真实模式目前仅支持视频问答与四个读取工具；该能力尚未开放。", "evidence_ids": [], "sources": [], "mock": False}, "next_node": "finalize"}
+                    "outcome": {"status": "ANSWER", "content": "真实模式支持问答和剪辑草稿；保存请用 CLI save，预览／导出尚未开放。", "evidence_ids": [], "sources": [], "mock": False}, "next_node": "finalize"}
+        if state.get("saved_result"):
+            return {"outcome": {"status": "SAVED", "content": "已保存制作只读；请用 --new 开始新需求。",
+                                "saved_result": state["saved_result"], "mock": ctx.mock}, "next_node": "finalize"}
         previous = state.get("requirements", {})
         req = previous
         if parsed.relation != "AMBIGUOUS":
@@ -35,6 +38,8 @@ async def understand_request(state: State, runtime: Runtime[Context], config):
                 # but never apply an invalid or arbitrarily relaxed hard condition.
         updates = {"requirements": req, "validation": state.get("validation") if req == previous else None,
                    "understanding": parsed.model_dump(), "model_sequence": state["model_sequence"]+1}
+        if not ctx.mock and req["mode"] == "DRAFT" and not state.get("production"):
+            updates["production"] = await ctx.executor.bind(state["identity"]["requirement_id"], state["question_scope"])
         if parsed.question or parsed.relation == "AMBIGUOUS":
             question = parsed.question or "这是修改当前需求，还是开始一个新需求？"
             waiting = {"kind": "USER_INPUT", "wait_id": fingerprint([state["identity"]["execution_id"], state["model_sequence"], question]), "question": question}

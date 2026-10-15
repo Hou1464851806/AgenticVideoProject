@@ -15,9 +15,9 @@ from .tools.mock import SCENARIOS
 
 
 def parser():
-    cli = argparse.ArgumentParser(description="视频 Agent：Mock 离线或 Java 真实问答")
+    cli = argparse.ArgumentParser(description="视频 Agent：Mock 离线或 Java 真实问答／草稿制作")
     cli.add_argument("--java-url", help="启用真实模式，例如 http://localhost:8080")
-    cli.add_argument("--project", help="首次真实问答的项目 UUID")
+    cli.add_argument("--project", help="首次真实问答／制作的项目 UUID")
     cli.add_argument("--asset", action="append", help="可重复指定初始素材 UUID")
     cli.add_argument("--data-dir", type=Path, default=Config().directory)
     cli.add_argument("--scenario", choices=sorted(SCENARIOS), default="normal")
@@ -28,7 +28,7 @@ def parser():
     run.add_argument("message")
     run.add_argument("--thread")
     run.add_argument("--new", action="store_true")
-    for name in ("status", "resume", "cancel", "complete-mock"):
+    for name in ("status", "resume", "cancel", "save", "complete-mock"):
         commands.add_parser(name).add_argument("thread")
     reply = commands.add_parser("reply")
     reply.add_argument("thread")
@@ -59,6 +59,8 @@ async def dispatch(args):
                   executor=executor, progress=lambda node: print(f"[{node}]", file=sys.stderr))
     if args.command == "run":
         return await agent.send(args.message, thread_id=args.thread, new=args.new)
+    if args.command == "save":
+        return await agent.save(args.thread)
     if args.command == "status":
         return await agent.inspect(args.thread)
     if args.command == "cancel":

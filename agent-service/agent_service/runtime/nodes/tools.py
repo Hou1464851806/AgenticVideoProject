@@ -101,10 +101,17 @@ def observe_tool(state: State, runtime: Runtime[Context]):
             updates["next_node"] = "check_result"
             updates["usage"] = {**usage, "no_progress": 0}
         else:
-            previous = state.get("validation") or {}
-            issues = result.data.get("issues", [])
-            improved = bool(previous) and len(issues) < len(previous.get("issues", []))
-            updates.update(repair(state, ctx, "DRAFT_INVALID", encoded(result.data)))
+            previous = state.get("previous_validation")
+            issues = {fingerprint({k: issue[k] for k in ("code", "field", "output_key", "actual", "expected") if k in issue})
+                      for issue in result.data["issues"]}
+            improved = (previous is not None and not previous["issues_truncated"] and not result.data["issues_truncated"]
+                        and previous["requirements_hash"] == result.data["requirements_hash"]
+                        and previous["draft_hash"] != result.data["draft_hash"]
+                        and issues < set(previous["issues"]))
+            updates["previous_validation"] = {"draft_hash": result.data["draft_hash"],
+                "requirements_hash": result.data["requirements_hash"], "issues": sorted(issues),
+                "issues_truncated": result.data["issues_truncated"]}
+            updates.update(repair(state, ctx, "DRAFT_INVALID", "草稿未通过校验；完整结构化问题见 validation。"))
             if improved:
                 updates["usage"]["no_progress"] = 0
     return updates

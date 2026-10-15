@@ -43,10 +43,12 @@ def check_result(state: State, runtime: Runtime[Context]):
                     error = source_error(state, ctx, targets, clip["evidence_ids"])
                     if error:
                         return repair(state, ctx, *error)
-            return {"outcome": {"status": "DRAFT_READY", "content": "Mock 样本剪辑草稿已通过模拟校验；尚未保存或渲染。",
+            return {"outcome": {"status": "DRAFT_READY", "content": ("Mock 样本剪辑草稿已通过模拟校验；尚未保存或渲染。" if ctx.mock else "剪辑草稿已通过 Java 校验；可用 CLI save 保存方案，尚未渲染。"),
                                 "draft": state["draft"], "validation": validation, "mock": ctx.mock}, "next_node": "finalize"}
-        return repair(state, ctx, "VALIDATION_REQUIRED", "草稿尚未通过当前输入的模拟校验")
+        return repair(state, ctx, "VALIDATION_REQUIRED", "草稿尚未通过当前输入的校验")
     if action.get("kind") == "ANSWER":
+        if state["requirements"].get("mode") == "DRAFT":
+            return {"outcome": incomplete(action["content"], state.get("draft"), mock=ctx.mock), "next_node": "finalize"}
         ids = action.get("evidence_ids", [])
         error = source_error(state, ctx, targets, ids)
         if error:

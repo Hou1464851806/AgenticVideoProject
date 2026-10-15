@@ -187,9 +187,9 @@ async def test_draft_cannot_reapprove_sources_invalidated_by_current_context(tmp
         del runner.assets["lecture"]
     runner.model = ScriptedModel(understanding("DRAFT"), [draft(), answer([], "当前素材依据不足，无法继续批准旧草稿。")])
     second = await runner.send("使用原来的草稿", thread_id=first["thread_id"])
-    assert second["status"] == "ANSWER"
+    assert second["status"] == "INCOMPLETE"
     assert second["usage"]["repairs"] == 1
-    assert second["outcome"].get("draft") is None
+    assert second["draft"] == draft()["draft"]
 
 
 @pytest.mark.asyncio

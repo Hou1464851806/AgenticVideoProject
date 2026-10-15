@@ -96,7 +96,7 @@ async def test_transport_uncertainty_stops_without_retry_or_empty_answer(tmp_pat
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("mode", ["DRAFT", "DISCUSS", "UNSUPPORTED"])
+@pytest.mark.parametrize("mode", ["DISCUSS", "UNSUPPORTED"])
 async def test_real_mode_capability_never_falls_back(tmp_path, mode):
     backend = Backend()
     result = await runner(tmp_path, backend, ScriptedModel({**UNDERSTAND, "mode": mode}, [READ])).send("剪辑")
