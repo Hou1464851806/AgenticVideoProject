@@ -51,6 +51,8 @@ mvn -B -ntp -pl backend -am test \
 
 Compose 使用 `backend/Dockerfile` 构建前端和后端，运行镜像包含固定 FFmpeg 与 Noto CJK 字体。媒体工作目录为可写 `/work`，继续使用 `worker_work` 卷；空间核算读取该同一目录。数据库、Silo、RabbitMQ 和 Qdrant 持久卷保留，启动脚本不会删除旧数据。
 
+Silo S3 API 使用本机 9000 端口，WebUI 固定为 [http://localhost:9001](http://localhost:9001)，两者仅绑定 `127.0.0.1`。WebUI 用户名为 `agentic-storage`，密码为根目录 `.env` 中的 `STORAGE_SECRET_KEY`。调整启动参数或端口映射后执行 `docker compose up -d --no-deps silo` 应用配置，保留 `silo_data`；单纯 restart 不会更新容器配置。
+
 ## 任务与 RabbitMQ
 
 ```text

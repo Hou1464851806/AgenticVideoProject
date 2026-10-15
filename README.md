@@ -17,6 +17,8 @@ M4 步骤 1～5 已完成：内部预览与 CLI、真实视频／故障验收、
 
 PostgreSQL 使用 `postgres_data` 持久卷。`docker compose restart` 保留账号；业务服务重启后需要重新登录。数据库没有发布到宿主端口。Silo 的 S3 入口仅绑定本机 9000 端口，原始对象保存在 `silo_data` 持久卷；存储密码同样由启动脚本随机生成。
 
+Silo WebUI 固定为 [http://localhost:9001](http://localhost:9001)，同样仅绑定本机。使用用户名 `agentic-storage` 和项目 `.env` 中的 `STORAGE_SECRET_KEY` 登录；9000 是 S3 API 端口。修改 Silo 的启动参数或端口映射后，执行 `docker compose up -d --no-deps silo` 重建该容器并应用配置，数据卷保留；`docker compose restart silo` 不会应用这些配置变更。
+
 上传可暂停或继续，网络失败只有限重试当前分片。刷新后在原上传条目重选原文件，增量 SHA-256 校验通过后只补传存储中缺失的分片；同名同大小的不同文件不能续接。同一上传被另一页面控制时显示冲突原因，可回到原页面继续或等待写入资格到期。
 
 上传也可取消，取消后停止后续分片并释放素材名额，真实存储残留清理完成后才释放字节占用，页面分别显示两种状态。未完成上传默认在最后合法活动后 24 小时过期，界面显示恢复期限；过期后需重新上传。可通过 `.env` 的 `UPLOAD_INACTIVITY_SECONDS` 配置期限；已发布素材不受上传取消或过期清理影响。
