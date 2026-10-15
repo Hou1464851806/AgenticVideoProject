@@ -23,15 +23,33 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT)
 class InternalPreviewApiIntegrationTest {
     @Container static final PostgreSQLContainer<?> POSTGRES=new PostgreSQLContainer<>("postgres:18.6-bookworm");
+    @Container static final org.testcontainers.containers.GenericContainer<?> SILO=new org.testcontainers.containers.GenericContainer<>(
+            "pgsty/silo:RELEASE.2026-09-16T00-00-00Z@sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46")
+            .withEnv("MINIO_ROOT_USER","preview-integration").withEnv("MINIO_ROOT_PASSWORD","preview-integration-password")
+            .withCommand("server","/data").withExposedPorts(9000)
+            .waitingFor(org.testcontainers.containers.wait.strategy.Wait.forHttp("/minio/health/ready").forPort(9000));
     static final ObjectMapper JSON=new ObjectMapper();
     @DynamicPropertySource static void properties(DynamicPropertyRegistry p) {
         p.add("spring.datasource.url",POSTGRES::getJdbcUrl);p.add("spring.datasource.username",POSTGRES::getUsername);p.add("spring.datasource.password",POSTGRES::getPassword);
         p.add("internal.worker-token",()->"draft-integration-internal-token");
+        p.add("storage.endpoint",()->"http://"+SILO.getHost()+":"+SILO.getMappedPort(9000));
+        p.add("storage.public-endpoint",()->"http://"+SILO.getHost()+":"+SILO.getMappedPort(9000));
+        p.add("storage.access-key",()->"preview-integration");p.add("storage.secret-key",()->"preview-integration-password");p.add("storage.bucket",()->"internal-preview-tests");
     }
     @Autowired JdbcTemplate db;
+    @Autowired com.agenticvideo.business.task.TaskExecution tasks;
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean com.agenticvideo.business.upload.MultipartStorage storageBoundary;
     @LocalServerPort int port;
     record Asset(UUID project,UUID id,UUID analysis,UUID model) {}
     record Production(UUID id,UUID scope) {}
+    static software.amazon.awssdk.services.s3.S3Client storage() {
+        return software.amazon.awssdk.services.s3.S3Client.builder().endpointOverride(URI.create("http://"+SILO.getHost()+":"+SILO.getMappedPort(9000)))
+                .credentialsProvider(software.amazon.awssdk.auth.credentials.StaticCredentialsProvider.create(software.amazon.awssdk.auth.credentials.AwsBasicCredentials.create("preview-integration","preview-integration-password")))
+                .region(software.amazon.awssdk.regions.Region.US_EAST_1).forcePathStyle(true).build();
+    }
+    @BeforeAll static void bucket() {
+        try(var store=storage()){store.createBucket(b->b.bucket("internal-preview-tests"));}
+    }
     Asset fixture(UUID project) {
         if(project==null) {
             UUID user=UUID.randomUUID();project=UUID.randomUUID();
@@ -46,6 +64,7 @@ class InternalPreviewApiIntegrationTest {
         db.update("INSERT INTO analysis_stages(asset_id,analysis_id,stage_key,status) VALUES (?,?,'ASR','SUCCEEDED'),(?,?,'VISION','SUCCEEDED')",asset,analysis,asset,analysis);
         db.update("INSERT INTO tasks(id,project_id,type,status,input_json) VALUES (?,?,'CONTENT_ANALYZE','SUCCEEDED','{}')",task,project);
         db.update("INSERT INTO model_calls(id,analysis_id,task_id,model,parameters_json,status) VALUES (?,?,?,'fixture','{}','SUCCEEDED')",model,analysis,task);
+        try(var store=storage()){store.putObject(b->b.bucket("internal-preview-tests").key(asset.toString()),software.amazon.awssdk.core.sync.RequestBody.fromBytes(new byte[]{1}));}
         return new Asset(project,asset,analysis,model);
     }
     UUID speech(Asset a,int ordinal,long start,long end,String text,Object... words) {
@@ -144,7 +163,145 @@ class InternalPreviewApiIntegrationTest {
         assertEquals("PREVIEW_FAILED",current.path("error").path("code").asText());
         assertEquals(1,JSON.readTree(http("GET",path,null).body()).path("items").size());
     }
+    @Test void retryHasOneSuccessorAndReplaysItsCurrentResult() throws Exception {
+        var a=fixture(null);var saved=saved(a,1);String path="/productions/"+saved.path("requirement_id").asText()+"/previews";
+        var first=JSON.readTree(http("POST",path,Map.of()).body());String original="/previews/"+first.path("request_id").asText();
+        var blocked=http("POST",original+"/retry",null);assertEquals(409,blocked.statusCode(),blocked.body());assertTrue(blocked.body().contains("PREVIEW_NOT_RETRYABLE"));
+        assertEquals(200,http("POST",original+"/cancel",null).statusCode());
+        var response=http("POST",original+"/retry",null);assertEquals(202,response.statusCode(),response.body());
+        var next=JSON.readTree(response.body());assertNotEquals(first.path("task_id"),next.path("task_id"));
+        db.update("UPDATE tasks SET status='FAILED',result_json='{\"code\":\"RENDER_FAILED\",\"message\":\"失败\"}' WHERE id=?",UUID.fromString(next.path("task_id").asText()));
+        response=http("POST",original+"/retry",null);assertEquals(200,response.statusCode(),response.body());
+        var replay=JSON.readTree(response.body());assertEquals(next.path("request_id"),replay.path("request_id"));assertEquals("FAILED",replay.path("task_status").asText());
+        assertEquals(next.path("request_id"),JSON.readTree(http("POST",path,Map.of()).body()).path("request_id"));
+        response=http("POST","/previews/"+next.path("request_id").asText()+"/retry",null);assertEquals(202,response.statusCode(),response.body());
+        assertEquals(3,JSON.readTree(http("GET",path,null).body()).path("items").size());
+    }
+    @Test void terminalHistorySurvivesChangedOrInvalidSources() throws Exception {
+        var a=fixture(null);var saved=saved(a,1);String path="/productions/"+saved.path("requirement_id").asText()+"/previews";
+        var first=JSON.readTree(http("POST",path,Map.of()).body());String original="/previews/"+first.path("request_id").asText();
+        assertEquals(200,http("POST",original+"/cancel",null).statusCode());
+        db.update("UPDATE assets SET sha256=?,validation_status='INVALID' WHERE id=?","c".repeat(64),a.id);
+        var response=http("POST",path,Map.of());assertEquals(200,response.statusCode(),response.body());assertEquals(first.path("request_id"),JSON.readTree(response.body()).path("request_id"));
+        response=http("POST",original+"/retry",null);assertEquals(409,response.statusCode(),response.body());assertTrue(response.body().contains("PREVIEW_SOURCE_UNAVAILABLE"));
+        assertEquals(1,JSON.readTree(http("GET",path,null).body()).path("items").size());
+    }
+    @Test void concurrentSubmissionsAndRetriesKeepOneTaskAndOneSuccessor() throws Exception {
+        var a=fixture(null);var saved=saved(a,1);String path="/productions/"+saved.path("requirement_id").asText()+"/previews";
+        var pool=java.util.concurrent.Executors.newFixedThreadPool(6);
+        try {
+            var submitted=new ArrayList<java.util.concurrent.Future<HttpResponse<String>>>();
+            for(int i=0;i<6;i++)submitted.add(pool.submit(()->http("POST",path,Map.of())));
+            var requests=new HashSet<String>();int created=0;
+            for(var pending:submitted){var response=pending.get();assertTrue(Set.of(200,202).contains(response.statusCode()),response.body());if(response.statusCode()==202)created++;requests.add(JSON.readTree(response.body()).path("request_id").asText());}
+            assertEquals(1,created);assertEquals(1,requests.size());String original="/previews/"+requests.iterator().next();
+            assertEquals(200,http("POST",original+"/cancel",null).statusCode());
+            submitted.clear();for(int i=0;i<6;i++)submitted.add(pool.submit(()->http("POST",original+"/retry",null)));
+            requests.clear();created=0;
+            for(var pending:submitted){var response=pending.get();assertTrue(Set.of(200,202).contains(response.statusCode()),response.body());if(response.statusCode()==202)created++;requests.add(JSON.readTree(response.body()).path("request_id").asText());}
+            assertEquals(1,created);assertEquals(1,requests.size());assertEquals(2,JSON.readTree(http("GET",path,null).body()).path("items").size());
+        } finally {pool.shutdownNow();}
+    }
+    @Test void reuseSearchesPastNewerFailuresAndRetryCanLinkToExistingWork() throws Exception {
+        var a=fixture(null);var saved=saved(a,1);String path="/productions/"+saved.path("requirement_id").asText()+"/previews";
+        var first=JSON.readTree(http("POST",path,Map.of()).body());UUID request=UUID.fromString(first.path("request_id").asText());
+        // Existing public clients can have more than one historical request for a target.
+        UUID failed=UUID.randomUUID(),failedTask=UUID.randomUUID();
+        var transaction=new org.springframework.transaction.support.TransactionTemplate(new org.springframework.jdbc.datasource.DataSourceTransactionManager(db.getDataSource()));
+        transaction.executeWithoutResult(tx->{
+            db.update("INSERT INTO tasks(id,project_id,type,status,input_json,result_json) SELECT ?,project_id,'PREVIEW_RENDER','FAILED',input_json,'{\"code\":\"RENDER_FAILED\",\"message\":\"失败\"}'::jsonb FROM tasks WHERE id=?",failedTask,UUID.fromString(first.path("task_id").asText()));
+            db.update("INSERT INTO render_requests(id,project_id,revision_id,output_id,kind,config_json,renderer_version,cache_key,task_id) SELECT ?,project_id,revision_id,output_id,kind,config_json,renderer_version,cache_key,? FROM render_requests WHERE id=?",failed,failedTask,request);
+        });
+        var response=http("POST",path,Map.of());assertEquals(200,response.statusCode(),response.body());assertEquals(first.path("request_id"),JSON.readTree(response.body()).path("request_id"));
+        response=http("POST","/previews/"+failed+"/retry",null);assertEquals(200,response.statusCode(),response.body());assertEquals(first.path("request_id"),JSON.readTree(response.body()).path("request_id"));
+        publish(first);
+        assertEquals(first.path("request_id"),JSON.readTree(http("POST",path,Map.of()).body()).path("request_id"));
+        // Fixed successor replay is independent of later source and executor state changes.
+        db.update("UPDATE assets SET sha256=?,validation_status='INVALID' WHERE id=?","c".repeat(64),a.id);
+        response=http("POST","/previews/"+failed+"/retry",null);assertEquals(200,response.statusCode(),response.body());assertEquals(first.path("request_id"),JSON.readTree(response.body()).path("request_id"));assertEquals("SUCCEEDED",JSON.readTree(response.body()).path("task_status").asText());
+        response=http("POST",path,Map.of());assertEquals(200,response.statusCode(),response.body());assertEquals(failed.toString(),JSON.readTree(response.body()).path("request_id").asText());
+    }
+    @Test void newRenderingRequiresSourceFilesButExistingTasksDoNot() throws Exception {
+        var a=fixture(null);var saved=saved(a,1);String path="/productions/"+saved.path("requirement_id").asText()+"/previews";
+        try(var store=storage()){store.deleteObject(b->b.bucket("internal-preview-tests").key(a.id.toString()));}
+        var response=http("POST",path,Map.of());assertEquals(409,response.statusCode(),response.body());assertTrue(response.body().contains("PREVIEW_SOURCE_UNAVAILABLE"));
+        assertEquals(0,JSON.readTree(http("GET",path,null).body()).path("items").size());
+        try(var store=storage()){store.putObject(b->b.bucket("internal-preview-tests").key(a.id.toString()),software.amazon.awssdk.core.sync.RequestBody.fromBytes(new byte[]{1}));}
+        var first=JSON.readTree(http("POST",path,Map.of()).body());
+        db.update("UPDATE assets SET validation_status='INVALID' WHERE id=?",a.id);
+        try(var store=storage()){store.deleteObject(b->b.bucket("internal-preview-tests").key(a.id.toString()));}
+        response=http("POST",path,Map.of());assertEquals(200,response.statusCode(),response.body());assertEquals(first.path("task_id"),JSON.readTree(response.body()).path("task_id"));
+    }
+    JsonNode publish(JsonNode request) throws Exception {
+        var run=tasks.claimLocal(UUID.fromString(request.path("task_id").asText()));
+        String key=run.input().path("artifactObjectKey").asText();byte[] bytes="preview-fixture".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        try(var store=storage()){store.putObject(b->b.bucket("internal-preview-tests").key(key),software.amazon.awssdk.core.sync.RequestBody.fromBytes(bytes));}
+        tasks.completeLocal(run,"PREVIEW_RENDERED",Map.of("artifactId",run.input().path("artifactId").asText(),"objectKey",key,"byteSize",bytes.length,"sha256","d".repeat(64),
+                "durationMs",4000,"mediaInfo",Map.of("streams",List.of(Map.of("codec_type","video","codec_name","h264","width",640,"height",360),Map.of("codec_type","audio","codec_name","aac","channels",2,"sample_rate","48000")))));
+        return run.input();
+    }
+    @Test void detailsCheckPublishedArtifactsAndRefreshPlayableAccessWithoutSources() throws Exception {
+        var a=fixture(null);var saved=saved(a,1);String path="/productions/"+saved.path("requirement_id").asText()+"/previews";
+        var first=JSON.readTree(http("POST",path,Map.of()).body());String original="/previews/"+first.path("request_id").asText();
+        var published=publish(first);
+        try(var store=storage()){store.deleteObject(b->b.bucket("internal-preview-tests").key(a.id.toString()));}
+        db.update("UPDATE assets SET validation_status='INVALID' WHERE id=?",a.id);
+        for(int i=0;i<2;i++) {
+            var response=http("GET",original,null);assertEquals(200,response.statusCode(),response.body());var result=JSON.readTree(response.body());
+            assertEquals("SUCCEEDED",result.path("task_status").asText());assertEquals("AVAILABLE",result.at("/artifact/state").asText());assertFalse(result.path("retry_allowed").asBoolean());
+            assertEquals(300,result.at("/playback/expires_in_seconds").asInt());assertEquals(4000,result.at("/artifact/duration_ms").asInt());
+            var video=HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create(result.at("/playback/url").asText())).GET().build(),HttpResponse.BodyHandlers.ofString());
+            assertEquals(200,video.statusCode());assertEquals("preview-fixture",video.body());
+        }
+        var response=http("POST",path,Map.of());assertEquals(200,response.statusCode(),response.body());assertEquals(first.path("request_id"),JSON.readTree(response.body()).path("request_id"));
+        assertEquals(409,http("POST",original+"/retry",null).statusCode());
+        response=http("POST",original+"/cancel",null);assertEquals(200,response.statusCode());assertEquals("AVAILABLE",JSON.readTree(response.body()).at("/artifact/state").asText());
+        try(var store=storage()){store.deleteObject(b->b.bucket("internal-preview-tests").key(published.path("artifactObjectKey").asText()));}
+        response=http("GET",original,null);assertEquals(200,response.statusCode(),response.body());var missing=JSON.readTree(response.body());
+        assertEquals("SUCCEEDED",missing.path("task_status").asText());assertEquals("UNAVAILABLE",missing.at("/artifact/state").asText());assertTrue(missing.path("playback").isNull());
+        assertTrue(missing.path("retry_allowed").asBoolean());assertEquals("PREVIEW_ARTIFACT_UNAVAILABLE",missing.at("/error/code").asText());
+        assertEquals(first.path("request_id"),JSON.readTree(http("POST",path,Map.of()).body()).path("request_id"));
+        db.update("UPDATE artifacts SET state='REMOVED' WHERE id=?",UUID.fromString(published.path("artifactId").asText()));
+        assertEquals("REMOVED",JSON.readTree(http("GET",original,null).body()).at("/artifact/state").asText());
+    }
+    @Test void storageErrorsDoNotInvalidateSuccessfulArtifactsAndSizeMismatchAllowsExplicitRetry() throws Exception {
+        var a=fixture(null);var saved=saved(a,1);String path="/productions/"+saved.path("requirement_id").asText()+"/previews";
+        var first=JSON.readTree(http("POST",path,Map.of()).body());String original="/previews/"+first.path("request_id").asText();var published=publish(first);
+        String key=published.path("artifactObjectKey").asText();
+        for(RuntimeException failure:List.of(software.amazon.awssdk.core.exception.SdkClientException.create("timeout"),software.amazon.awssdk.services.s3.model.S3Exception.builder().statusCode(403).message("denied").build(),software.amazon.awssdk.services.s3.model.S3Exception.builder().statusCode(500).message("unavailable").build())) {
+            org.mockito.Mockito.doThrow(failure).when(storageBoundary).objectSize(key);
+            for(String operation:List.of("detail","submit","retry")) {
+                var response=operation.equals("detail")?http("GET",original,null):operation.equals("submit")?http("POST",path,Map.of()):http("POST",original+"/retry",null);
+                assertEquals(503,response.statusCode(),response.body());assertTrue(response.body().contains("PREVIEW_STORAGE_UNAVAILABLE"));
+            }
+            org.mockito.Mockito.reset(storageBoundary);
+            var result=JSON.readTree(http("GET",original,null).body());assertEquals("AVAILABLE",result.at("/artifact/state").asText());assertEquals("SUCCEEDED",result.path("task_status").asText());
+        }
+        try(var store=storage()){store.putObject(b->b.bucket("internal-preview-tests").key(key),software.amazon.awssdk.core.sync.RequestBody.fromBytes(new byte[]{1}));}
+        var response=http("GET",original,null);assertEquals(200,response.statusCode());assertEquals("UNAVAILABLE",JSON.readTree(response.body()).at("/artifact/state").asText());
+        response=http("POST",original+"/retry",null);assertEquals(202,response.statusCode(),response.body());assertNotEquals(first.path("task_id"),JSON.readTree(response.body()).path("task_id"));
+    }
+    @Test void cancellationWaitsForTheExecutorAndNeverRevealsStagedArtifacts() throws Exception {
+        var a=fixture(null);var saved=saved(a,1);String path="/productions/"+saved.path("requirement_id").asText()+"/previews";
+        var first=JSON.readTree(http("POST",path,Map.of()).body());String original="/previews/"+first.path("request_id").asText();
+        var run=tasks.claimLocal(UUID.fromString(first.path("task_id").asText()));
+        var response=http("GET",original,null);assertEquals("RUNNING",JSON.readTree(response.body()).path("task_status").asText());assertTrue(JSON.readTree(response.body()).path("artifact").isNull());
+        for(int i=0;i<2;i++) {
+            response=http("POST",original+"/cancel",null);assertEquals(200,response.statusCode());assertEquals("CANCEL_REQUESTED",JSON.readTree(response.body()).path("task_status").asText());
+            assertFalse(JSON.readTree(response.body()).path("retry_allowed").asBoolean());assertEquals(409,http("POST",original+"/retry",null).statusCode());
+            assertEquals(first.path("task_id"),JSON.readTree(http("POST",path,Map.of()).body()).path("task_id"));
+        }
+        tasks.cancelLocal(run);
+        response=http("POST",original+"/cancel",null);assertEquals("CANCELLED",JSON.readTree(response.body()).path("task_status").asText());
+        assertEquals(200,http("GET","/productions/"+saved.path("requirement_id").asText()+"/save",null).statusCode());
+    }
     @Test void malformedTransportReturnsThePreviewErrorContract() throws Exception {
+        for(String suffix:List.of("","/cancel","/retry")) {
+            var missing=http(suffix.isEmpty()?"GET":"POST","/previews/"+UUID.randomUUID()+suffix,null);
+            assertEquals(404,missing.statusCode(),missing.body());assertTrue(missing.body().contains("PREVIEW_NOT_FOUND"));
+            var malformed=http(suffix.isEmpty()?"GET":"POST","/previews/not-a-uuid"+suffix,null);
+            assertEquals(400,malformed.statusCode(),malformed.body());assertTrue(malformed.body().contains("INVALID_REQUEST"));
+        }
         var response=http("POST","/productions/not-a-uuid/previews",Map.of());
         assertEquals(400,response.statusCode(),response.body());assertTrue(response.body().contains("INVALID_REQUEST"));
         for(String payload:List.of("{", "null", "[]", "{\"output_key\":null}","{\"output_key\":\"\"}")) {
@@ -161,6 +318,10 @@ class InternalPreviewApiIntegrationTest {
         db.update("INSERT INTO tasks(id,project_id,type,input_json) VALUES (?,?,'EXPORT_RENDER','{}')",task,a.project);
         db.update("INSERT INTO render_requests(id,project_id,revision_id,output_id,kind,config_json,renderer_version,cache_key,task_id,confirmation_id,actor_user_id,intent_source_json) SELECT ?,id,?,?,'EXPORT','{}','fixture','export-fixture',?,?,owner_user_id,'{}' FROM projects WHERE id=?",
                 request,revision,UUID.fromString(saved.path("outputs").get(0).path("output_id").asText()),task,confirmation,a.project);
+        for(String suffix:List.of("","/cancel","/retry")) {
+            var denied=http(suffix.isEmpty()?"GET":"POST","/previews/"+request+suffix,null);
+            assertEquals(404,denied.statusCode(),denied.body());assertTrue(denied.body().contains("PREVIEW_NOT_FOUND"));
+        }
         var response=http("GET","/productions/"+saved.path("requirement_id").asText()+"/previews",null);
         assertEquals(200,response.statusCode(),response.body());assertEquals(0,JSON.readTree(response.body()).path("items").size());
     }

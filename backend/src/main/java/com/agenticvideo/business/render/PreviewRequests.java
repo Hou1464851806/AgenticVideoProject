@@ -22,8 +22,9 @@ public class PreviewRequests {
     private final ObjectMapper json;
     private final TransactionTemplate transactions;
     private final RenderArtifacts artifacts;
-    public PreviewRequests(JdbcTemplate database,ObjectMapper json,PlatformTransactionManager manager,RenderArtifacts artifacts,com.agenticvideo.business.storage.StorageCapacity capacity) {
-        this.capacity=capacity;this.database=database;this.json=json;transactions=new TransactionTemplate(manager);this.artifacts=artifacts;
+    private final com.agenticvideo.business.upload.MultipartStorage storage;
+    public PreviewRequests(JdbcTemplate database,ObjectMapper json,PlatformTransactionManager manager,RenderArtifacts artifacts,com.agenticvideo.business.storage.StorageCapacity capacity,com.agenticvideo.business.upload.MultipartStorage storage) {
+        this.storage=storage;this.capacity=capacity;this.database=database;this.json=json;transactions=new TransactionTemplate(manager);this.artifacts=artifacts;
     }
     public Map<String,Object> revision(UUID id) {
         var rows=database.queryForList("SELECT * FROM plan_revisions WHERE id=?",id);
@@ -40,13 +41,14 @@ public class PreviewRequests {
         public final String code;
         public Rejected(org.springframework.http.HttpStatus status,String code,String message){super(status,message);this.code=code;}
     }
+    private enum Mode { PUBLIC, SAVED, RETRY }
     public Object request(UUID revisionId,JsonNode body,String key) {
-        return admit(revisionId,body,key,false).result();
+        return admit(revisionId,body,key,Mode.PUBLIC).result();
     }
     public Admission requestSaved(UUID revisionId,UUID outputId) {
-        return admit(revisionId,json.valueToTree(Map.of("outputId",outputId,"previewProfile","LOW_360")),UUID.randomUUID().toString(),true);
+        return admit(revisionId,json.valueToTree(Map.of("outputId",outputId,"previewProfile","LOW_360")),UUID.randomUUID().toString(),Mode.SAVED);
     }
-    private Admission admit(UUID revisionId,JsonNode body,String key,boolean requireExplicitRetry) {
+    private Admission admit(UUID revisionId,JsonNode body,String key,Mode mode) {
         if(key==null || key.isBlank() || key.length()>200)throw new ResponseStatusException(BAD_REQUEST,"请求标识必须为 1–200 个字符");
         if(body==null || !body.isObject())throw new ResponseStatusException(BAD_REQUEST,"请指定成片与支持的预览规格");
         body.fieldNames().forEachRemaining(field -> {
@@ -61,7 +63,7 @@ public class PreviewRequests {
             // Serialize project intent replay and version cache admission in this order.
             UUID projectId=(UUID)revision(revisionId).get("project_id");
             database.queryForMap("SELECT id FROM projects WHERE id=? FOR UPDATE",projectId);
-            var intent=database.queryForList("SELECT *,request_json=?::jsonb AS same_input FROM preview_intents WHERE project_id=? AND idempotency_key=?",encode(normalized),projectId,key);
+            var intent=mode==Mode.PUBLIC ? database.queryForList("SELECT *,request_json=?::jsonb AS same_input FROM preview_intents WHERE project_id=? AND idempotency_key=?",encode(normalized),projectId,key) : List.<Map<String,Object>>of();
             if(!intent.isEmpty()) {
                 if(!revisionId.equals(intent.get(0).get("revision_id")) || !Boolean.TRUE.equals(intent.get(0).get("same_input")))throw new ResponseStatusException(CONFLICT,"同一请求标识不能用于不同预览输入");
                 return new Admission(parse(intent.get(0).get("response_json")),false);
@@ -72,16 +74,23 @@ public class PreviewRequests {
                 if(outputId.toString().equals(candidate.path("outputId").asText()))output=candidate;
             }
             if(output==null)throw new ResponseStatusException(NOT_FOUND,"成片定义不属于当前版本");
+            var history=mode==Mode.PUBLIC ? List.<Map<String,Object>>of() : database.queryForList("SELECT r.id FROM render_requests r JOIN tasks t ON t.id=r.task_id WHERE r.revision_id=? AND r.output_id=? AND r.kind='PREVIEW' AND t.type='PREVIEW_RENDER' AND r.config_json->>'profile'='LOW_360' ORDER BY r.created_at DESC,r.id DESC",revisionId,outputId);
             var sources=new LinkedHashMap<UUID,Map<String,Object>>();
+            boolean validSources=true;
             for(var clip:output.path("clips")) {
                 UUID asset=UUID.fromString(clip.path("assetId").asText());
                 if(sources.containsKey(asset))continue;
-                var rows=database.queryForList("SELECT id,object_key,byte_size,sha256,duration_ms,media_info_json,time_mapping_json FROM assets WHERE id=? AND project_id=? AND validation_status='VALID'",asset,revision.get("project_id"));
+                var rows=database.queryForList("SELECT id,object_key,byte_size,sha256,duration_ms,media_info_json,time_mapping_json,validation_status FROM assets WHERE id=? AND project_id=?",asset,revision.get("project_id"));
                 if(rows.isEmpty()) {
-                    if(requireExplicitRetry)throw new Rejected(CONFLICT,"PREVIEW_SOURCE_UNAVAILABLE","方案依赖的原素材不可用");
+                    if(mode==Mode.SAVED && !history.isEmpty())return new Admission(read((UUID)history.get(0).get("id")),false);
+                    if(mode!=Mode.PUBLIC)throw new Rejected(CONFLICT,"PREVIEW_SOURCE_UNAVAILABLE","方案依赖的原素材不可用");
                     throw new ResponseStatusException(CONFLICT,"方案依赖的原素材不可用");
                 }
                 var row=rows.get(0);
+                if(!"VALID".equals(row.get("validation_status"))) {
+                    if(mode==Mode.PUBLIC)throw new ResponseStatusException(CONFLICT,"方案依赖的原素材不可用");
+                    validSources=false;
+                }
                 sources.put(asset,Map.of("assetId",asset,"objectKey",row.get("object_key"),"sizeBytes",row.get("byte_size"),"sha256",row.get("sha256"),
                         "durationMs",row.get("duration_ms"),"mediaInfo",parse(row.get("media_info_json")),"timeMapping",parse(row.get("time_mapping_json"))));
             }
@@ -92,13 +101,17 @@ public class PreviewRequests {
                     Map.entry("audioSampleRate",48000),Map.entry("audioChannels",2),Map.entry("subtitleFont","Noto Sans CJK SC"),Map.entry("fontPackage","20230817+repack1-3"));
             String cacheKey=digest(encode(Map.of("revisionId",revisionId,"outputId",outputId,"configuration",configuration,"rendererVersion",RENDERER_VERSION,
                     "sources",sources.values().stream().map(source -> Map.of("assetId",source.get("assetId"),"sha256",source.get("sha256"))).toList())));
-            var existing=database.queryForList("SELECT r.*,t.status FROM render_requests r JOIN tasks t ON t.id=r.task_id WHERE r.cache_key=? ORDER BY r.created_at DESC,r.id DESC LIMIT 1",cacheKey);
-            if(!existing.isEmpty()) {
-                var prior=existing.get(0);
+            var existing=database.queryForList("SELECT r.*,t.status FROM render_requests r JOIN tasks t ON t.id=r.task_id WHERE r.cache_key=? AND r.kind='PREVIEW' AND t.type='PREVIEW_RENDER' ORDER BY r.created_at DESC,r.id DESC"+(mode==Mode.PUBLIC?" LIMIT 1":""),cacheKey);
+            for(var prior:existing) {
                 if(Set.of("PENDING","RUNNING","CANCEL_REQUESTED").contains(prior.get("status"))
                         || "SUCCEEDED".equals(prior.get("status")) && prior.get("artifact_id")!=null && artifacts.available((UUID)prior.get("artifact_id")))
-                    return new Admission(remember(projectId,key,revisionId,normalized,read((UUID)prior.get("id"))),false);
-                if(requireExplicitRetry)return new Admission(read((UUID)prior.get("id")),false);
+                    return new Admission(mode!=Mode.PUBLIC ? read((UUID)prior.get("id")) : remember(projectId,key,revisionId,normalized,read((UUID)prior.get("id"))),false);
+            }
+            if(mode==Mode.SAVED && !history.isEmpty())return new Admission(read((UUID)history.get(0).get("id")),false);
+            if(mode!=Mode.PUBLIC) {
+                if(!validSources)throw new Rejected(CONFLICT,"PREVIEW_SOURCE_UNAVAILABLE","方案依赖的原素材不可用");
+                for(var source:sources.values())if(!Objects.equals(source.get("sizeBytes"),storage.objectSize(source.get("objectKey").toString())))
+                    throw new Rejected(CONFLICT,"PREVIEW_SOURCE_UNAVAILABLE","方案依赖的原素材文件不可用");
             }
             UUID request=UUID.randomUUID(),task=UUID.randomUUID(),event=UUID.randomUUID();
             var input=Map.of("operation","PREVIEW","requestId",request,"revisionId",revisionId,"outputId",outputId,"output",output,
@@ -110,7 +123,21 @@ public class PreviewRequests {
             database.update("INSERT INTO tasks(id,project_id,type,input_json,disk_budget_bytes) VALUES (?,?,'PREVIEW_RENDER',?::jsonb,?)",task,revision.get("project_id"),encode(input),diskBudget);
             database.update("INSERT INTO outbox_events(id,task_id,type,payload_json) VALUES (?,?,'PREVIEW_RENDER',jsonb_build_object('schemaVersion','1.0','eventId',?::text,'taskId',?::text,'taskType','PREVIEW_RENDER','projectId',?::text,'occurredAt',now()))",
                     event,task,event,task,revision.get("project_id"));
-            return new Admission(remember(projectId,key,revisionId,normalized,read(request)),true);
+            return new Admission(mode!=Mode.PUBLIC ? read(request) : remember(projectId,key,revisionId,normalized,read(request)),true);
+        });
+    }
+    public Admission retryPreview(UUID requestId) {
+        return transactions.execute(tx -> {
+            var original=previewRow(requestId);UUID project=(UUID)original.get("project_id");
+            database.queryForMap("SELECT id FROM projects WHERE id=? FOR UPDATE",project);
+            // Public keys remain opaque; only the server writes this receipt shape.
+            var successor=database.queryForList("SELECT render_request_id FROM preview_intents WHERE project_id=? AND request_json->>'retry_of'=?",project,requestId.toString());
+            if(!successor.isEmpty())return new Admission(read((UUID)successor.get(0).get("render_request_id")),false);
+            if(!readPreview(requestId).retry_allowed())throw new Rejected(CONFLICT,"PREVIEW_NOT_RETRYABLE","当前预览不允许重试");
+            UUID revision=(UUID)original.get("revision_id");
+            var admission=admit(revision,json.valueToTree(Map.of("outputId",original.get("output_id"),"previewProfile","LOW_360")),UUID.randomUUID().toString(),Mode.RETRY);
+            remember(project,UUID.randomUUID().toString(),revision,json.valueToTree(Map.of("retry_of",requestId)),admission.result());
+            return admission;
         });
     }
     private Object remember(UUID project,String key,UUID revision,JsonNode body,Object response) {
@@ -139,19 +166,27 @@ public class PreviewRequests {
     }
     /** The internal CLI cannot use this boundary to inspect EXPORT or other task types. */
     public Map<String,Object> previewRow(UUID requestId) {
-        var rows=database.queryForList("SELECT r.* FROM render_requests r JOIN tasks t ON t.id=r.task_id WHERE r.id=? AND r.kind='PREVIEW' AND t.type='PREVIEW_RENDER'",requestId);
+        var rows=database.queryForList("SELECT r.*,t.status,t.result_json FROM render_requests r JOIN tasks t ON t.id=r.task_id WHERE r.id=? AND r.kind='PREVIEW' AND t.type='PREVIEW_RENDER'",requestId);
         if(rows.isEmpty())throw new Rejected(NOT_FOUND,"PREVIEW_NOT_FOUND","预览请求不存在");
         return rows.get(0);
     }
     public PreviewContracts.Result readPreview(UUID requestId) {
+        return readPreview(requestId,false);
+    }
+    public PreviewContracts.Result readPreview(UUID requestId,boolean includePlayback) {
         var row=previewRow(requestId);
-        var current=json.valueToTree(read(requestId));
-        var status=PreviewContracts.TaskStatus.valueOf(current.path("status").asText());
+        var status=PreviewContracts.TaskStatus.valueOf(row.get("status").toString());
         boolean retry=status==PreviewContracts.TaskStatus.FAILED || status==PreviewContracts.TaskStatus.CANCELLED;
-        PreviewContracts.Error error=current.has("error") ? new PreviewContracts.Error(current.path("error").path("code").asText(),current.path("error").path("message").asText()) : null;
+        PreviewContracts.Error error=null;
+        if(status==PreviewContracts.TaskStatus.FAILED && row.get("result_json")!=null) {
+            var failure=parse(row.get("result_json"));error=new PreviewContracts.Error(failure.path("code").asText(),failure.path("message").asText());
+        }
         PreviewContracts.Artifact artifact=null;
+        PreviewContracts.Playback playback=null;
         if(row.get("artifact_id")!=null) {
-            UUID id=(UUID)row.get("artifact_id");var published=artifacts.row(id);
+            UUID id=(UUID)row.get("artifact_id");
+            var access=artifacts.inspect(id,includePlayback);var published=access.artifact();
+            if(access.url()!=null)playback=new PreviewContracts.Playback(access.url(),300);
             var state=PreviewContracts.ArtifactState.valueOf(published.get("state").toString());
             artifact=new PreviewContracts.Artifact(id,state,((Number)published.get("duration_ms")).longValue());
             if(status==PreviewContracts.TaskStatus.SUCCEEDED && state!=PreviewContracts.ArtifactState.AVAILABLE) {
@@ -159,7 +194,7 @@ public class PreviewRequests {
             }
         }
         return new PreviewContracts.Result(requestId,(UUID)row.get("project_id"),(UUID)row.get("revision_id"),(UUID)row.get("output_id"),(UUID)row.get("task_id"),
-                status,current.path("createdAt").asText(),artifact,null,retry,error);
+                status,((java.sql.Timestamp)row.get("created_at")).toInstant().toString(),artifact,playback,retry,error);
     }
     private JsonNode parse(Object value) {try{return json.readTree(value.toString());}catch(java.io.IOException invalid){throw new IllegalStateException(invalid);}}
     private String encode(Object value) {try{return json.writer().with(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).writeValueAsString(value);}catch(java.io.IOException invalid){throw new IllegalStateException(invalid);}}

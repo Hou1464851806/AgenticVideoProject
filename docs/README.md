@@ -16,7 +16,7 @@ Q58 已确认首期 MVP 整体设计；2026-10-12 补充确认统一自然语言
 | Python Agent 独立重写的最终设计、边界与 MVP 验收标准 | [Agent MVP 设计](agent-mvp-design.md) |
 | Java 单体基础分析、四个真实读取工具、Python 接入与验收记录（已确认，M1 已验收） | [Java 工具 M1 设计](java-tools-m1-design.md) |
 | M2 已确认的真实草稿、校验、显式保存设计及阶段进度 | [M2 最终设计](java-tools-m2-design.md)、[阶段 1 契约与上下文](verification/java-tools-m2-stage1.md)、[阶段 2 Java 校验](verification/java-tools-m2-stage2.md)、[阶段 3 显式保存](verification/java-tools-m2-stage3.md)、[阶段 4 Python 制作](verification/java-tools-m2-stage4.md)、[阶段 5 真实验收](verification/java-tools-m2-stage5.md) |
-| M4 已确认的 CLI 显式预览、接口契约、文件范围、实施计划及验收标准；M3 按需细读后移 | [M4 最终设计](java-tools-m4-design.md)、[步骤 1 实施记录](verification/java-tools-m4.md) |
+| M4 已确认的 CLI 显式预览、接口契约、文件范围、实施计划及验收标准；M3 按需细读后移 | [M4 最终设计](java-tools-m4-design.md)、[步骤 1、2 实施记录](verification/java-tools-m4.md) |
 | Java 后端结构、模型与运行说明（随 M1 实施维护） | [后端 README](../backend/README.md) |
 | 独立 Agent CLI、重启恢复、真实 DeepSeek 与本机 Langfuse 的验收证据 | [运行说明](../agent-service/README.md)、[MVP 验收记录](verification/agent-mvp.md) |
 | DeepSeek Flash 模型名称、OpenAI 兼容请求与 LangChain 客户端核对 | [Flash 适配核验](research/deepseek-flash-adapter-verification.md) |

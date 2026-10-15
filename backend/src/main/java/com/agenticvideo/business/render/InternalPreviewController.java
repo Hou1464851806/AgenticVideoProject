@@ -20,8 +20,9 @@ public class InternalPreviewController {
     private final ProductionSaves saves;
     private final PreviewRequests previews;
     private final ObjectMapper json;
-    public InternalPreviewController(ProductionDrafts productions,ProductionSaves saves,PreviewRequests previews,ObjectMapper json) {
-        this.productions=productions;this.saves=saves;this.previews=previews;this.json=json;
+    private final com.agenticvideo.business.task.TaskExecution tasks;
+    public InternalPreviewController(ProductionDrafts productions,ProductionSaves saves,PreviewRequests previews,ObjectMapper json,com.agenticvideo.business.task.TaskExecution tasks) {
+        this.tasks=tasks;this.productions=productions;this.saves=saves;this.previews=previews;this.json=json;
     }
     private JsonNode saved(UUID requirement) {
         try {productions.get(requirement);}
@@ -65,6 +66,22 @@ public class InternalPreviewController {
                     UUID.fromString(row.path("taskId").asText()),PreviewContracts.TaskStatus.valueOf(row.path("status").asText()),row.path("createdAt").asText()));
         }
         return new PreviewContracts.ListResult(requirementId,revision,items);
+    }
+    @GetMapping("/previews/{requestId}")
+    public PreviewContracts.Result detail(@PathVariable UUID requestId) {
+        return previews.readPreview(requestId,true);
+    }
+    @PostMapping("/previews/{requestId}/cancel")
+    public PreviewContracts.Result cancel(@PathVariable UUID requestId) {
+        var row=previews.previewRow(requestId);
+        tasks.cancel((UUID)row.get("task_id"));
+        return previews.readPreview(requestId);
+    }
+    @PostMapping("/previews/{requestId}/retry")
+    public ResponseEntity<PreviewContracts.Result> retry(@PathVariable UUID requestId) {
+        var admission=previews.retryPreview(requestId);
+        UUID successor=UUID.fromString(json.valueToTree(admission.result()).path("requestId").asText());
+        return ResponseEntity.status(admission.created()?ACCEPTED:OK).body(previews.readPreview(successor));
     }
     @ExceptionHandler(software.amazon.awssdk.core.exception.SdkException.class)
     @ResponseStatus(SERVICE_UNAVAILABLE)

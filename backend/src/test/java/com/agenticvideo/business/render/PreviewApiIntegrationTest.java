@@ -179,6 +179,23 @@ class PreviewApiIntegrationTest {
         assertEquals("FAILED",data(owner.get("/render-requests/"+first.path("requestId").asText())).path("status").asText());
     }
 
+    @Test void publicIdempotencyKeysCannotBecomeInternalRetryReceipts() throws Exception {
+        var owner=signedIn("preview-retry-namespace");String project=data(owner.post("/projects",Map.of("name","独立重试回执"))).path("id").asText();var plan=planFixture(project);
+        var body=Map.of("outputId",plan.output(),"previewProfile","LOW_360");String path="/revisions/"+plan.revision()+"/previews";
+        var first=data(owner.post(path,body));String key="retry:"+first.path("requestId").asText();
+        assertEquals(first,data(owner.post(path,body,key)));
+        assertEquals(202,owner.post("/tasks/"+first.path("taskId").asText()+"/cancel",Map.of()).statusCode());
+        try(var store=storage()) {
+            try{store.createBucket(b->b.bucket("preview-tests"));}catch(software.amazon.awssdk.services.s3.model.S3Exception exists){if(exists.statusCode()!=409)throw exists;}
+            store.putObject(b->b.bucket("preview-tests").key(plan.asset().toString()),software.amazon.awssdk.core.sync.RequestBody.fromBytes(new byte[]{1}));
+        }
+        String retry="http://localhost:"+port+"/internal/v1/previews/"+first.path("requestId").asText()+"/retry";
+        var response=HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create(retry)).header("Authorization","Bearer preview-integration-worker-token").POST(HttpRequest.BodyPublishers.noBody()).build(),HttpResponse.BodyHandlers.ofString());
+        assertEquals(202,response.statusCode(),response.body());var next=json.readTree(response.body());org.junit.jupiter.api.Assertions.assertNotEquals(first.path("requestId"),next.path("request_id"));
+        assertEquals(first,data(owner.post(path,body,key)));
+        response=HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create(retry)).header("Authorization","Bearer preview-integration-worker-token").POST(HttpRequest.BodyPublishers.noBody()).build(),HttpResponse.BodyHandlers.ofString());
+        assertEquals(200,response.statusCode(),response.body());assertEquals(next.path("request_id"),json.readTree(response.body()).path("request_id"));
+    }
     private HttpResponse<String> internal(String task,String action,Object body) throws Exception {
         return HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create("http://localhost:"+port+"/internal/v1/tasks/"+task+"/"+action))
                 .header("Authorization","Bearer preview-integration-worker-token").header("Content-Type","application/json")
