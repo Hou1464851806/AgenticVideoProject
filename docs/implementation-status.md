@@ -1,5 +1,9 @@
 # 实施状态
 
+## 2026-10-15 Java 工具 M2
+
+M2 的跨语言契约、Java校验与保存、Python真实制作和显式CLI保存已经接通。阶段5复用M1素材完成单／多素材、单／多输出及多轮调整的真实模型验收，成功与失败证据、两轴审查及最终回归见 [阶段5记录](verification/java-tools-m2-stage5.md)。保存结束当前制作，不等于确认或渲染；已保存版本派生编辑、按需细读及新Agent预览／导出仍在后续范围。下述Issue和自然语言入口状态保留其历史交付范围，不能据此宣称旧浏览器制作入口已恢复。
+
 ## 2026-10-14 Java 工具 M1 重构
 
 已授权开始实施，第一阶段单应用、媒体执行、MQ 与已有预览/导出已落地；2026-10-15 继续第二阶段，Java 百炼 ASR/VLM/Embedding、分来源证据及 Qdrant 索引已接入。四个固定视频的真实付费模型验收通过，详见 [第二阶段记录](verification/java-tools-m1-stage2.md)。网络恢复后已补齐新版镜像构建、Compose 启动、现有数据库 V49 迁移和两项浏览器冒烟验证。真实基础设施检查及未完成范围见 [阶段记录](verification/java-tools-m1-stage1.md)，当前运行方式见 [后端 README](../backend/README.md)。2026-10-15 第三阶段问答范围快照、四读取工具、回执、稳定分页和通道降级已实现，验证见 [第三阶段记录](verification/java-tools-m1-stage3.md)；2026-10-15 第四阶段 Python JavaToolExecutor、真实模式与点证据引用已接入；真实 DeepSeek 问答、跨进程补答和恢复验证见 [第四阶段记录](verification/java-tools-m1-stage4.md)。2026-10-15 第五阶段运行真实新上传到四工具/DeepSeek问答、保留语义集、SIGKILL恢复、MQ故障和媒体回归；清理旧Python分析路径与Compose服务，具体结果和未验证边界见[第五阶段记录](verification/java-tools-m1-stage5.md)。最终提交前完成双轴收尾审查，修复多检索分组累计突破通道候选上限的问题；最新验证与未验证边界见[收尾审查](verification/java-tools-m1-closeout.md)。本文件以下条目是历史交付记录，不能替代重构后的 M1 验收。

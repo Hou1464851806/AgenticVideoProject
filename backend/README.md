@@ -2,6 +2,8 @@
 
 M1 已落地单体媒体执行、Java 百炼基础分析与索引，以及第三阶段问答快照、四个真实读取工具、稳定分页和独立通道降级。Python `JavaToolExecutor` 已在第四阶段接入；真实上传到问答、故障与媒体回归见[第五阶段综合记录](../docs/verification/java-tools-m1-stage5.md)，未运行项目单独列明。完整范围见 [最终设计](../docs/java-tools-m1-design.md)，媒体阶段验证见 [记录](../docs/verification/java-tools-m1-stage1.md)，分析阶段见 [记录](../docs/verification/java-tools-m1-stage2.md)，工具阶段见 [记录](../docs/verification/java-tools-m1-stage3.md)。
 
+M2 已增加真实草稿校验、显式整体保存及制作来源；Python CLI 可制作、修正、调整未保存草稿并保存方案。真实素材制作、约束失败、版本消费兼容和本轮回归见 [M2 阶段5记录](../docs/verification/java-tools-m2-stage5.md)。保存不触发确认、预览或导出，旧浏览器 Agent 入口仍不可用。
+
 ## 结构与职责
 
 ```text
