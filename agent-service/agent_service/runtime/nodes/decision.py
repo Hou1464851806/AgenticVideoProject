@@ -5,7 +5,7 @@ from ...tools.catalog import READ_TOOLS
 from ...tools.contracts import PARAMETERS, ToolRequest
 from ..calls import invoke_model
 from ..policy import LimitReached, ModelFormatError, SubmissionUnknown, fingerprint
-from ..state import Action, Context, State
+from ..state import Action, Context, State, Requirements
 
 
 async def decide_next(state: State, runtime: Runtime[Context], config):
@@ -59,8 +59,9 @@ def check_action(state: State, runtime: Runtime[Context]):
                 raise ValueError("DRAFT requires draft")
             draft = action.draft.model_dump()
             name = "validate_edit_draft"
-            args = {"draft": draft, "requirements": state["requirements"], "read_ids": list(state["observations"]), "read_records": list(state["observations"].values()),
-                    "draft_hash": fingerprint(draft), "requirements_hash": fingerprint(state["requirements"])}
+            requirements = Requirements.model_validate(state["requirements"]).production(sorted(ctx.assets))
+            args = {"draft": draft, "requirements": requirements,
+                    "draft_hash": fingerprint(draft), "requirements_hash": fingerprint(requirements)}
             changes = {"draft": draft, "validation": None}
         else:
             name, args = action.tool_name, action.arguments

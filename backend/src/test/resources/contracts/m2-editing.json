@@ -1,0 +1,336 @@
+{
+  "validation": {
+    "draft": {
+      "title": "上传流程 🎬\u001b",
+      "outputs": [
+        {
+          "output_key": "out-1",
+          "title": "上传与核查",
+          "clips": [
+            {
+              "asset_id": "10000000-0000-4000-8000-000000000001",
+              "source_in_ms": 10000,
+              "source_out_ms": 20000,
+              "evidence_ids": [
+                "20000000-0000-4000-8000-000000000001"
+              ],
+              "reason": "保留原声与“上传”步骤\n核查；字面\\u001B保持大小写"
+            }
+          ]
+        },
+        {
+          "output_key": "out-2",
+          "title": "确认导出",
+          "clips": [
+            {
+              "asset_id": "10000000-0000-4000-8000-000000000001",
+              "source_in_ms": 30000,
+              "source_out_ms": 37900,
+              "evidence_ids": [
+                "20000000-0000-4000-8000-000000000001"
+              ],
+              "reason": "确认导出"
+            }
+          ]
+        }
+      ]
+    },
+    "requirements": {
+      "topic": "上传流程",
+      "asset_ids": [
+        "10000000-0000-4000-8000-000000000001"
+      ],
+      "outputs": [
+        {
+          "output_key": "out-1",
+          "duration_min_ms": 10000,
+          "duration_max_ms": 12000
+        },
+        {
+          "output_key": "out-2",
+          "duration_min_ms": 8000,
+          "duration_max_ms": 8000
+        }
+      ],
+      "profile": "LANDSCAPE_720",
+      "subtitles_enabled": true,
+      "require_complete_subtitles": false,
+      "forbidden_content": []
+    },
+    "draft_hash": "0f0345f234673f22856cac42cbf9ddd7e03110ba265d09909e732027aa4bfd5c",
+    "requirements_hash": "a9df54f553dd9354bcbcdf07c8fbf438fd53e1fe6f62a2b9c89e8c33164fac89"
+  },
+  "validation_result": {
+    "validation_id": "30000000-0000-4000-8000-000000000001",
+    "valid": false,
+    "draft_hash": "0f0345f234673f22856cac42cbf9ddd7e03110ba265d09909e732027aa4bfd5c",
+    "requirements_hash": "a9df54f553dd9354bcbcdf07c8fbf438fd53e1fe6f62a2b9c89e8c33164fac89",
+    "durations_ms": [
+      10000,
+      7900
+    ],
+    "issues": [
+      {
+        "code": "OUTPUT_DURATION",
+        "field": "outputs[1]",
+        "output_key": "out-2",
+        "message": "输出时长不满足条件",
+        "actual": 7900,
+        "expected": {
+          "min_ms": 8000,
+          "max_ms": 8000
+        },
+        "hint": "重新核对原始语音边界"
+      }
+    ],
+    "issues_truncated": false,
+    "warnings": []
+  },
+  "saved_result": {
+    "status": "SAVED",
+    "plan_id": "40000000-0000-4000-8000-000000000001",
+    "revision_id": "50000000-0000-4000-8000-000000000001",
+    "revision_number": 1,
+    "outputs": [
+      {
+        "output_key": "out-1",
+        "output_id": "60000000-0000-4000-8000-000000000001",
+        "duration_ms": 10000
+      },
+      {
+        "output_key": "out-2",
+        "output_id": "60000000-0000-4000-8000-000000000002",
+        "duration_ms": 8000
+      }
+    ]
+  },
+  "invalid": [
+    {
+      "name": "integer string",
+      "path": [
+        "draft",
+        "outputs",
+        0,
+        "clips",
+        0,
+        "source_in_ms"
+      ],
+      "value": "10000"
+    },
+    {
+      "name": "boolean integer",
+      "path": [
+        "draft",
+        "outputs",
+        0,
+        "clips",
+        0,
+        "source_in_ms"
+      ],
+      "value": true
+    },
+    {
+      "name": "fractional time",
+      "path": [
+        "draft",
+        "outputs",
+        0,
+        "clips",
+        0,
+        "source_in_ms"
+      ],
+      "value": 10000.5
+    },
+    {
+      "name": "integer overflow",
+      "path": [
+        "draft",
+        "outputs",
+        0,
+        "clips",
+        0,
+        "source_in_ms"
+      ],
+      "value": 9223372036854775808
+    },
+    {
+      "name": "negative time",
+      "path": [
+        "draft",
+        "outputs",
+        0,
+        "clips",
+        0,
+        "source_in_ms"
+      ],
+      "value": -1
+    },
+    {
+      "name": "duplicate draft key",
+      "path": [
+        "draft",
+        "outputs",
+        1,
+        "output_key"
+      ],
+      "value": "out-1"
+    },
+    {
+      "name": "duplicate condition key",
+      "path": [
+        "requirements",
+        "outputs",
+        1,
+        "output_key"
+      ],
+      "value": "out-1"
+    },
+    {
+      "name": "mismatched condition key",
+      "path": [
+        "requirements",
+        "outputs",
+        1,
+        "output_key"
+      ],
+      "value": "out-3"
+    },
+    {
+      "name": "reversed duration",
+      "path": [
+        "requirements",
+        "outputs",
+        1,
+        "duration_min_ms"
+      ],
+      "value": 9000
+    },
+    {
+      "name": "zero duration",
+      "path": [
+        "requirements",
+        "outputs",
+        1,
+        "duration_min_ms"
+      ],
+      "value": 0
+    },
+    {
+      "name": "empty clips",
+      "path": [
+        "draft",
+        "outputs",
+        0,
+        "clips"
+      ],
+      "value": []
+    },
+    {
+      "name": "null output",
+      "path": [
+        "draft",
+        "outputs",
+        0
+      ],
+      "value": null
+    },
+    {
+      "name": "missing title",
+      "path": [
+        "draft",
+        "title"
+      ],
+      "remove": true
+    },
+    {
+      "name": "null subtitles",
+      "path": [
+        "requirements",
+        "subtitles_enabled"
+      ],
+      "value": null
+    },
+    {
+      "name": "string subtitles",
+      "path": [
+        "requirements",
+        "subtitles_enabled"
+      ],
+      "value": "true"
+    },
+    {
+      "name": "numeric profile",
+      "path": [
+        "requirements",
+        "profile"
+      ],
+      "value": 0
+    },
+    {
+      "name": "model supplied subtitles",
+      "path": [
+        "draft",
+        "subtitles"
+      ],
+      "value": {}
+    },
+    {
+      "name": "client read proof",
+      "path": [
+        "read_ids"
+      ],
+      "value": [
+        "fake"
+      ]
+    },
+    {
+      "name": "empty title",
+      "path": [
+        "draft",
+        "title"
+      ],
+      "value": ""
+    },
+    {
+      "name": "title codepoint limit",
+      "path": [
+        "draft",
+        "title"
+      ],
+      "value": "🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬🎬"
+    },
+    {
+      "name": "invalid hash",
+      "path": [
+        "draft_hash"
+      ],
+      "value": "abc"
+    },
+    {
+      "name": "ignored method property",
+      "path": [
+        "draft",
+        "unique"
+      ],
+      "value": true
+    },
+    {
+      "name": "ignored ordered property",
+      "path": [
+        "requirements",
+        "outputs",
+        0,
+        "ordered"
+      ],
+      "value": true
+    },
+    {
+      "name": "numeric boolean",
+      "path": [
+        "requirements",
+        "subtitles_enabled"
+      ],
+      "value": 1
+    }
+  ]
+}

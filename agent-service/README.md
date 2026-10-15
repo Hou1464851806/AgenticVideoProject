@@ -141,3 +141,13 @@ agent-service/.venv/bin/python agent-service/scripts/verify_java_crash.py
 ```
 
 完整结果与未验证边界见[第五阶段记录](../docs/verification/java-tools-m1-stage5.md)。
+
+## M2 阶段 1：制作数据契约
+
+已落实 [M2 设计](../docs/java-tools-m2-design.md) 的契约与制作条件，真实模式仍只开放 M1 问答和四读取工具。Java 真实校验、保存命令、固定制作快照与修正闭环在后续阶段接入。
+
+`agent_service/editing.py` 定义独立的草稿、逐输出条件、校验输入／问题／结果、制作身份和保存请求／结果。`runtime/state.py` 将理解增量合并为完整条件：程序生成 `out-1` 等稳定 `output_key`，单输出修改按键定位；标题和草稿顺序不影响条件关联。默认单输出、横屏、字幕开启、不强求完整字幕，不增加默认硬时长。`requirements.sources` 记录默认值或用户消息身份及原文，随 checkpoint 持久保存，CLI/status 可查看。
+
+调用 Java 时只传规范化条件，不包含运行模式和条件来源；未显式限定素材时，由程序展开固定素材上下文。`validate_edit_draft` 的参数只有 `draft/requirements/draft_hash/requirements_hash`；不再携带 `read_ids/read_records`。模型只能提出编排，不能携带项目／需求／scope 等可信身份，不能提出字幕或业务标识。保存请求已定义类型，尚无可执行保存命令。
+
+跨语言样例位于 `backend/src/test/resources/contracts/m2-editing.json`，两侧均验证中文、换行、emoji 的紧凑 UTF-8 键排序 SHA256，以及严格类型、输出键对应、数量、时长和大小限制。阶段记录见 [M2 阶段 1](../docs/verification/java-tools-m2-stage1.md)。

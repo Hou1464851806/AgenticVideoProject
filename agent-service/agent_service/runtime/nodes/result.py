@@ -2,7 +2,7 @@ from langgraph.runtime import Runtime
 
 from ...tools.evidence import valid_evidence
 from ..policy import fingerprint, incomplete
-from ..state import Context, State
+from ..state import Context, State, Requirements
 from .decision import repair
 
 
@@ -32,7 +32,7 @@ def check_result(state: State, runtime: Runtime[Context]):
     requested = state["requirements"].get("asset_ids")
     targets = set(ctx.assets) if requested is None else set(requested)
     if action.get("kind") == "DRAFT":
-        if validation.get("valid") and validation.get("draft_hash") == fingerprint(state["draft"]) and validation.get("requirements_hash") == fingerprint(state["requirements"]):
+        if validation.get("valid") and validation.get("draft_hash") == fingerprint(state["draft"]) and validation.get("requirements_hash") == fingerprint(Requirements.model_validate(state["requirements"]).production(sorted(ctx.assets))):
             for output in state["draft"]["outputs"]:
                 for clip in output["clips"]:
                     asset = ctx.assets.get(clip["asset_id"])

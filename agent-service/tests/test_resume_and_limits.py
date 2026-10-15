@@ -118,7 +118,7 @@ def test_cli_process_restart_user_wait(tmp_path):
     assert second["status"] == "DRAFT_READY"
     assert first["identity"] == second["identity"]
     assert second["usage"]["model_calls"] == 4
-    assert second["requirements"]["duration_min_ms"] == 30000
+    assert second["requirements"]["outputs"][0]["duration_min_ms"] == 30000
 
 
 @pytest.mark.asyncio

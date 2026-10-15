@@ -3,9 +3,10 @@ import asyncio
 from langgraph.runtime import Runtime
 
 from ...tools.evidence import valid_evidence
+from ...tools.mock import MockExecutor
 from ...tools.contracts import ToolRequest, ToolResult
 from ..policy import LimitReached, TemporaryToolError, await_operation, encoded, fingerprint
-from ..state import Context, State
+from ..state import Context, State, Requirements
 from .decision import repair
 
 
@@ -14,6 +15,9 @@ async def call_tool(state: State, runtime: Runtime[Context]):
     ctx.progress("call_tool")
     request = ToolRequest.model_validate(state["pending_tool"])
     try:
+        if request.tool_name == "validate_edit_draft" and isinstance(ctx.executor, MockExecutor):
+            # Development adapter restores trusted checkpoint observations, never model-supplied proof.
+            ctx.executor.read_records = dict(state["observations"])
         with ctx.tracer.tool(request):
             for attempt in range(ctx.limits.attempts):
                 ctx.stop()
@@ -90,7 +94,7 @@ def observe_tool(state: State, runtime: Runtime[Context]):
     usage = {**state["usage"], "no_progress": 0 if progress else state["usage"]["no_progress"]+1}
     updates = {"observations": observations, "coverage": coverage, "pending_tool": None, "usage": usage, "next_node": "decide_next"}
     if request.tool_name == "validate_edit_draft":
-        if result.data.get("draft_hash") != fingerprint(state["draft"]) or result.data.get("requirements_hash") != fingerprint(state["requirements"]):
+        if result.data.get("draft_hash") != fingerprint(state["draft"]) or result.data.get("requirements_hash") != fingerprint(Requirements.model_validate(state["requirements"]).production(sorted(ctx.assets))):
             raise RuntimeError("Stale draft validation result")
         updates["validation"] = result.data
         if result.data.get("valid"):

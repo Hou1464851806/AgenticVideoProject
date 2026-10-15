@@ -1,1 +1,48 @@
-{"understanding":{"relation":"CONTINUE","mode":"DRAFT","question":"需要严格多少秒？"},"after_clarification":{"relation":"CONTINUE","mode":"DRAFT","topic":"缓存","duration_min_ms":30000,"duration_max_ms":30000},"actions":[{"kind":"TOOL","tool_name":"read_video_range","arguments":{"asset_id":"lecture","start_ms":15000,"end_ms":45000}},{"kind":"DRAFT","draft":{"title":"缓存流程","outputs":[{"title":"讲解","clips":[{"asset_id":"lecture","source_in_ms":15000,"source_out_ms":45000,"evidence_ids":["speech-cache"],"reason":"完整读取流程"}]}]}}]}
+{
+  "understanding": {
+    "relation": "CONTINUE",
+    "mode": "DRAFT",
+    "question": "需要严格多少秒？"
+  },
+  "after_clarification": {
+    "relation": "CONTINUE",
+    "mode": "DRAFT",
+    "topic": "缓存",
+    "duration_min_ms": 30000,
+    "duration_max_ms": 30000
+  },
+  "actions": [
+    {
+      "kind": "TOOL",
+      "tool_name": "read_video_range",
+      "arguments": {
+        "asset_id": "lecture",
+        "start_ms": 15000,
+        "end_ms": 45000
+      }
+    },
+    {
+      "kind": "DRAFT",
+      "draft": {
+        "title": "缓存流程",
+        "outputs": [
+          {
+            "title": "讲解",
+            "clips": [
+              {
+                "asset_id": "lecture",
+                "source_in_ms": 15000,
+                "source_out_ms": 45000,
+                "evidence_ids": [
+                  "speech-cache"
+                ],
+                "reason": "完整读取流程"
+              }
+            ],
+            "output_key": "out-1"
+          }
+        ]
+      }
+    }
+  ]
+}

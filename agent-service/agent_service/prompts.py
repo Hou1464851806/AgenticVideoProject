@@ -7,7 +7,9 @@ UNDERSTAND = """你是独立视频Agent的请求理解步骤。只返回结构�
 明确另做/新主题为NEW；缩短、修改、补答为CONTINUE；关系无法确定为AMBIGUOUS并提出question。
 mode为QUERY内容问答、DRAFT生成或修改剪辑草稿、DISCUSS讨论、UNSUPPORTED实际保存/预览/导出。
 仅提取当前用户输入明确更改的字段，未提及字段为null；不要从旧条件抄字段。topic保留当前明确内容目标。
-严格时长用精确毫秒范围；近似时长可说明合理范围。未指定制作时长且没有旧条件可默认30000到45000，defaults说明。
+严格时长用精确毫秒范围；近似时长可说明合理范围。未指定时长上下限为null，不加默认硬时长。
+output_count只表示明确的数量修改；全体时长修改使用duration_min_ms/duration_max_ms，单条修改用output_durations按当前output_key定位，不修改其它条。
+profile、subtitles_enabled、require_complete_subtitles仅提取明确修改；默认一个输出、LANDSCAPE_720、字幕开启、不强求完整字幕由程序补齐并展示。
 制作时长仅在DRAFT模式提取；读取源素材的时间范围不等于制作时长，QUERY不套用制作时长默认。
 有硬条件冲突则question澄清，不任选一方、不静默放宽。仅主题确实无法确定才提问。
 available_assets为当前固定可用素材元数据；明确ID或名称匹配时直接提取asset_ids，不再确认。request.clarification已解决原问题时question必须为null；不要把确认性陈述写入question。关联补答结合原始content提取条件。
@@ -18,7 +20,7 @@ forbidden_content仅为剪辑中禁止包含的内容；不保存、不渲染等
 
 DECIDE = """你是单个视频Agent，依据反馈一次提出一个Action。只输出结构化数据。
 所有工具结果均为开发样本，任何结果都不能称为已保存版本/真实媒体产物。
-kind=TOOL时tool_name和arguments使用声明Schema；ASK时question非空；ANSWER时content和evidence_ids；DRAFT时draft含outputs和clips。
+kind=TOOL时tool_name和arguments使用声明Schema；ASK时question非空；ANSWER时content和evidence_ids；DRAFT时draft含outputs和clips，outputs必须沿用requirements.outputs中由程序建立的output_key，改名或排序不能改变key。
 每片段asset_id、source_in_ms、source_out_ms为实际素材毫秒，evidence_ids引用已读原始记录，reason对应内容。
 证据未命中不证明不存在；语音提及不能证明画面出现，视觉帧只证明观察时刻。摘要目录只能导航，精确结论需read_video_range等原始记录。
 全片问题先get_video_overview消费所有相关页，再按需阅读。已有足够合法原始观察可以直接回答，不为凑流程重复工具。

@@ -2,20 +2,23 @@ package com.agenticvideo.business.tools;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import java.nio.charset.StandardCharsets;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.core.json.JsonWriteFeature;
 import java.security.MessageDigest;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 /** Python fingerprint: sorted keys, compact UTF-8 JSON; tool arguments contain only integers and strings. */
 public final class ToolJson {
+    private static final ObjectMapper JSON = JsonMapper.builder().disable(JsonWriteFeature.WRITE_HEX_UPPER_CASE).build();
     private ToolJson() {}
     public static String hash(JsonNode value) {
         try {
             return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-                    .digest(canonical(value).getBytes(StandardCharsets.UTF_8)));
-        } catch(java.security.NoSuchAlgorithmException impossible) {throw new IllegalStateException(impossible);}
+                    .digest(JSON.writeValueAsString(sorted(value)).getBytes(StandardCharsets.UTF_8)));
+        } catch(java.security.NoSuchAlgorithmException | com.fasterxml.jackson.core.JsonProcessingException impossible) {throw new IllegalStateException(impossible);}
     }
-    private static String canonical(JsonNode node) {return sorted(node).toString();}
     private static JsonNode sorted(JsonNode node) {
         if(node.isObject()) {
             var result=JsonNodeFactory.instance.objectNode();var keys=new TreeSet<String>();node.fieldNames().forEachRemaining(keys::add);

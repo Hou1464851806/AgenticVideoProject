@@ -69,11 +69,11 @@ async def test_two_clarifications_preserve_confirmed_fields_across_restarts(tmp_
     second = await agent(tmp_path, parse, [read(), draft()]).resume(first["thread_id"], {
         "kind": "USER_INPUT", "wait_id": first["waiting"]["wait_id"], "content": "严格30秒"})
     assert second["status"] == "WAITING"
-    assert second["requirements"]["duration_min_ms"] == 30000
+    assert second["requirements"]["outputs"][0]["duration_min_ms"] == 30000
     third = await agent(tmp_path, parse, [read(), draft()]).resume(first["thread_id"], {
         "kind": "USER_INPUT", "wait_id": second["waiting"]["wait_id"], "content": "lecture"})
     assert third["status"] == "DRAFT_READY"
-    assert third["requirements"]["duration_min_ms"] == third["requirements"]["duration_max_ms"] == 30000
+    assert third["requirements"]["outputs"][0]["duration_min_ms"] == third["requirements"]["outputs"][0]["duration_max_ms"] == 30000
     assert third["outcome"]["validation"]["durations_ms"] == [30000]
     assert third["identity"] == first["identity"]
     assert third["usage"]["model_calls"] == 5
@@ -84,7 +84,7 @@ async def test_conflicting_duration_patch_waits_without_applying_invalid_conditi
     parsed = understanding("DRAFT", duration_min_ms=30000, duration_max_ms=20000, question="以哪个时长为准？")
     first = await agent(tmp_path, parsed).send("严格30秒且不超过20秒")
     assert first["status"] == "WAITING"
-    assert first["requirements"]["duration_min_ms"] is None
+    assert first["requirements"]["outputs"][0]["duration_min_ms"] is None
     assert first["usage"]["repairs"] == 0
 
 
@@ -190,3 +190,26 @@ async def test_draft_cannot_reapprove_sources_invalidated_by_current_context(tmp
     assert second["status"] == "ANSWER"
     assert second["usage"]["repairs"] == 1
     assert second["outcome"].get("draft") is None
+
+
+@pytest.mark.asyncio
+async def test_mock_draft_uses_persisted_reads_after_executor_restart(tmp_path):
+    first = await agent(tmp_path, understanding('DRAFT'), [read(), {'kind':'ASK','question':'保留当前内容吗？'}]).send('缓存草稿')
+    assert first['status'] == 'WAITING'
+    resumed = await agent(tmp_path, understanding('DRAFT'), [draft()]).resume(first['thread_id'], {
+        'kind':'USER_INPUT','wait_id':first['waiting']['wait_id'],'content':'保留'})
+    assert resumed['status'] == 'DRAFT_READY'
+
+
+@pytest.mark.asyncio
+async def test_mock_draft_can_cite_received_inspection(tmp_path):
+    def decide(ctx):
+        if not ctx['observations']:
+            return {'kind':'TOOL','tool_name':'inspect_video_range','arguments':{
+                'asset_id':'demo','start_ms':15000,'end_ms':20000,'goal':'核查画面'}}
+        action = draft(15000, 20000)
+        action['draft']['outputs'][0]['clips'][0]['asset_id'] = 'demo'
+        action['draft']['outputs'][0]['clips'][0]['evidence_ids'] = list(ctx['observations'])
+        return action
+    result = await agent(tmp_path, understanding('DRAFT'), decide).send('画面草稿')
+    assert result['status'] == 'DRAFT_READY'

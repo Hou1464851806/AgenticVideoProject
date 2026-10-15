@@ -26,8 +26,9 @@ async def understand_request(state: State, runtime: Runtime[Context], config):
         req = previous
         if parsed.relation != "AMBIGUOUS":
             try:
-                req = merge_requirements(previous, parsed, state["identity"]["turn_id"])
-            except ValidationError:
+                req = merge_requirements(previous, parsed, state["identity"]["turn_id"],
+                                         state["request"].get("clarification", state["request"]["content"]))
+            except (ValidationError, ValueError):
                 if not parsed.question:
                     raise
                 # Preserve conflicting parsed fields for the next understanding call,
@@ -40,7 +41,7 @@ async def understand_request(state: State, runtime: Runtime[Context], config):
             return {**updates, "waiting": waiting, "next_node": "await_input"}
         return {**updates,
                 "next_node": "decide_next", "feedback": {"defaults": parsed.defaults}}
-    except (ModelFormatError, ValidationError) as error:
+    except (ModelFormatError, ValidationError, ValueError) as error:
         if state["usage"]["repairs"] >= ctx.limits.repairs:
             return {"stop_reason": "请求理解修正额度已用尽", "next_node": "check_result"}
         usage = {**state["usage"], "repairs": state["usage"]["repairs"]+1}

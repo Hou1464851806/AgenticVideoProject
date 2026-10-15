@@ -19,7 +19,7 @@ def answer(ids=None, text="先查缓存，未命中再查询数据库并写回�
 
 
 def draft(start=15000, end=45000):
-    return {"kind": "DRAFT", "draft": {"title": "缓存流程", "outputs": [{"title": "讲解", "clips": [
+    return {"kind": "DRAFT", "draft": {"title": "缓存流程", "outputs": [{"output_key": "out-1", "title": "讲解", "clips": [
         {"asset_id": "lecture", "source_in_ms": start, "source_out_ms": end, "evidence_ids": ["speech-cache"], "reason": "保留完整读取流程"}]}]}}
 
 
@@ -78,7 +78,7 @@ async def test_new_requirement_isolated_even_when_detected_by_model(tmp_path):
     runner.model = ScriptedModel({"relation": "NEW", "mode": "DISCUSS", "topic": "新的项目"}, [answer([], "可以讨论新项目。")])
     second = await runner.send("另做一个新主题", thread_id=first["thread_id"])
     assert second["thread_id"] != first["thread_id"]
-    assert second["requirements"]["duration_min_ms"] is None
+    assert second["requirements"]["outputs"][0]["duration_min_ms"] is None
     assert second["requirements"]["topic"] == "新的项目"
     assert second["outcome"]["status"] == "ANSWER"
 
@@ -125,7 +125,10 @@ async def test_no_match_does_not_create_evidence(tmp_path):
 @pytest.mark.asyncio
 async def test_multiple_outputs_are_independently_validated(tmp_path):
     action = draft()
-    action['draft']['outputs'] *= 2
+    import copy
+    second = copy.deepcopy(action['draft']['outputs'][0])
+    second['output_key'] = "out-2"
+    action['draft']['outputs'].append(second)
     result = await agent(tmp_path, understanding('DRAFT', output_count=2, duration_min_ms=30000, duration_max_ms=30000), [read(), action]).send('两条严格30秒草稿')
     assert result['status'] == 'DRAFT_READY'
     assert result['outcome']['validation']['durations_ms'] == [30000, 30000]

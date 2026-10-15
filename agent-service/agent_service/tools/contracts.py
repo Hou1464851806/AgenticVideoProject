@@ -1,6 +1,8 @@
 """Transport-independent tool contracts; no graph or provider imports."""
 import json
 from typing import Any, Literal
+from ..editing import Validation
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
@@ -35,15 +37,6 @@ class Range(Overview):
 
 class Inspection(Range):
     goal: str = Field(min_length=1, max_length=500)
-
-
-class Validation(Contract):
-    draft: dict
-    requirements: dict
-    read_ids: list[str]
-    read_records: list[dict] = Field(default_factory=list)
-    draft_hash: str
-    requirements_hash: str
 
 
 class ToolRequest(Contract):

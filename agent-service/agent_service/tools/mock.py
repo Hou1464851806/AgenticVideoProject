@@ -1,10 +1,11 @@
 """Development-only executor over immutable sample data, not production tools."""
 import json
 from pathlib import Path
+from typing import Literal
 
 from .contracts import PARAMETERS, ToolRequest, ToolResult
 from ..runtime.policy import TemporaryToolError, fingerprint
-from ..runtime.state import Draft, Requirements
+from ..editing import ValidationResult
 
 SCENARIOS = {"normal", "pending", "validation_failure", "transient", "no_match"}
 
@@ -18,9 +19,12 @@ class MockExecutor:
         self.assets = {a["id"]: a for a in self.sample["assets"]}
         self.records = {r["id"]: r for r in self.sample["records"]}
         self.attempts = {}
+        self.read_records = {}
 
     async def execute(self, request: ToolRequest) -> ToolResult:
-        def result(status="READY", **kwargs):
+        def result(status: Literal["READY", "PENDING", "ERROR"] = "READY", **kwargs):
+            if status == "READY":
+                self.read_records.update({r["id"]: r for r in kwargs.get("records", [])})
             return ToolResult(call_id=request.call_id, tool_name=request.tool_name,
                               request_hash=request.request_hash, status=status, **kwargs)
         args = PARAMETERS[request.tool_name].model_validate(request.arguments)
@@ -63,8 +67,9 @@ class MockExecutor:
             return result(records=[record], coverage={"asset_id": args.asset_id, "start_ms": args.start_ms, "end_ms": args.end_ms, "visual_complete": False})
         if request.tool_name == "validate_edit_draft":
             if self.scenario == "validation_failure" and request.call_id.endswith(":v0"):
-                return result(data={"valid": False, "issues": [{"field": "outputs", "code": "INJECTED_CHECK"}], "durations_ms": [],
-                                    "draft_hash": args.draft_hash, "requirements_hash": args.requirements_hash})
+                return result(data={"valid": False, "issues": [{"field": "outputs", "code": "INJECTED_CHECK", "message": "模拟校验拒绝本次草稿"}], "durations_ms": [],
+                                    "draft_hash": args.draft_hash, "requirements_hash": args.requirements_hash,
+                                    "validation_id": "mock-"+request.call_id, "issues_truncated": False, "warnings": []})
             return result(data=self.validate(args))
         raise RuntimeError("Catalog and Mock executor are inconsistent")
 
@@ -76,39 +81,46 @@ class MockExecutor:
 
     def complete(self, request):
         """Explicit development event used by CLI, never an automatic polling loop."""
+        record = self.inspection_record(request)
+        self.read_records[record["id"]] = record
         return ToolResult(call_id=request.call_id, tool_name=request.tool_name, request_hash=request.request_hash,
-                          status="READY", records=[self.inspection_record(request)],
+                          status="READY", records=[record],
                           coverage={"asset_id": request.arguments["asset_id"], "visual_complete": False})
 
     def validate(self, args):
-        draft, req = Draft.model_validate(args.draft), Requirements.model_validate(args.requirements)
+        draft, req = args.draft, args.requirements
         issues, durations = [], []
-        if fingerprint(args.draft) != args.draft_hash or fingerprint(args.requirements) != args.requirements_hash:
+        if fingerprint(args.draft.model_dump()) != args.draft_hash or fingerprint(args.requirements.model_dump()) != args.requirements_hash:
             raise RuntimeError("Draft validation identity mismatch")
-        if len(draft.outputs) != req.output_count:
-            issues.append({"field": "outputs", "code": "OUTPUT_COUNT", "expected": req.output_count})
+        conditions = {o.output_key: o for o in req.outputs}
         for i, output in enumerate(draft.outputs):
             total = 0
             for j, clip in enumerate(output.clips):
                 asset = self.assets.get(clip.asset_id)
                 field = f"outputs[{i}].clips[{j}]"
-                if not asset or (req.asset_ids is not None and clip.asset_id not in req.asset_ids):
+                if not asset or clip.asset_id not in req.asset_ids:
                     issues.append({"field": field, "code": "ASSET_SCOPE"})
                     continue
                 if not 0 <= clip.source_in_ms < clip.source_out_ms <= asset["duration_ms"]:
                     issues.append({"field": field, "code": "INVALID_RANGE"})
                 for evidence_id in clip.evidence_ids:
-                    record = self.records.get(evidence_id) or next((r for r in args.read_records if r["id"] == evidence_id), None)
-                    if evidence_id not in args.read_ids or not record or record["asset_id"] != clip.asset_id:
-                        issues.append({"field": field+".evidence_ids", "code": "UNREAD_SOURCE", "id": evidence_id})
+                    record = self.read_records.get(evidence_id)
+                    if not record or record["asset_id"] != clip.asset_id:
+                        issues.append({"field": field+".evidence_ids", "code": "UNREAD_SOURCE"})
                     elif record["end_ms"] <= clip.source_in_ms or record["start_ms"] >= clip.source_out_ms:
-                        issues.append({"field": field+".evidence_ids", "code": "SOURCE_OUTSIDE_RANGE", "id": evidence_id})
+                        issues.append({"field": field+".evidence_ids", "code": "SOURCE_OUTSIDE_RANGE"})
                     elif any(word in record["text"] for word in req.forbidden_content):
                         issues.append({"field": field, "code": "FORBIDDEN_CONTENT"})
                 total += clip.source_out_ms - clip.source_in_ms
             durations.append(total)
-            if (req.duration_min_ms and total < req.duration_min_ms) or (req.duration_max_ms and total > req.duration_max_ms):
-                issues.append({"field": f"outputs[{i}]", "code": "DURATION", "actual_ms": total,
-                               "min_ms": req.duration_min_ms, "max_ms": req.duration_max_ms})
-        return {"valid": not issues, "issues": issues, "durations_ms": durations,
-                "draft_hash": args.draft_hash, "requirements_hash": args.requirements_hash}
+            condition = conditions[output.output_key]
+            if (condition.duration_min_ms and total < condition.duration_min_ms) or (condition.duration_max_ms and total > condition.duration_max_ms):
+                issues.append({"field": f"outputs[{i}]", "code": "OUTPUT_DURATION", "output_key": output.output_key, "actual": total,
+                               "expected": {"min_ms": condition.duration_min_ms, "max_ms": condition.duration_max_ms}})
+        for issue in issues:
+            issue["message"] = {"ASSET_SCOPE": "素材不在许可范围", "INVALID_RANGE": "片段区间无效",
+                                "UNREAD_SOURCE": "引用尚未读取或不属于片段素材", "SOURCE_OUTSIDE_RANGE": "引用不在片段区间内",
+                                "FORBIDDEN_CONTENT": "引用原文包含禁用内容", "OUTPUT_DURATION": "输出时长不满足条件"}[issue["code"]]
+        return ValidationResult(validation_id="mock-"+args.draft_hash, valid=not issues, issues=issues, durations_ms=durations,
+                                draft_hash=args.draft_hash, requirements_hash=args.requirements_hash,
+                                issues_truncated=False, warnings=[]).model_dump(exclude_none=True)

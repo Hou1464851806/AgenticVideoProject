@@ -152,3 +152,11 @@ agent-service/.venv/bin/python agent-service/scripts/verify_java_m1.py --output 
 ```
 
 另需 `DEEPSEEK_API_KEY` 与本机 Python 虚拟环境。该脚本保存新素材范围、百炼回执、语义查询、四工具反馈、DeepSeek回答与 trace；它与只运行 Java 的 `test-models.mjs` 分别报告。实际SIGKILL恢复及单体媒体浏览器回归入口见第五阶段记录；服务重启后浏览器须重新登录。
+
+## M2 阶段 1：方案契约与来源
+
+`business/plan/EditDraftContracts.java` 定义 M2 跨语言值与边界解析，不执行证据校验或保存。与 Python 共用测试样例，限制 1～10 输出、每输出 1～100 片段，整数使用非负／正数的有符号 64 位范围；文本长度按 Unicode 码点计。校验参数最多 65536 UTF-8 字节，校验和保存结果最多 32768 字节。可省略的输出时长上／下限规范化为 null；字段类型不做字符串、布尔或浮点到整数的隐式转换。
+
+V52 新增 `edit_productions` 和 `edit_draft_validations`：制作需求绑定项目及固定 scope；校验绑定需求、原工具回执、完整条件／草稿、来源、两种哈希、规则版本和规范化内容。Python `identity.requirement_id` 对应 `edit_productions.id`，`question_scope.scope_id` 对应其 `scope_id`。`plan_revisions` 保留旧任务来源，并支持独立制作来源：二者必须择一；新来源必须引用本需求、本项目的校验，并与保存结果（含 output_key 映射）同一行提交。同需求唯一约束为后续幂等保存提供基础。
+
+本阶段只交付类型和数据库约束，没有开放校验或保存 HTTP 路由，也没有贯通新 Agent 到既有媒体制作。实际阶段验证见 [M2 阶段 1](../docs/verification/java-tools-m2-stage1.md)。
