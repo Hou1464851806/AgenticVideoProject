@@ -10,7 +10,7 @@ import java.util.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-/** Four read-only tools: identity admission, strict parameters, bounded feedback and durable replay. */
+/** Fixed tool gateway: identity admission, strict parameters, bounded feedback and durable replay. */
 @Service
 public class ReadTools {
     public static final int MAX_BYTES=32768;
@@ -19,8 +19,10 @@ public class ReadTools {
     private final ObjectMapper json;
     private final QuestionScopes scopes;
     private final QuestionEvidence evidence;
-    public ReadTools(JdbcTemplate db,ObjectMapper json,QuestionScopes scopes,QuestionEvidence evidence){this.db=db;this.json=json;this.scopes=scopes;this.evidence=evidence;}
-    public JsonNode execute(UUID scopeId,JsonNode request) {
+    private final com.agenticvideo.business.plan.ProductionDrafts productions;
+    public ReadTools(JdbcTemplate db,ObjectMapper json,QuestionScopes scopes,QuestionEvidence evidence,com.agenticvideo.business.plan.ProductionDrafts productions){this.db=db;this.json=json;this.scopes=scopes;this.evidence=evidence;this.productions=productions;}
+    public JsonNode execute(UUID scopeId,JsonNode request) {return execute(scopeId,null,request);}
+    public JsonNode execute(UUID scopeId,UUID productionId,JsonNode request) {
         for(String name:List.of("call_id","tool_name","request_hash"))
             if(!request.path(name).isTextual()||request.path(name).asText().isBlank()||request.path(name).asText().length()>200)
                 throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST,"调用身份字段无效");
@@ -30,13 +32,18 @@ public class ReadTools {
         boolean admitted=false;
         try {
             validateRequest(request);
+            if(productionId!=null && !"validate_edit_draft".equals(request.path("tool_name").asText()))throw parameter("TOOL_UNAVAILABLE","制作入口只接纳草稿校验");
+            if(productionId==null && "validate_edit_draft".equals(request.path("tool_name").asText()))throw new ToolFailure("PRODUCTION_REQUIRED","IDENTITY_CONFLICT","校验须使用可信制作入口");
+            var admittedRequest=(ObjectNode)request.deepCopy();
+            if(productionId!=null)admittedRequest.put("production_id",productionId.toString());
             // Check dependencies even before replay; never hide an invalid snapshot behind an old receipt.
             scopes.requireDependencies(scope);
-            admitted=db.update("INSERT INTO question_tool_receipts(scope_id,call_id,request_json) VALUES (?,?,?::jsonb) ON CONFLICT(scope_id,call_id) DO NOTHING",scopeId,request.path("call_id").asText(),request.toString())==1;
+            admitted=db.update("INSERT INTO question_tool_receipts(scope_id,call_id,request_json) VALUES (?,?,?::jsonb) ON CONFLICT(scope_id,call_id) DO NOTHING",scopeId,request.path("call_id").asText(),admittedRequest.toString())==1;
             var receipt=db.queryForMap("SELECT request_json,result_json FROM question_tool_receipts WHERE scope_id=? AND call_id=?",scopeId,request.path("call_id").asText());
-            if(!parse(receipt.get("request_json")).equals(request))throw new ToolFailure("CALL_ID_CONFLICT","IDENTITY_CONFLICT","相同调用身份的工具或参数不同");
+            if(!parse(receipt.get("request_json")).equals(admittedRequest))throw new ToolFailure("CALL_ID_CONFLICT","IDENTITY_CONFLICT","相同调用身份的工具或参数不同");
             if(receipt.get("result_json")!=null)return parse(receipt.get("result_json"));
             if(!admitted)throw new ToolFailure("CALL_UNCONFIRMED","EXECUTION_UNCONFIRMED","调用仍在执行或结果尚未核对，停止本次尝试");
+            if(productionId!=null){((ObjectNode)result.path("coverage")).put("scope_id",scopeId.toString());return productions.validate(scope,productionId,request,result);}
             var args=request.path("arguments");String name=request.path("tool_name").asText();
             validateArguments(name,args);
             int cursor=args.path("cursor").asInt(0);

@@ -84,21 +84,12 @@ public class EditPlanValidation {
                 long observedStart = ((Number)observation.get("start_ms")).longValue();
                 long observedEnd = ((Number)observation.get("end_ms")).longValue();
                 String caption = observation.get("text").toString();
-                if (observedStart < start || observedEnd > end) {
-                    var selectedWords = new ArrayList<JsonNode>();
-                    for (var word : timings.words(observation)) {
-                        long wordStart=word.path("startMs").asLong(), wordEnd=word.path("endMs").asLong();
-                        if (wordStart >= end || wordEnd <= start) continue;
-                        if (wordStart < start || wordEnd > end || wordEnd <= wordStart) reject("剪辑边界不能截断原文中的词");
-                        selectedWords.add(word);
-                    }
-                    if (selectedWords.isEmpty()) reject("缺少词级证据，不能截断已有语音原句");
-                    var originalText = new StringBuilder();
-                    for (var word : selectedWords) originalText.append(word.path("text").asText()).append(word.path("punctuation").asText());
-                    caption=originalText.toString();
-                    observedStart=selectedWords.get(0).path("startMs").asLong();
-                    observedEnd=selectedWords.get(selectedWords.size()-1).path("endMs").asLong();
-                }
+                var mapping=parseMapping(assets.get(0).get("time_mapping_json"));
+                var selected=timings.select(observation,start,end,mapping.path("audioStartMs").asLong()-mapping.path("formatStartMs").asLong());
+                if(selected.sentenceCut())reject("缺少词级证据，不能截断已有语音原句");
+                if(!selected.cuts().isEmpty())reject("剪辑边界不能截断原文中的词");
+                caption=selected.text();observedStart=selected.startMs();observedEnd=selected.endMs();
+                if(caption.isEmpty())continue;
                 if (caption.isBlank() || caption.length() > 2000 || caption.chars().anyMatch(value -> value < 32 && value != 10)) reject("原文字幕不符合渲染文本限制");
                 for(var forbidden:input.path("editing").path("forbiddenContent"))if(caption.contains(forbidden.asText()))reject("选段原文包含明确禁用内容");
                 cues.add(Map.of("startMs", duration+observedStart-start, "endMs", duration+observedEnd-start,

@@ -47,6 +47,8 @@ public class QuestionScopes {
                 asset.put("id",row.get("id").toString()).put("filename",row.get("filename").toString())
                     .put("source_sha256",row.get("sha256").toString()).put("validation_status",row.get("validation_status").toString());
                 asset.set("duration_ms",json.valueToTree(row.get("duration_ms")));
+                asset.put("has_audio",row.get("time_mapping_json")!=null && parse(row.get("time_mapping_json")).path("hasAudio").asBoolean());
+                if(row.get("time_mapping_json")!=null){var mapping=parse(row.get("time_mapping_json"));asset.put("audio_offset_ms",mapping.path("audioStartMs").asLong()-mapping.path("formatStartMs").asLong());}
                 asset.set("analysis_version",json.valueToTree(row.get("analysis_id")));
                 asset.set("index_generation",json.valueToTree(row.get("generation_id")));
                 boolean valid="VALID".equals(row.get("validation_status"));
@@ -57,7 +59,8 @@ public class QuestionScopes {
                 var ready=asset.putArray("source_kinds");
                 sources.fields().forEachRemaining(entry->{if("SUCCEEDED".equals(entry.getValue().asText()))ready.add(entry.getKey());});
                 var coverage=asset.putObject("coverage");
-                coverage.set("speech_processed_ranges",speechRanges(row));
+                var audioRanges=audioRanges(row);coverage.set("audio_ranges",audioRanges);
+                coverage.set("speech_processed_ranges","SUCCEEDED".equals(row.get("speech_status"))?audioRanges:json.createArrayNode());
                 coverage.set("sampling",row.get("vision_profile_json")==null?json.valueToTree(Map.of("kind","SPARSE_FRAMES","complete",false)):parse(row.get("vision_profile_json")));
                 coverage.put("visual_complete",false);
                 if(row.get("analysis_id")!=null)coverage.set("sampled_at_ms",json.valueToTree(db.queryForList("SELECT observed_at_ms FROM vision_frames WHERE analysis_id=? AND inspection_id IS NULL ORDER BY ordinal",Long.class,row.get("analysis_id"))));
@@ -73,9 +76,9 @@ public class QuestionScopes {
             return new Scope(id,project,assets);
         });
     }
-    private JsonNode speechRanges(Map<String,Object> row) {
+    private JsonNode audioRanges(Map<String,Object> row) {
         var ranges=json.createArrayNode();
-        if(!"SUCCEEDED".equals(row.get("speech_status"))||row.get("media_info_json")==null||row.get("time_mapping_json")==null)return ranges;
+        if(row.get("media_info_json")==null||row.get("time_mapping_json")==null)return ranges;
         var mapping=parse(row.get("time_mapping_json"));long offset=mapping.path("audioStartMs").asLong()-mapping.path("formatStartMs").asLong();
         for(var stream:parse(row.get("media_info_json")).path("streams"))if("audio".equals(stream.path("codec_type").asText())) {
             String duration=stream.path("duration").asText();

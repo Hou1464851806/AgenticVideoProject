@@ -160,3 +160,18 @@ agent-service/.venv/bin/python agent-service/scripts/verify_java_m1.py --output 
 V52 新增 `edit_productions` 和 `edit_draft_validations`：制作需求绑定项目及固定 scope；校验绑定需求、原工具回执、完整条件／草稿、来源、两种哈希、规则版本和规范化内容。Python `identity.requirement_id` 对应 `edit_productions.id`，`question_scope.scope_id` 对应其 `scope_id`。`plan_revisions` 保留旧任务来源，并支持独立制作来源：二者必须择一；新来源必须引用本需求、本项目的校验，并与保存结果（含 output_key 映射）同一行提交。同需求唯一约束为后续幂等保存提供基础。
 
 本阶段只交付类型和数据库约束，没有开放校验或保存 HTTP 路由，也没有贯通新 Agent 到既有媒体制作。实际阶段验证见 [M2 阶段 1](../docs/verification/java-tools-m2-stage1.md)。
+
+## M2 阶段 2：真实草稿校验
+
+内部 Bearer 认证继续使用上述凭据。先创建固定 scope，再由可信客户端将制作需求 UUID 绑定到该 scope：
+
+| 接口 | 契约 |
+| --- | --- |
+| `PUT /internal/v1/questions/productions/{requirement_id}` | `{ "project_id": "UUID", "scope_id": "UUID" }`；绑定可重放，同身份不能更换项目／scope |
+| `POST /internal/v1/questions/productions/{requirement_id}/tools` | `call_id/tool_name/arguments/request_hash`；仅接纳 `validate_edit_draft`。参数为阶段 1 的完整 `draft/requirements/draft_hash/requirements_hash`；制作身份来自路由和已存关联 |
+
+读取仍使用该 scope 的四个工具入口。校验只采信服务端成功 `read_video_range` 回执，核验从 cursor=0 到末页的完整链；完整范围可相接覆盖片段。检索／目录不替代范围阅读。新 head 不改变固定分析版本；真实依赖失效返回停止类错误。scope 现在同时固定音轨存在性、源坐标偏移与音轨范围，用于切词、字幕映射和 ASR 覆盖检查。旧 scope 若缺少这些固定媒体信息，制作入口明确停止，需用户明确启动新需求并创建新 scope；不会自动更新旧快照。
+
+校验成功执行返回 `READY`；`data.valid=false` 表示草稿不合规，issues 含字段路径和 `output_key`。返回实际源区间时长、两种哈希、`validation_id` 和必要警告；超过反馈上限明确设置 `issues_truncated`，警告省略以 `WARNINGS_TRUNCATED` 计数。规范化内容只存于数据库，不进入模型反馈，不分配永久 outputId/clipId。校验记录与工具结果在短事务内同时写入，相同调用重放返回原结果；提交故障上抛，未核对回执明确停止。
+
+方案规则在 `business/plan/EditDraftValidation`，服务端证据／读取依据在 `DraftEvidence`，制作绑定与校验持久化在 `ProductionDrafts`；工具入口复用现有身份、哈希与回执治理。旧方案入口共用 `SpeechTimings` 的原文选词和边界规则。本阶段不创建方案版本、不调用 ASR/VLM，也没有接入 Python 的真实 DRAFT 或 CLI 保存。验证记录见 [M2 阶段 2](../docs/verification/java-tools-m2-stage2.md)。
