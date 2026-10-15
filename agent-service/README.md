@@ -1,5 +1,8 @@
 # Independent Python Agent MVP
 
+M4 步骤 1 已增加独立的 `agent_service.preview` 传输模型，与 Java 共用契约样例；HTTP 客户端和五个预览命令尚未接入，现阶段不能通过 CLI 预览。进度见 [M4 实施记录](../docs/verification/java-tools-m4.md)。
+
+
 本目录只负责 LangGraph 决策、条件、证据、草稿、等待、预算和恢复。工具通过 `ToolExecutor` 执行；可使用固定样本 Mock 或 `JavaToolExecutor` 的真实问答／剪辑草稿模式。ASR/VLM/Embedding 与索引由 Java 后端负责，旧 Python 分析适配器已删除。
 
 ## 安装与运行

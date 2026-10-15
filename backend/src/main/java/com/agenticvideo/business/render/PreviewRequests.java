@@ -35,7 +35,18 @@ public class PreviewRequests {
         if(rows.isEmpty())throw new ResponseStatusException(NOT_FOUND,"渲染请求不存在或无权访问");
         return rows.get(0);
     }
+    public record Admission(Object result,boolean created) {}
+    public static class Rejected extends ResponseStatusException {
+        public final String code;
+        public Rejected(org.springframework.http.HttpStatus status,String code,String message){super(status,message);this.code=code;}
+    }
     public Object request(UUID revisionId,JsonNode body,String key) {
+        return admit(revisionId,body,key,false).result();
+    }
+    public Admission requestSaved(UUID revisionId,UUID outputId) {
+        return admit(revisionId,json.valueToTree(Map.of("outputId",outputId,"previewProfile","LOW_360")),UUID.randomUUID().toString(),true);
+    }
+    private Admission admit(UUID revisionId,JsonNode body,String key,boolean requireExplicitRetry) {
         if(key==null || key.isBlank() || key.length()>200)throw new ResponseStatusException(BAD_REQUEST,"请求标识必须为 1–200 个字符");
         if(body==null || !body.isObject())throw new ResponseStatusException(BAD_REQUEST,"请指定成片与支持的预览规格");
         body.fieldNames().forEachRemaining(field -> {
@@ -53,7 +64,7 @@ public class PreviewRequests {
             var intent=database.queryForList("SELECT *,request_json=?::jsonb AS same_input FROM preview_intents WHERE project_id=? AND idempotency_key=?",encode(normalized),projectId,key);
             if(!intent.isEmpty()) {
                 if(!revisionId.equals(intent.get(0).get("revision_id")) || !Boolean.TRUE.equals(intent.get(0).get("same_input")))throw new ResponseStatusException(CONFLICT,"同一请求标识不能用于不同预览输入");
-                return parse(intent.get(0).get("response_json"));
+                return new Admission(parse(intent.get(0).get("response_json")),false);
             }
             var revision=database.queryForMap("SELECT * FROM plan_revisions WHERE id=? FOR UPDATE",revisionId);
             JsonNode output=null;
@@ -66,7 +77,10 @@ public class PreviewRequests {
                 UUID asset=UUID.fromString(clip.path("assetId").asText());
                 if(sources.containsKey(asset))continue;
                 var rows=database.queryForList("SELECT id,object_key,byte_size,sha256,duration_ms,media_info_json,time_mapping_json FROM assets WHERE id=? AND project_id=? AND validation_status='VALID'",asset,revision.get("project_id"));
-                if(rows.isEmpty())throw new ResponseStatusException(CONFLICT,"方案依赖的原素材不可用");
+                if(rows.isEmpty()) {
+                    if(requireExplicitRetry)throw new Rejected(CONFLICT,"PREVIEW_SOURCE_UNAVAILABLE","方案依赖的原素材不可用");
+                    throw new ResponseStatusException(CONFLICT,"方案依赖的原素材不可用");
+                }
                 var row=rows.get(0);
                 sources.put(asset,Map.of("assetId",asset,"objectKey",row.get("object_key"),"sizeBytes",row.get("byte_size"),"sha256",row.get("sha256"),
                         "durationMs",row.get("duration_ms"),"mediaInfo",parse(row.get("media_info_json")),"timeMapping",parse(row.get("time_mapping_json"))));
@@ -83,7 +97,8 @@ public class PreviewRequests {
                 var prior=existing.get(0);
                 if(Set.of("PENDING","RUNNING","CANCEL_REQUESTED").contains(prior.get("status"))
                         || "SUCCEEDED".equals(prior.get("status")) && prior.get("artifact_id")!=null && artifacts.available((UUID)prior.get("artifact_id")))
-                    return remember(projectId,key,revisionId,normalized,read((UUID)prior.get("id")));
+                    return new Admission(remember(projectId,key,revisionId,normalized,read((UUID)prior.get("id"))),false);
+                if(requireExplicitRetry)return new Admission(read((UUID)prior.get("id")),false);
             }
             UUID request=UUID.randomUUID(),task=UUID.randomUUID(),event=UUID.randomUUID();
             var input=Map.of("operation","PREVIEW","requestId",request,"revisionId",revisionId,"outputId",outputId,"output",output,
@@ -95,7 +110,7 @@ public class PreviewRequests {
             database.update("INSERT INTO tasks(id,project_id,type,input_json,disk_budget_bytes) VALUES (?,?,'PREVIEW_RENDER',?::jsonb,?)",task,revision.get("project_id"),encode(input),diskBudget);
             database.update("INSERT INTO outbox_events(id,task_id,type,payload_json) VALUES (?,?,'PREVIEW_RENDER',jsonb_build_object('schemaVersion','1.0','eventId',?::text,'taskId',?::text,'taskType','PREVIEW_RENDER','projectId',?::text,'occurredAt',now()))",
                     event,task,event,task,revision.get("project_id"));
-            return remember(projectId,key,revisionId,normalized,read(request));
+            return new Admission(remember(projectId,key,revisionId,normalized,read(request)),true);
         });
     }
     private Object remember(UUID project,String key,UUID revision,JsonNode body,Object response) {
@@ -121,6 +136,30 @@ public class PreviewRequests {
     public Object list(UUID revision) {
         return Map.of("items",database.queryForList("SELECT id FROM render_requests WHERE revision_id=? AND kind='PREVIEW' ORDER BY created_at,id",revision).stream()
                 .map(row -> read((UUID)row.get("id"))).toList());
+    }
+    /** The internal CLI cannot use this boundary to inspect EXPORT or other task types. */
+    public Map<String,Object> previewRow(UUID requestId) {
+        var rows=database.queryForList("SELECT r.* FROM render_requests r JOIN tasks t ON t.id=r.task_id WHERE r.id=? AND r.kind='PREVIEW' AND t.type='PREVIEW_RENDER'",requestId);
+        if(rows.isEmpty())throw new Rejected(NOT_FOUND,"PREVIEW_NOT_FOUND","预览请求不存在");
+        return rows.get(0);
+    }
+    public PreviewContracts.Result readPreview(UUID requestId) {
+        var row=previewRow(requestId);
+        var current=json.valueToTree(read(requestId));
+        var status=PreviewContracts.TaskStatus.valueOf(current.path("status").asText());
+        boolean retry=status==PreviewContracts.TaskStatus.FAILED || status==PreviewContracts.TaskStatus.CANCELLED;
+        PreviewContracts.Error error=current.has("error") ? new PreviewContracts.Error(current.path("error").path("code").asText(),current.path("error").path("message").asText()) : null;
+        PreviewContracts.Artifact artifact=null;
+        if(row.get("artifact_id")!=null) {
+            UUID id=(UUID)row.get("artifact_id");var published=artifacts.row(id);
+            var state=PreviewContracts.ArtifactState.valueOf(published.get("state").toString());
+            artifact=new PreviewContracts.Artifact(id,state,((Number)published.get("duration_ms")).longValue());
+            if(status==PreviewContracts.TaskStatus.SUCCEEDED && state!=PreviewContracts.ArtifactState.AVAILABLE) {
+                retry=true;error=new PreviewContracts.Error("PREVIEW_ARTIFACT_UNAVAILABLE","预览产物不可用，请显式重试");
+            }
+        }
+        return new PreviewContracts.Result(requestId,(UUID)row.get("project_id"),(UUID)row.get("revision_id"),(UUID)row.get("output_id"),(UUID)row.get("task_id"),
+                status,current.path("createdAt").asText(),artifact,null,retry,error);
     }
     private JsonNode parse(Object value) {try{return json.readTree(value.toString());}catch(java.io.IOException invalid){throw new IllegalStateException(invalid);}}
     private String encode(Object value) {try{return json.writer().with(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).writeValueAsString(value);}catch(java.io.IOException invalid){throw new IllegalStateException(invalid);}}

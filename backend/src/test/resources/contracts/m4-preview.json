@@ -1,0 +1,99 @@
+{
+  "request": {
+    "output_key": "out-1"
+  },
+  "results": [
+    {
+      "request_id": "00000000-0000-0000-0000-000000000001",
+      "project_id": "00000000-0000-0000-0000-000000000002",
+      "revision_id": "00000000-0000-0000-0000-000000000003",
+      "output_id": "00000000-0000-0000-0000-000000000004",
+      "task_id": "00000000-0000-0000-0000-000000000005",
+      "task_status": "PENDING",
+      "created_at": "2026-10-15T08:00:00Z",
+      "artifact": null,
+      "playback": null,
+      "retry_allowed": false,
+      "error": null
+    },
+    {
+      "request_id": "00000000-0000-0000-0000-000000000001",
+      "project_id": "00000000-0000-0000-0000-000000000002",
+      "revision_id": "00000000-0000-0000-0000-000000000003",
+      "output_id": "00000000-0000-0000-0000-000000000004",
+      "task_id": "00000000-0000-0000-0000-000000000005",
+      "task_status": "SUCCEEDED",
+      "created_at": "2026-10-15T08:00:00Z",
+      "artifact": {
+        "artifact_id": "00000000-0000-0000-0000-000000000006",
+        "state": "AVAILABLE",
+        "duration_ms": 4000
+      },
+      "playback": {
+        "url": "https://storage.example/temporary-preview-url",
+        "expires_in_seconds": 300
+      },
+      "retry_allowed": false,
+      "error": null
+    },
+    {
+      "request_id": "00000000-0000-0000-0000-000000000001",
+      "project_id": "00000000-0000-0000-0000-000000000002",
+      "revision_id": "00000000-0000-0000-0000-000000000003",
+      "output_id": "00000000-0000-0000-0000-000000000004",
+      "task_id": "00000000-0000-0000-0000-000000000005",
+      "task_status": "FAILED",
+      "created_at": "2026-10-15T08:00:00Z",
+      "artifact": null,
+      "playback": null,
+      "retry_allowed": true,
+      "error": {
+        "code": "PREVIEW_SOURCE_UNAVAILABLE",
+        "message": "方案依赖的原素材不可用"
+      }
+    },
+    {
+      "request_id": "00000000-0000-0000-0000-000000000001",
+      "project_id": "00000000-0000-0000-0000-000000000002",
+      "revision_id": "00000000-0000-0000-0000-000000000003",
+      "output_id": "00000000-0000-0000-0000-000000000004",
+      "task_id": "00000000-0000-0000-0000-000000000005",
+      "task_status": "SUCCEEDED",
+      "created_at": "2026-10-15T08:00:00Z",
+      "artifact": {
+        "artifact_id": "00000000-0000-0000-0000-000000000006",
+        "state": "UNAVAILABLE",
+        "duration_ms": 4000
+      },
+      "playback": null,
+      "retry_allowed": true,
+      "error": {
+        "code": "PREVIEW_ARTIFACT_UNAVAILABLE",
+        "message": "预览产物不可用，请显式重试"
+      }
+    }
+  ],
+  "list": {
+    "requirement_id": "00000000-0000-0000-0000-000000000007",
+    "revision_id": "00000000-0000-0000-0000-000000000003",
+    "items": [
+      {
+        "request_id": "00000000-0000-0000-0000-000000000001",
+        "output_id": "00000000-0000-0000-0000-000000000004",
+        "task_id": "00000000-0000-0000-0000-000000000005",
+        "task_status": "PENDING",
+        "created_at": "2026-10-15T08:00:00Z",
+        "output_key": "out-1"
+      }
+    ]
+  },
+  "selection_requests": [
+    {},
+    {
+      "output_key": " "
+    },
+    {
+      "output_key": "片段🎬片段🎬片段🎬片段🎬片段🎬片段🎬片段🎬片段🎬片段🎬片段🎬片段🎬片段🎬片段🎬片段🎬片段🎬片段🎬"
+    }
+  ]
+}
