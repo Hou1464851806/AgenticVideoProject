@@ -80,7 +80,8 @@ public final class EditDraftContracts {
                               @NotNull @CodePointLength(min=1,max=200) String scope_id,
                               @NotNull @CodePointLength(min=1,max=200) String validation_id,
                               @NotNull @Pattern(regexp="[0-9a-f]{64}") String draft_hash,
-                              @NotNull @Pattern(regexp="[0-9a-f]{64}") String requirements_hash) {}
+                              @NotNull @Pattern(regexp="[0-9a-f]{64}") String requirements_hash,
+                              @NotNull @Size(min=1,max=1000) Map<@NotEmpty String,@NotNull Map<String,JsonNode>> requirements_sources) {}
 
     public static Input validation(JsonNode value) {
         var input = read(value, Input.class);

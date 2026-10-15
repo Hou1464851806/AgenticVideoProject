@@ -175,3 +175,18 @@ V52 新增 `edit_productions` 和 `edit_draft_validations`：制作需求绑定�
 校验成功执行返回 `READY`；`data.valid=false` 表示草稿不合规，issues 含字段路径和 `output_key`。返回实际源区间时长、两种哈希、`validation_id` 和必要警告；超过反馈上限明确设置 `issues_truncated`，警告省略以 `WARNINGS_TRUNCATED` 计数。规范化内容只存于数据库，不进入模型反馈，不分配永久 outputId/clipId。校验记录与工具结果在短事务内同时写入，相同调用重放返回原结果；提交故障上抛，未核对回执明确停止。
 
 方案规则在 `business/plan/EditDraftValidation`，服务端证据／读取依据在 `DraftEvidence`，制作绑定与校验持久化在 `ProductionDrafts`；工具入口复用现有身份、哈希与回执治理。旧方案入口共用 `SpeechTimings` 的原文选词和边界规则。本阶段不创建方案版本、不调用 ASR/VLM，也没有接入 Python 的真实 DRAFT 或 CLI 保存。验证记录见 [M2 阶段 2](../docs/verification/java-tools-m2-stage2.md)。
+
+
+## M2 阶段 3：显式保存与版本读取
+
+保存仍走内部 Bearer 认证，不是模型工具。先取得本需求 `validate_edit_draft` 的通过结果，再显式调用：
+
+- `POST /internal/v1/questions/productions/{requirement_id}/save`：提交 `project_id/requirement_id/scope_id/validation_id/draft_hash/requirements_hash/requirements_sources`。身份均为 UUID，哈希为完整 SHA256；`requirements_sources` 为客户端保存的字段来源对象（1～1000 项），例如 `{"topic":{"kind":"USER","message_id":"m1","text":"剪辑上传流程"},"profile":{"kind":"DEFAULT","value":"LANDSCAPE_720"}}`。请求最多 65536 UTF-8 字节。不接受替换草稿、条件或字幕；完整内容取自匹配的持久校验。
+- `GET /internal/v1/questions/productions/{requirement_id}/save`：恢复已提交的原保存结果；尚未保存／需求不存在返回 404。返回阶段 1 `SavedResult`，无浏览器 data 外层包装。
+- 既有 `GET /api/v1/revisions/{revision_id}`：按项目所有权读取正式版本。M2 版本增加 `productionSource`，含原草稿、完整条件、客户端条件来源、制作／scope／校验身份、哈希、规则版本、证据及读取调用引用、output_key 到 outputId 映射；旧任务来源版本不增加此字段。
+
+所有输出在一个短数据库事务内保存为同一方案的 V1；分配永久 outputId/clipId，持久化素材／证据引用并同步提交保存结果。来源元数据与已验证条件分开保存，Java 不声称能证明原文被正确理解。V53 只增加版本上的条件来源 JSON 字段。
+
+同需求行锁串行化校验发布和保存，并在保存时锁定、核对固定数据库依赖。草稿／条件哈希不符、回执不通过、其他需求的校验、已有不同内容的新校验或依赖失效都拒绝保存。数据库故障上抛并整体回滚，可以按原请求重试。相同保存请求重放、并发保存及响应丢失后的查询返回同一版本；已提交结果不因后来依赖失效被隐藏。保存后禁止新增草稿校验，M2 不派生编辑已有版本。
+
+保存不产生确认、预览或导出。受控 HTTP 夹具验证新版本能被既有预览请求组装逻辑消费；Python 真实 DRAFT、修正循环及 CLI 保存仍属于阶段 4。验证记录见 [M2 阶段 3](../docs/verification/java-tools-m2-stage3.md)。

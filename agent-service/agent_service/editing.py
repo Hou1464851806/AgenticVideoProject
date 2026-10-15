@@ -139,3 +139,4 @@ class SaveRequest(ProductionBinding):
     validation_id: Identifier
     draft_hash: Hash
     requirements_hash: Hash
+    requirements_sources: dict[Annotated[str, Field(min_length=1)], dict] = Field(min_length=1, max_length=1000)

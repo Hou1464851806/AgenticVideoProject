@@ -16,6 +16,17 @@ class EditDraftContractsTest {
         assertEquals(input.requirements_hash(), ToolJson.hash(json.valueToTree(input.requirements())));
         EditDraftContracts.read(sample.path("validation_result"), EditDraftContracts.ValidationResult.class);
         EditDraftContracts.read(sample.path("saved_result"), EditDraftContracts.SavedResult.class);
+        assertEquals(sample.path("save_request"),json.valueToTree(EditDraftContracts.read(sample.path("save_request"), EditDraftContracts.SaveRequest.class)));
+    }
+
+    @Test void saveRequiresBoundedObjectProvenanceAndCannotAcceptReplacementContent() throws Exception {
+        var sample=(com.fasterxml.jackson.databind.node.ObjectNode)json.readTree(getClass().getResourceAsStream("/contracts/m2-editing.json")).path("save_request");
+        var missing=sample.deepCopy();missing.remove("requirements_sources");
+        assertThrows(IllegalArgumentException.class,()->EditDraftContracts.read(missing,EditDraftContracts.SaveRequest.class));
+        var replacement=sample.deepCopy();replacement.putObject("draft");
+        assertThrows(IllegalArgumentException.class,()->EditDraftContracts.read(replacement,EditDraftContracts.SaveRequest.class));
+        var large=sample.deepCopy();large.putObject("requirements_sources").putObject("topic").put("text","字".repeat(22000));
+        assertThrows(IllegalArgumentException.class,()->EditDraftContracts.read(large,EditDraftContracts.SaveRequest.class));
     }
 
     @Test void sharedInvalidValuesAreRejectedWithoutCoercion() throws Exception {

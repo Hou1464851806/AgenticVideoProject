@@ -332,5 +332,24 @@
       ],
       "value": 1
     }
-  ]
+  ],
+  "save_request": {
+    "project_id": "70000000-0000-4000-8000-000000000001",
+    "requirement_id": "80000000-0000-4000-8000-000000000001",
+    "scope_id": "90000000-0000-4000-8000-000000000001",
+    "validation_id": "30000000-0000-4000-8000-000000000001",
+    "draft_hash": "0f0345f234673f22856cac42cbf9ddd7e03110ba265d09909e732027aa4bfd5c",
+    "requirements_hash": "a9df54f553dd9354bcbcdf07c8fbf438fd53e1fe6f62a2b9c89e8c33164fac89",
+    "requirements_sources": {
+      "topic": {
+        "kind": "USER",
+        "message_id": "m1",
+        "text": "上传流程 🎬"
+      },
+      "profile": {
+        "kind": "DEFAULT",
+        "value": "LANDSCAPE_720"
+      }
+    }
+  }
 }

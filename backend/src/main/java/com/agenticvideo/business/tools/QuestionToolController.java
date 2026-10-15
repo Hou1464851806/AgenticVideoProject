@@ -13,7 +13,8 @@ class QuestionToolController {
     private final QuestionScopes scopes;
     private final ReadTools tools;
     private final com.agenticvideo.business.plan.ProductionDrafts productions;
-    QuestionToolController(QuestionScopes scopes,ReadTools tools,com.agenticvideo.business.plan.ProductionDrafts productions){this.scopes=scopes;this.tools=tools;this.productions=productions;}
+    QuestionToolController(QuestionScopes scopes,ReadTools tools,com.agenticvideo.business.plan.ProductionDrafts productions,com.agenticvideo.business.plan.ProductionSaves saves){this.saves=saves;this.scopes=scopes;this.tools=tools;this.productions=productions;}
+    private final com.agenticvideo.business.plan.ProductionSaves saves;
     record Create(@NotNull UUID project_id,List<@NotNull UUID> asset_ids) {}
     @PostMapping("/scopes") @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
     Map<String,Object> create(@Valid @RequestBody Create input){return view(scopes.create(input.project_id(),input.asset_ids()));}
@@ -29,6 +30,10 @@ class QuestionToolController {
         var production=productions.get(requirementId);
         return tools.execute((UUID)production.get("scope_id"),requirementId,request);
     }
+    @PostMapping("/productions/{requirementId}/save")
+    JsonNode save(@PathVariable UUID requirementId,@RequestBody JsonNode request){return saves.save(requirementId,request);}
+    @GetMapping("/productions/{requirementId}/save")
+    JsonNode saved(@PathVariable UUID requirementId){return saves.result(requirementId);}
     private Map<String,Object> view(com.agenticvideo.business.search.QuestionEvidence.Scope scope){return Map.of("scope_id",scope.id(),"project_id",scope.projectId(),"assets",scope.assets(),"mock",false);}
     @ExceptionHandler(ToolFailure.class) @ResponseStatus(org.springframework.http.HttpStatus.CONFLICT)
     Map<String,Object> invalid(ToolFailure failure){return Map.of("error",Map.of("code",failure.code,"category",failure.category,"message",failure.getMessage()));}

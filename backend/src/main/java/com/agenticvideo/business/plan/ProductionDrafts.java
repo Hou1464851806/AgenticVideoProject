@@ -49,11 +49,14 @@ public class ProductionDrafts {
         UUID id=UUID.randomUUID();var checked=validation.validate(scope,input,id);envelope.set("data",checked.result());
         bound(envelope);
         return transaction.execute(tx->{
+            db.queryForMap("SELECT id FROM edit_productions WHERE id=? FOR UPDATE",production);
+            if(Boolean.TRUE.equals(db.queryForObject("SELECT EXISTS(SELECT 1 FROM plan_revisions WHERE source_production_id=?)",Boolean.class,production)))
+                throw new ToolFailure("PRODUCTION_SAVED","IDENTITY_CONFLICT","制作已经保存，请明确开始新的制作需求");
             scopes.requireDependencies(scope);
             db.update("""
                     INSERT INTO edit_draft_validations(id,production_id,project_id,scope_id,call_id,draft_hash,requirements_hash,
-                        rule_version,draft_json,requirements_json,sources_json,result_json,normalized_content_json)
-                    VALUES (?,?,?,?,?,?,?,?,?::jsonb,?::jsonb,?::jsonb,?::jsonb,?::jsonb)
+                        rule_version,draft_json,requirements_json,sources_json,result_json,normalized_content_json,created_at)
+                    VALUES (?,?,?,?,?,?,?,?,?::jsonb,?::jsonb,?::jsonb,?::jsonb,?::jsonb,clock_timestamp())
                     """,id,production,scope.projectId(),scope.id(),request.path("call_id").asText(),input.draft_hash(),input.requirements_hash(),EditDraftValidation.RULE_VERSION,
                     json.valueToTree(input.draft()).toString(),json.valueToTree(input.requirements()).toString(),checked.sources().toString(),envelope.path("data").toString(),checked.content()==null?null:checked.content().toString());
             db.update("UPDATE question_tool_receipts SET result_json=?::jsonb WHERE scope_id=? AND call_id=?",envelope.toString(),scope.id(),request.path("call_id").asText());

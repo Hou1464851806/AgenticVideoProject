@@ -93,6 +93,20 @@ public class EditPlans {
         return input;
     }
 
+    public JsonNode productionSource(UUID revision) {
+        var rows=database.queryForList("""
+                SELECT v.*,r.production_save_result_json,r.production_requirements_sources_json
+                FROM plan_revisions r JOIN edit_draft_validations v ON v.id=r.source_validation_id WHERE r.id=?
+                """,revision);
+        if(rows.isEmpty())return null;
+        var row=rows.get(0);var source=json.createObjectNode();
+        for(var field:Map.of("requirement_id","production_id","project_id","project_id","scope_id","scope_id","validation_id","id",
+                "draft_hash","draft_hash","requirements_hash","requirements_hash","rule_version","rule_version","call_id","call_id").entrySet())source.put(field.getKey(),row.get(field.getValue()).toString());
+        source.set("draft",json.valueToTree(parse(row.get("draft_json"))));source.set("requirements",json.valueToTree(parse(row.get("requirements_json"))));
+        source.set("references",json.valueToTree(parse(row.get("sources_json"))));source.set("requirements_sources",json.valueToTree(parse(row.get("production_requirements_sources_json"))));
+        source.set("outputs",((JsonNode)parse(row.get("production_save_result_json"))).path("outputs"));return source;
+    }
+
     public Object parse(Object value) {
         try { return json.readTree(value.toString()); }
         catch (java.io.IOException invalid) { throw new IllegalStateException(invalid); }

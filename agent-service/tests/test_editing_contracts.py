@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from agent_service.editing import Validation, ValidationResult, SavedResult
+from agent_service.editing import Validation, ValidationResult, SavedResult, SaveRequest
 from agent_service.runtime.policy import fingerprint
 
 FIXTURE = Path(__file__).resolve().parents[2] / 'backend/src/test/resources/contracts/m2-editing.json'
@@ -15,6 +15,7 @@ def test_shared_multilingual_contracts_and_fingerprints():
     assert fingerprint(request.requirements.model_dump()) == request.requirements_hash
     assert ValidationResult.model_validate(sample['validation_result']).model_dump(exclude_none=True) == sample['validation_result']
     assert SavedResult.model_validate(sample['saved_result']).model_dump() == sample['saved_result']
+    assert SaveRequest.model_validate(sample['save_request']).model_dump() == sample['save_request']
 
 
 def test_second_output_patch_keeps_first_and_explicit_defaults():
@@ -99,3 +100,17 @@ def test_feedback_has_its_own_byte_limit():
     result['issues'] = [{**issue, 'message':'字' * 200} for _ in range(100)]
     with pytest.raises(ValidationError, match='byte limit'):
         ValidationResult.model_validate(result)
+
+
+def test_save_requires_bounded_object_provenance_and_no_replacement_content():
+    import copy
+    import pytest
+    from pydantic import ValidationError
+    sample = json.loads(FIXTURE.read_text())['save_request']
+    missing = copy.deepcopy(sample)
+    del missing['requirements_sources']
+    replacement = {**sample, 'draft': {}}
+    large = {**sample, 'requirements_sources': {'topic': {'text': '字' * 22000}}}
+    for value in (missing, replacement, large):
+        with pytest.raises(ValidationError):
+            SaveRequest.model_validate(value)

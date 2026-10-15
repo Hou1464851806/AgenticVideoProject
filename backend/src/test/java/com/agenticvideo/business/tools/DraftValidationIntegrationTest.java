@@ -82,6 +82,118 @@ class DraftValidationIntegrationTest {
     JsonNode validate(Production p,String call,ObjectNode input) throws Exception{return tool("/productions/"+p.id,call,"validate_edit_draft",hashes(input));}
     JsonNode content(JsonNode result) throws Exception{return JSON.readTree(db.queryForObject("SELECT normalized_content_json::text FROM edit_draft_validations WHERE id=?",String.class,UUID.fromString(result.path("data").path("validation_id").asText())));}
 
+    ObjectNode saveRequest(Asset a,Production p,JsonNode validation,ObjectNode input) {
+        var request=JSON.createObjectNode().put("project_id",a.project.toString()).put("requirement_id",p.id.toString()).put("scope_id",p.scope.toString())
+            .put("validation_id",validation.path("data").path("validation_id").asText()).put("draft_hash",input.path("draft_hash").asText()).put("requirements_hash",input.path("requirements_hash").asText());
+        request.set("requirements_sources",JSON.valueToTree(Map.of("topic",Map.of("kind","USER","message_id","m1","text","剪辑上传核查"),"profile",Map.of("kind","DEFAULT","value","LANDSCAPE_720"))));return request;
+    }
+    @Test void explicitSavePublishesAllOutputsAndRecoversTheSameVersion() throws Exception {
+        var a=fixture(null);var b=fixture(a.project);var first=speech(a,0,2000,6000,"上传");var second=speech(b,0,3000,5000,"核查");
+        var p=production(a,b);read(p,a,2000,6000,0);read(p,b,3000,5000,0);
+        var input=input(List.of(a,b),List.of(clip(a,2000,6000,first),clip(b,3000,5000,second)),List.of(clip(a,2000,6000,first)));
+        var checked=validate(p,"save-valid",input);assertTrue(checked.path("data").path("valid").asBoolean());
+        assertEquals(404,http("GET","/productions/"+p.id+"/save",null).statusCode());
+        var request=saveRequest(a,p,checked,input);var response=http("POST","/productions/"+p.id+"/save",request);assertEquals(200,response.statusCode(),response.body());
+        var saved=JSON.readTree(response.body());assertEquals("SAVED",saved.path("status").asText());assertEquals(1,saved.path("revision_number").asInt());assertEquals(2,saved.path("outputs").size());
+        assertEquals(6000,saved.path("outputs").get(0).path("duration_ms").asLong());assertEquals(4000,saved.path("outputs").get(1).path("duration_ms").asLong());
+        assertEquals(saved,JSON.readTree(http("POST","/productions/"+p.id+"/save",request).body()));
+        assertEquals(saved,JSON.readTree(http("GET","/productions/"+p.id+"/save",null).body()));
+        assertEquals(1,db.queryForObject("SELECT count(*) FROM plan_revisions WHERE source_production_id=?",Integer.class,p.id));
+        assertEquals(2,db.queryForObject("SELECT count(*) FROM revision_asset_refs WHERE revision_id=?",Integer.class,UUID.fromString(saved.path("revision_id").asText())));
+        assertEquals(2,db.queryForObject("SELECT count(*) FROM revision_evidence_refs WHERE revision_id=?",Integer.class,UUID.fromString(saved.path("revision_id").asText())));
+        assertEquals("PRODUCTION_SAVED",validate(p,"after-save",input).path("error").path("code").asText());
+    }
+
+    HttpResponse<String> api(HttpClient client,String method,String path,Object body) throws Exception {
+        var request=HttpRequest.newBuilder(URI.create("http://localhost:"+port+"/api/v1"+path)).header("Content-Type","application/json");
+        if(!method.equals("GET")) {
+            var csrf=client.send(HttpRequest.newBuilder(URI.create("http://localhost:"+port+"/api/v1/auth/csrf")).GET().build(),HttpResponse.BodyHandlers.ofString());
+            request.header("X-XSRF-TOKEN",JSON.readTree(csrf.body()).path("data").path("csrfToken").asText()).header("Idempotency-Key",UUID.randomUUID().toString());
+        }
+        return client.send(request.method(method,body==null?HttpRequest.BodyPublishers.noBody():HttpRequest.BodyPublishers.ofString(JSON.writeValueAsString(body))).build(),HttpResponse.BodyHandlers.ofString());
+    }
+    HttpClient owner(Asset a) throws Exception {
+        String user=db.queryForObject("SELECT owner_user_id::text FROM projects WHERE id=?",String.class,a.project);
+        db.update("UPDATE users SET password_hash=? WHERE id=?",new org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder().encode("fixture-password"),UUID.fromString(user));
+        var client=HttpClient.newBuilder().cookieHandler(new CookieManager(null,CookiePolicy.ACCEPT_ALL)).build();
+        var response=api(client,"POST","/auth/login",Map.of("username",user,"password","fixture-password"));assertEquals(200,response.statusCode(),response.body());return client;
+    }
+    @Test void savedRevisionExposesItsSourceAndFeedsTheExistingPreviewAssembler() throws Exception {
+        var a=fixture(null);var id=speech(a,0,2000,6000,"上传核查");var p=production(a);read(p,a,2000,6000,0);
+        var input=input(List.of(a),List.of(clip(a,2000,6000,id)),List.of(clip(a,2000,6000,id)));((ObjectNode)input.path("requirements")).put("profile","PORTRAIT_720").put("subtitles_enabled",false);
+        var checked=validate(p,"consume",input);var response=http("POST","/productions/"+p.id+"/save",saveRequest(a,p,checked,input));assertEquals(200,response.statusCode(),response.body());
+        var saved=JSON.readTree(response.body());var client=owner(a);var retrieved=api(client,"GET","/revisions/"+saved.path("revision_id").asText(),null);assertEquals(200,retrieved.statusCode(),retrieved.body());
+        var version=JSON.readTree(retrieved.body()).path("data");var source=version.path("productionSource");assertEquals(p.id.toString(),source.path("requirement_id").asText());assertEquals(p.scope.toString(),source.path("scope_id").asText());
+        assertEquals(JSON.readTree(input.path("draft").toString()),source.path("draft"));assertEquals(JSON.readTree(input.path("requirements").toString()),source.path("requirements"));assertEquals(checked.path("data").path("validation_id"),source.path("validation_id"));
+        assertEquals(saved.path("outputs"),source.path("outputs"));
+        assertEquals("剪辑上传核查",source.path("requirements_sources").path("topic").path("text").asText());
+        var ids=new HashSet<String>();
+        for(int i=0;i<2;i++) {
+            var output=version.path("content").path("outputs").get(i);assertEquals(saved.path("outputs").get(i).path("output_id").asText(),output.path("outputId").asText());
+            assertTrue(ids.add(output.path("outputId").asText()));assertTrue(ids.add(output.path("clips").get(0).path("clipId").asText()));assertFalse(output.has("output_key"));
+            assertFalse(output.path("subtitles").path("enabled").asBoolean());assertTrue(output.path("subtitles").path("cues").isEmpty());assertEquals(720,output.path("render").path("width").asInt());
+            var preview=api(client,"POST","/revisions/"+saved.path("revision_id").asText()+"/previews",Map.of("outputId",output.path("outputId").asText(),"previewProfile","LOW_360"));assertEquals(202,preview.statusCode(),preview.body());
+            var task=UUID.fromString(JSON.readTree(preview.body()).path("data").path("taskId").asText());
+            var renderInput=JSON.readTree(db.queryForObject("SELECT input_json::text FROM tasks WHERE id=?",String.class,task));
+            assertEquals(output,renderInput.path("output"));assertEquals(360,renderInput.path("configuration").path("width").asInt());assertEquals(640,renderInput.path("configuration").path("height").asInt());assertEquals(a.id.toString(),renderInput.path("sources").get(0).path("assetId").asText());
+        }
+        assertEquals(404,api(owner(fixture(null)),"GET","/revisions/"+saved.path("revision_id").asText(),null).statusCode());
+    }
+
+    @Test void saveRejectsMismatchedIdentityHashesAndUnapprovedOrSupersededDrafts() throws Exception {
+        var a=fixture(null);var id=speech(a,0,2000,6000,"原句");var p=production(a);read(p,a,2000,6000,0);
+        var input=input(List.of(a),List.of(clip(a,2000,6000,id)));var checked=validate(p,"initial",input);var request=saveRequest(a,p,checked,input);
+        for(String field:List.of("project_id","scope_id","requirement_id","validation_id")) {
+            var changed=request.deepCopy().put(field,UUID.randomUUID().toString());var rejected=http("POST","/productions/"+p.id+"/save",changed);assertTrue(Set.of(400,409).contains(rejected.statusCode()),rejected.body());
+        }
+        for(String field:List.of("draft_hash","requirements_hash"))assertEquals(409,http("POST","/productions/"+p.id+"/save",request.deepCopy().put(field,"0".repeat(64))).statusCode());
+        var other=production(a);assertEquals(409,http("POST","/productions/"+other.id+"/save",request.deepCopy().put("requirement_id",other.id.toString()).put("scope_id",other.scope.toString())).statusCode());
+        ((ObjectNode)input.path("requirements").path("outputs").get(0)).put("duration_min_ms",9000);
+        var invalid=validate(p,"bad-duration",input);assertFalse(invalid.path("data").path("valid").asBoolean());
+        var rejected=http("POST","/productions/"+p.id+"/save",saveRequest(a,p,invalid,input));assertEquals(409,rejected.statusCode(),rejected.body());assertEquals("DRAFT_NOT_VALID",JSON.readTree(rejected.body()).path("error").path("code").asText());
+        rejected=http("POST","/productions/"+p.id+"/save",request);assertEquals(409,rejected.statusCode());assertEquals("VALIDATION_STALE",JSON.readTree(rejected.body()).path("error").path("code").asText());
+        assertEquals(404,http("GET","/productions/"+p.id+"/save",null).statusCode());
+        assertEquals(0,db.queryForObject("SELECT count(*) FROM edit_plans WHERE project_id=?",Integer.class,a.project));
+    }
+    @Test void invalidDependenciesStopAnUnsavedDraftButDoNotEraseAnAlreadyCommittedResult() throws Exception {
+        var a=fixture(null);var id=speech(a,0,2000,6000,"原句");var p=production(a);read(p,a,2000,6000,0);
+        var input=input(List.of(a),List.of(clip(a,2000,6000,id)));var checked=validate(p,"dependency",input);var request=saveRequest(a,p,checked,input);
+        db.update("UPDATE assets SET sha256=? WHERE id=?","c".repeat(64),a.id);
+        var rejected=http("POST","/productions/"+p.id+"/save",request);assertEquals(409,rejected.statusCode());assertEquals("DEPENDENCY_INVALID",JSON.readTree(rejected.body()).path("error").path("category").asText());
+        assertEquals(404,http("GET","/productions/"+p.id+"/save",null).statusCode());
+        db.update("UPDATE assets SET sha256=? WHERE id=?","b".repeat(64),a.id);
+        var saved=http("POST","/productions/"+p.id+"/save",request);assertEquals(200,saved.statusCode(),saved.body());
+        db.update("UPDATE assets SET validation_status='INVALID' WHERE id=?",a.id);
+        assertEquals(JSON.readTree(saved.body()),JSON.readTree(http("GET","/productions/"+p.id+"/save",null).body()));
+        assertEquals(JSON.readTree(saved.body()),JSON.readTree(http("POST","/productions/"+p.id+"/save",request).body()));
+    }
+    @Test void failureAfterRevisionAndReferenceWritesRollsBackTheWholeSaveAndCanBeRetried() throws Exception {
+        var a=fixture(null);var first=speech(a,0,2000,4000,"上传");var second=speech(a,1,4000,6000,"核查");var p=production(a);read(p,a,2000,6000,0);
+        var input=input(List.of(a),List.of(clip(a,2000,4000,first)),List.of(clip(a,4000,6000,second)));var checked=validate(p,"atomic-save",input);var request=saveRequest(a,p,checked,input);
+        db.execute("CREATE FUNCTION reject_test_save() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'controlled save failure'; END $$");
+        db.execute("CREATE TRIGGER reject_test_save BEFORE INSERT ON revision_evidence_refs FOR EACH ROW EXECUTE FUNCTION reject_test_save()");
+        try {
+            assertEquals(500,http("POST","/productions/"+p.id+"/save",request).statusCode());
+            assertEquals(404,http("GET","/productions/"+p.id+"/save",null).statusCode());
+            assertEquals(0,db.queryForObject("SELECT count(*) FROM edit_plans WHERE project_id=?",Integer.class,a.project));
+            assertEquals(0,db.queryForObject("SELECT count(*) FROM plan_revisions WHERE project_id=?",Integer.class,a.project));
+            assertEquals(0,db.queryForObject("SELECT count(*) FROM revision_asset_refs WHERE asset_id=?",Integer.class,a.id));
+        } finally {db.execute("DROP TRIGGER reject_test_save ON revision_evidence_refs");db.execute("DROP FUNCTION reject_test_save()");}
+        var response=http("POST","/productions/"+p.id+"/save",request);assertEquals(200,response.statusCode(),response.body());assertEquals(2,JSON.readTree(response.body()).path("outputs").size());
+    }
+    @Test void concurrentSavesReturnOneVersionAndCannotChangeItsContentOrProvenance() throws Exception {
+        var a=fixture(null);var id=speech(a,0,2000,6000,"原句");var p=production(a);read(p,a,2000,6000,0);var input=input(List.of(a),List.of(clip(a,2000,6000,id)));
+        var checked=validate(p,"concurrent",input);var request=saveRequest(a,p,checked,input);
+        var executor=java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var first=executor.submit(()->http("POST","/productions/"+p.id+"/save",request));var second=executor.submit(()->http("POST","/productions/"+p.id+"/save",request));
+            var one=first.get();var two=second.get();assertEquals(200,one.statusCode(),one.body());assertEquals(200,two.statusCode(),two.body());assertEquals(JSON.readTree(one.body()),JSON.readTree(two.body()));
+        } finally {executor.shutdownNow();}
+        var changed=request.deepCopy();((ObjectNode)changed.path("requirements_sources").path("topic")).put("text","篡改来源");assertEquals(409,http("POST","/productions/"+p.id+"/save",changed).statusCode());
+        assertEquals(1,db.queryForObject("SELECT count(*) FROM edit_plans WHERE project_id=?",Integer.class,a.project));
+        assertEquals(1,db.queryForObject("SELECT count(*) FROM plan_revisions WHERE source_production_id=?",Integer.class,p.id));
+    }
+
     @Test void legalMultipleOutputsPersistNormalizedCaptionsAndReplayWithoutPublishing() throws Exception {
         var a=fixture(null);var b=fixture(a.project);var first=speech(a,0,2000,6000,"上传核查",word(2000,4000,"上传"),word(4000,6000,"核查"));var second=speech(b,0,3000,5000,"导出");
         var p=production(a,b);read(p,a,2000,6000,0);read(p,b,3000,5000,0);

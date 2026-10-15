@@ -6,6 +6,10 @@
 
 旧浏览器 Agent 问答、生成/修改方案和自然语言制作入口已停用；按需细读、真实草稿与 Agent 到成片不属于 M1。当前操作见[根 README](../README.md)、[后端说明](../backend/README.md)和[Python CLI](../agent-service/README.md)，实际验收与未验证边界见[第五阶段记录](verification/java-tools-m1-stage5.md)。
 
+## M2 实施增量（2026-10-15）
+
+Java HTTP 已提供固定制作需求绑定、真实草稿校验、显式整体保存及保存结果恢复；正式版本保留来源和永久输出／片段标识，可由既有版本读取及制作请求组装接口消费。保存不自动确认或渲染。阶段 1～3 的受控测试记录见 [M2 最终设计](java-tools-m2-design.md)及 [阶段 3 记录](verification/java-tools-m2-stage3.md)。Python CLI 真实制作、修正和保存尚待阶段 4，真实 Agent 素材验收尚待阶段 5；当前 CLI 仍为 M1 问答入口。
+
 ## 历史交付清单（截至 2026-10-13）
 
 以下记录重构前的交付能力，运行边界以本页当前 M1 说明为准。

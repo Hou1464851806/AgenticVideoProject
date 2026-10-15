@@ -35,6 +35,7 @@ public class EditPlanController {
         var row = rows.get(0);
         requireOwned((UUID)row.get("planId"), account);
         row.put("content", plans.parse(row.remove("content_json")));
+        var source=plans.productionSource(revisionId);if(source!=null)row.put("productionSource",source);
         return response(row);
     }
     private void requireOwned(UUID plan, Authentication account) {
