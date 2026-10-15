@@ -86,6 +86,8 @@ class Agent:
             snapshot = await build_graph(saver).aget_state({"configurable": {"thread_id": thread_id}})
         if not snapshot.values:
             raise ValueError("需求不存在")
+        if snapshot.values.get("save_request") and not snapshot.values.get("saved_result"):
+            return await self.save(thread_id)
         if not snapshot.next:
             return self._view(thread_id, snapshot.values, False)
         waiting = snapshot.values.get("waiting")
@@ -247,9 +249,9 @@ class Agent:
                 result = self._view(thread_id, snapshot.values, bool(snapshot.interrupts))
                 if status == "NEW_REQUIREMENT":
                     new_thread = str(uuid.uuid4())
-                    # Preserve this message's execution and model receipt; isolate the new requirement.
-                    migrated = {"identity": {**identity, "requirement_id": new_thread},
-                                "request": {"content": snapshot.values["request"]["content"], "new_requirement": True,
+                    # The parsed understanding is reused; model-call identities belong to the new execution.
+                    migrated = {"identity": {**identity, "requirement_id": new_thread, "execution_id": str(uuid.uuid4())},
+                                "request": {**snapshot.values["request"], "new_requirement": True,
                                             "pre_understanding": snapshot.values["understanding"]},
                                 "requirements": Requirements().model_dump(), "messages": [], "observations": {}, "coverage": {},
                                 "draft": None, "validation": None, "scenario": self.config.scenario,
@@ -270,7 +272,10 @@ class Agent:
 
     @staticmethod
     def _view(thread_id, state, waiting):
-        return {"thread_id": thread_id, "identity": state["identity"], "status": "WAITING" if waiting else (state.get("outcome") or {}).get("status", "FAILED"),
-                "waiting": state.get("waiting") if waiting else None, "outcome": state.get("outcome"),
+        outcome = state.get("outcome")
+        if state.get("save_request") and not state.get("saved_result"):
+            outcome = incomplete("保存结果尚未核对，请执行 save 或 resume 恢复。", state.get("draft"), mock=False)
+        return {"thread_id": thread_id, "identity": state["identity"], "status": "WAITING" if waiting else (outcome or {}).get("status", "FAILED"),
+                "waiting": state.get("waiting") if waiting else None, "outcome": outcome,
                 "production": state.get("production"), "draft": state.get("draft"), "validation": state.get("validation"),
                 "saved_result": state.get("saved_result"), "question_scope": state.get("question_scope"), "requirements": state["requirements"], "pending_tool": state.get("pending_tool"), "usage": state.get("usage", {})}

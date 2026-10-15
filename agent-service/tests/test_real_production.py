@@ -132,7 +132,9 @@ async def test_explicit_save_recovers_lost_response_and_makes_production_readonl
             return httpx.Response(409)
         return original(req)
     backend.handle = invalid_scope
-    saved = await runner(tmp_path, backend, None).save(first['thread_id'])
+    uncertain = await runner(tmp_path, backend, None).inspect(first['thread_id'])
+    assert uncertain['status'] == 'INCOMPLETE'
+    saved = await runner(tmp_path, backend, None).resume(first['thread_id'])
     assert saved['status'] == 'SAVED'
     assert saved['saved_result']['revision_id'] == 'revision'
     again = await runner(tmp_path, backend, None).save(first['thread_id'])
@@ -241,3 +243,39 @@ async def test_dependency_failure_stops_production_without_refresh_or_repair(tmp
         await runner(tmp_path, backend, ScriptedModel(UNDERSTAND, [DRAFT])).send('修改', thread_id=first['thread_id'])
     assert backend.creates == 1
     assert len(backend.validations) == 1
+
+
+@pytest.mark.asyncio
+async def test_binding_protocol_failure_is_not_a_model_repair(tmp_path):
+    from pydantic import ValidationError
+    backend = ProductionBackend()
+    handle = backend.handle
+    def malformed(req):
+        return httpx.Response(200, json={}) if req.method == 'PUT' else handle(req)
+    backend.handle = malformed
+    with pytest.raises(ValidationError):
+        await runner(tmp_path, backend, ScriptedModel(UNDERSTAND, [READ, DRAFT])).send('制作', thread_id='protocol')
+    state = await runner(tmp_path, backend, None).inspect('protocol')
+    assert state['usage']['model_calls'] == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('followup', [False, True])
+async def test_new_requirement_in_clarification_keeps_source_and_new_execution(tmp_path, followup):
+    backend = ProductionBackend()
+    def understand(ctx):
+        return {**UNDERSTAND, 'relation': 'NEW', 'subtitles_enabled': False} if ctx['request'].get('clarification') else UNDERSTAND
+    if followup:
+        ready = await runner(tmp_path, backend, ScriptedModel(UNDERSTAND, [READ, DRAFT])).send('制作')
+        first = await runner(tmp_path, backend, ScriptedModel(understand, [{'kind': 'ASK', 'question': '确定主题？'}])).send(
+            '修改草稿', thread_id=ready['thread_id'])
+    else:
+        first = await runner(tmp_path, backend, ScriptedModel(understand, [READ, {'kind': 'ASK', 'question': '确定主题？'}])).send('制作')
+    assert first['status'] == 'WAITING'
+    result = await runner(tmp_path, backend, ScriptedModel(understand, [READ, DRAFT])).resume(first['thread_id'], {
+        'kind': 'USER_INPUT', 'wait_id': first['waiting']['wait_id'], 'content': '另做红矩形，不要字幕'})
+    assert result['status'] == 'DRAFT_READY'
+    assert result['thread_id'] != first['thread_id']
+    assert result['identity']['execution_id'] != first['identity']['execution_id']
+    assert result['requirements']['sources']['subtitles_enabled']['text'] == '另做红矩形，不要字幕'
+    assert result['question_scope']['scope_id'] != first['question_scope']['scope_id']

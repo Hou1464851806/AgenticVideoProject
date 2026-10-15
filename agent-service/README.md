@@ -166,6 +166,6 @@ agent-service/.venv/bin/python agent-service/scripts/verify_java_crash.py
 
 只有当前 DRAFT_READY 可以保存。草稿或条件修改后必须重新校验；所有输出整体保存，不能只保存成功部分。保存命令不调用模型，不要求 DeepSeek 凭据，返回 `saved_result` 中的 `plan_id/revision_id/outputs[].output_id`。保存不触发确认、预览或渲染。
 
-保存前先将当前校验和来源绑定持久化。HTTP 断开或提交结果未知时，保留失败并停止；再次执行相同 `save THREAD_ID`，先查询 Java 的权威保存结果，已经提交则恢复同一版本，不依赖原素材仍可用。结果未核对前拒绝继续编辑，请先运行 save。已保存制作只读，重复 save 返回原结果；明确新制作使用 --new 创建新方案，不派生旧版本。
+保存前先将当前校验和来源绑定持久化。HTTP 断开或提交结果未知时，保留失败并停止；再次执行相同 `save THREAD_ID`（或 `resume THREAD_ID`），先查询 Java 的权威保存结果，已经提交则恢复同一版本，不依赖原素材仍可用。结果未核对时 status 返回 INCOMPLETE；拒绝继续编辑，请先运行 save 或 resume。已保存制作只读，重复 save 返回原结果；明确新制作使用 --new 创建新方案，不派生旧版本。
 
 跨语言受控闭环由 `DraftValidationIntegrationTest#pythonAgentRepairsRealValidationThenExplicitCliSaves` 自动启动隔离 PostgreSQL 与真实 Java HTTP，再调用本机 `agent-service/.venv/bin/python`。此用例覆盖错误草稿、补读、修正、校验发布后的进程故障恢复、多输出局部编辑与显式 CLI 保存；输出证据位于 `backend/target/m2-stage4-controlled.json`，不调用付费模型。
