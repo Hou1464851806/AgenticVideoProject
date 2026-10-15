@@ -144,7 +144,7 @@ agent-service/.venv/bin/python agent-service/scripts/verify_java_crash.py
 
 ## M2 阶段 1：制作数据契约
 
-已落实 [M2 设计](../docs/java-tools-m2-design.md) 的契约与制作条件；阶段 2～3 实现 Java 校验和原子保存，阶段 4 接通 Python 真实制作、修正、固定快照和显式保存。受控验证见 [阶段 4 记录](../docs/verification/java-tools-m2-stage4.md)，付费真实 Agent 验收属于阶段 5。
+已落实 [M2 设计](../docs/java-tools-m2-design.md) 的契约与制作条件；阶段 2～3 实现 Java 校验和原子保存，阶段 4 接通 Python 真实制作、修正、固定快照和显式保存。受控验证见 [阶段 4 记录](../docs/verification/java-tools-m2-stage4.md)，真实 Agent 素材验收见 [阶段 5 记录](../docs/verification/java-tools-m2-stage5.md)。
 
 `agent_service/editing.py` 定义独立的草稿、逐输出条件、校验输入／问题／结果、制作身份和保存请求／结果。`runtime/state.py` 将理解增量合并为完整条件：程序生成 `out-1` 等稳定 `output_key`，单输出修改按键定位；标题和草稿顺序不影响条件关联。默认单输出、横屏、字幕开启、不强求完整字幕，不增加默认硬时长。`requirements.sources` 记录默认值或用户消息身份及原文，随 checkpoint 持久保存，CLI/status 可查看。
 
@@ -169,3 +169,17 @@ agent-service/.venv/bin/python agent-service/scripts/verify_java_crash.py
 保存前先将当前校验和来源绑定持久化。HTTP 断开或提交结果未知时，保留失败并停止；再次执行相同 `save THREAD_ID`（或 `resume THREAD_ID`），先查询 Java 的权威保存结果，已经提交则恢复同一版本，不依赖原素材仍可用。结果未核对时 status 返回 INCOMPLETE；拒绝继续编辑，请先运行 save 或 resume。已保存制作只读，重复 save 返回原结果；明确新制作使用 --new 创建新方案，不派生旧版本。
 
 跨语言受控闭环由 `DraftValidationIntegrationTest#pythonAgentRepairsRealValidationThenExplicitCliSaves` 自动启动隔离 PostgreSQL 与真实 Java HTTP，再调用本机 `agent-service/.venv/bin/python`。此用例覆盖错误草稿、补读、修正、校验发布后的进程故障恢复、多输出局部编辑与显式 CLI 保存；输出证据位于 `backend/target/m2-stage4-controlled.json`，不调用付费模型。
+
+## M2 真实素材验收
+
+复用 M1 已分析素材，从仓库根目录运行，配置 DeepSeek 和内部凭据并启动当前 Java 服务：
+
+```sh
+agent-service/.venv/bin/python agent-service/scripts/verify_java_m2.py --case multi --output agent-service/.local/m2-acceptance-multi
+```
+
+可选 case 为 `single`（默认条件）、`single-multi`、`multi-single`、`multi`（两条制作，第二条缩短为严格4秒、改名并重排）、`visual`（竖屏／关闭字幕）和 `impossible`（60秒不可满足）。默认清单为 M1 阶段5已有素材；其他数据库须显式传入 `--samples`，不会自动换素材。每次必须使用新输出目录，命令可能产生 DeepSeek 和查询 Embedding 费用，不上传或启动基础分析。
+
+每轮使用真实 CLI 子进程，保存完整结果、stderr、SQLite 模型回执及 PostgreSQL 工具／校验／版本来源到 `evidence.json`。生成后不自动保存是 Agent 的行为；本验收命令代替用户显式运行 CLI save，并核对重复保存和跨进程 resume 的同一版本身份。生产使用时请先查看草稿再运行 save。`impossible` 必须未完成且无版本；模型可能在提出草稿前说明不可满足，此时不会伪造 Java 校验回执。
+
+读取进度中的 `_range_reads.complete` 只表示固定范围的已有记录分页已完整消费，与稀疏分析覆盖不同。修正反馈会明确拒绝多个结构化调用，模型仍可能用尽预算或算错时长；失败保留且不能保存。本轮成功和失败样本、确定性边界验证及媒体回归分别见阶段5记录。

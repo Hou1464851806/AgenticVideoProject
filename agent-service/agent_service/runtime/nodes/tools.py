@@ -64,6 +64,22 @@ def observe_tool(state: State, runtime: Runtime[Context]):
         observations[record["id"]] = record
     coverage = dict(state["coverage"])
     progress = bool(added)
+    if request.tool_name == "read_video_range":
+        arguments = request.arguments
+        key = fingerprint({k: arguments[k] for k in ("asset_id", "start_ms", "end_ms")})
+        ranges = dict(coverage.get("_range_reads", {}))
+        entry = dict(ranges.get(key, {**{k: arguments[k] for k in ("asset_id", "start_ms", "end_ms")},
+                                     "pages": [], "next_cursor": 0, "complete": False}))
+        entry["pages"] = list(entry["pages"])
+        cursor = arguments["cursor"]
+        progress |= cursor not in entry["pages"] or cursor == entry["next_cursor"]
+        if cursor not in entry["pages"]:
+            entry["pages"].append(cursor)
+        if cursor == entry["next_cursor"]:
+            entry["next_cursor"] = result.data.get("next_cursor")
+            entry["complete"] = entry["next_cursor"] is None
+        ranges[key] = entry
+        coverage["_range_reads"] = ranges
     if request.tool_name == "get_video_overview":
         asset_id, cursor = request.arguments["asset_id"], request.arguments["cursor"]
         version = ctx.assets[asset_id]["analysis_version"]

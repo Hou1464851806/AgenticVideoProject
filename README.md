@@ -22,7 +22,7 @@ PostgreSQL 使用 `postgres_data` 持久卷。`docker compose restart` 保留账
 
 M1 已实现并运行综合验收。当前上传执行真实媒体准备，Compose 默认开启 Java 基础分析：有音轨进行全音轨 ASR，按稀疏帧执行 VLM，并生成文档 Embedding / Qdrant 索引。需配置 `DASHSCOPE_API_KEY`；缺凭据时对应阶段明确失败，已完成的其他来源仍可用。无音轨 ASR 标为不适用；稀疏视觉不代表逐帧覆盖。权威证据和付费回执由 PostgreSQL 保存。
 
-旧浏览器 Agent 对话执行入口明确不可用，避免创建无人消费的任务。独立 Python CLI 的离线 Mock 模式继续可用，见 [Python 说明](agent-service/README.md)；Java 问答快照与四个读取工具已实现，Python 真实模式已接入，问答／补答／恢复使用固定快照，见 [工具阶段记录](docs/verification/java-tools-m1-stage3.md)与 [Python 接入记录](docs/verification/java-tools-m1-stage4.md)。M2 已接通真实草稿、Java 校验及显式 CLI 保存，受控闭环见 [M2 阶段 4 记录](docs/verification/java-tools-m2-stage4.md)，付费真实模型制作验收留待阶段 5。
+旧浏览器 Agent 对话执行入口明确不可用，避免创建无人消费的任务。独立 Python CLI 的离线 Mock 模式继续可用，见 [Python 说明](agent-service/README.md)；Java 问答快照与四个读取工具已实现，Python 真实模式已接入，问答／补答／恢复使用固定快照，见 [工具阶段记录](docs/verification/java-tools-m1-stage3.md)与 [Python 接入记录](docs/verification/java-tools-m1-stage4.md)。M2 已接通真实草稿、Java 校验及显式 CLI 保存，受控闭环见 [M2 阶段 4 记录](docs/verification/java-tools-m2-stage4.md)，真实模型制作、多轮修改、保存及失败样本见 [M2 阶段 5 记录](docs/verification/java-tools-m2-stage5.md)。
 
 ## 既有方案与媒体渲染
 

@@ -29,3 +29,19 @@ def test_prompt_limit_includes_function_schema_before_submission():
     model = DeepSeekModel('test-local-only', Limits(prompt_bytes=10))
     with pytest.raises(LimitReached):
         model.prepare('understand', {})
+
+
+@pytest.mark.asyncio
+async def test_multiple_actions_are_rejected_with_serial_repair_feedback():
+    class Runnable:
+        async def ainvoke(self, *args, **kwargs):
+            raw = SimpleNamespace(tool_calls=[{}, {}], invalid_tool_calls=[], usage_metadata={},
+                                  response_metadata={'finish_reason': 'tool_calls'})
+            return {'raw': raw, 'parsed': SimpleNamespace(model_dump=lambda: {'kind': 'TOOL'}),
+                    'parsing_error': None}
+    model = object.__new__(DeepSeekModel)
+    model.prepare = lambda *args: (Runnable(), [])
+    response = await model.invoke('decide', {}, {})
+    assert '2' in response['error']
+    assert '只调用一次' in response['error']
+    assert response['value'] is None

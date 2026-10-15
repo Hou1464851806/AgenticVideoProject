@@ -2,7 +2,7 @@
 
 日期：2026-10-15。状态：用户已确认 M2-Q1 至 M2-Q14，以及草稿、制作条件、方案内容和校验反馈契约。本文件汇总最终设计、模块范围、实施计划与验收标准；用户明确要求本轮不开始实现。以下计划和标准均为待执行事项，不代表功能已实现或验收已通过。
 
-> 实施更新（2026-10-15）：后续会话已获用户明确授权实施阶段 1，进度与验证见 [阶段 1 记录](verification/java-tools-m2-stage1.md)。本文“本轮未执行”“尚未实现”等表述记录设计会话时点；阶段 2 已获后续授权并实施，进度与验证见 [阶段 2 记录](verification/java-tools-m2-stage2.md)；阶段 3 的显式保存和版本消费兼容已实施，进度与验证见 [阶段 3 记录](verification/java-tools-m2-stage3.md)；阶段 4 的 Python 真实制作、修正闭环与 CLI 保存已接通，验证见 [阶段 4 记录](verification/java-tools-m2-stage4.md)；阶段 5 真实模型素材验收仍待实施。
+> 实施更新（2026-10-15）：后续会话已获用户明确授权实施阶段 1，进度与验证见 [阶段 1 记录](verification/java-tools-m2-stage1.md)。本文“本轮未执行”“尚未实现”等表述记录设计会话时点；阶段 2 已获后续授权并实施，进度与验证见 [阶段 2 记录](verification/java-tools-m2-stage2.md)；阶段 3 的显式保存和版本消费兼容已实施，进度与验证见 [阶段 3 记录](verification/java-tools-m2-stage3.md)；阶段 4 的 Python 真实制作、修正闭环与 CLI 保存已接通，验证见 [阶段 4 记录](verification/java-tools-m2-stage4.md)；阶段 5 真实模型素材验收与收尾检查见 [阶段 5 记录](verification/java-tools-m2-stage5.md)。
 
 ## M1 已交付的基础
 

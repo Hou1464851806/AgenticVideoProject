@@ -31,12 +31,13 @@ class DeepSeekModel:
         raw = response["raw"]
         error = None
         if len(raw.tool_calls) != 1 or raw.invalid_tool_calls:
-            error = "模型必须恰好提出一个结构化动作"
+            error = (f"本轮返回了 {len(raw.tool_calls)} 个合法调用和 {len(raw.invalid_tool_calls)} 个非法调用。"
+                     "每轮只调用一次结构化函数；只选择下一步的一个动作，其他素材或工具留到下一轮。")
         elif response["parsing_error"]:
             error = str(response["parsing_error"])
         elif raw.response_metadata.get("finish_reason") == "length":
             error = "模型输出已截断，不能当作完整结果"
-        return {"value": response["parsed"].model_dump() if response["parsed"] is not None else None,
+        return {"value": response["parsed"].model_dump() if error is None and response["parsed"] is not None else None,
                 "error": error, "usage": raw.usage_metadata or {},
                 "model": raw.response_metadata.get("model_name", "deepseek-flash")}
 

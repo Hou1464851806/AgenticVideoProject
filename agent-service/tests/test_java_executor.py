@@ -145,6 +145,34 @@ async def test_asset_pages_accumulate_without_claiming_visual_coverage(tmp_path)
 
 
 @pytest.mark.asyncio
+async def test_range_pages_expose_consumption_and_only_new_pages_make_progress(tmp_path):
+    backend = Backend()
+    def handle(req):
+        response = backend.handle(req)
+        if req.url.path.endswith('/tools'):
+            body = json.loads(req.content)
+            value = response.json()
+            value['data'] = {'next_cursor': 1 if body['arguments']['cursor'] == 0 else None}
+            return httpx.Response(200, json=value)
+        return response
+    def actions(ctx):
+        step = ctx['usage']['decisions']
+        if step:
+            ranges = list(ctx['coverage']['_range_reads'].values())
+            assert len(ranges) == 1
+            assert {key: ranges[0][key] for key in ('asset_id', 'start_ms', 'end_ms')} == {
+                'asset_id': 'a', 'start_ms': 0, 'end_ms': 10000}
+            assert ranges[0]['complete'] is (step >= 3)
+            assert ctx['usage']['no_progress'] == (1 if step == 4 else 0)
+        if step < 4:
+            return {**READ, 'arguments': {**READ['arguments'], 'cursor': [1, 0, 1, 1][step]}}
+        return ANSWER
+    executor = JavaToolExecutor('http://java', 'private-token', 'p', transport=httpx.MockTransport(handle))
+    result = await Agent(Config(tmp_path, trace=False), ScriptedModel(UNDERSTAND, actions), executor=executor).send('读取画面')
+    assert result['status'] == 'ANSWER'
+
+
+@pytest.mark.asyncio
 async def test_changed_snapshot_and_mock_recovery_are_rejected(tmp_path):
     backend = Backend()
     first = await runner(tmp_path,backend,ScriptedModel({**UNDERSTAND,'question':'内容？'},[READ,ANSWER])).send('问答')
