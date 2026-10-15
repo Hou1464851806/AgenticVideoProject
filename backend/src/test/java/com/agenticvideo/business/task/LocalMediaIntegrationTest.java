@@ -73,6 +73,58 @@ class LocalMediaIntegrationTest {
     @org.springframework.beans.factory.annotation.Autowired LocalTaskRunner runtime;
 
     @Test
+    void savedSilentProductionRendersThroughInternalPreviewAndMq() throws Exception {
+        var browser=signedIn("m4-silent-owner");var json=new ObjectMapper();
+        var project=java.util.UUID.fromString(json(browser.post("/projects","{\"name\":\"M4 静音保存方案\"}")).path("data").path("id").asText());
+        byte[] bytes=java.nio.file.Files.readAllBytes(java.nio.file.Path.of("../frontend/e2e/fixtures/labelled-vision-vfr.mp4"));
+        var hash=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+        var upload=json(browser.post("/projects/"+project+"/uploads",json.writeValueAsString(java.util.Map.of("filename","silent.mp4","sizeBytes",bytes.length,"sha256",hash,"idempotencyKey","m4-silent","writerId",browser.writerId)))).path("data");
+        String writer=upload.path("writerToken").asText(),uploadId=upload.path("uploadId").asText();
+        var urls=json(browser.post("/uploads/"+uploadId+"/part-urls",json.writeValueAsString(java.util.Map.of("partNumbers",java.util.List.of(1),"writerToken",writer)))).path("data");
+        assertEquals(200,HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create(urls.path("parts").get(0).path("url").asText())).PUT(HttpRequest.BodyPublishers.ofByteArray(bytes)).build(),HttpResponse.BodyHandlers.ofString()).statusCode());
+        var completed=json(browser.post("/uploads/"+uploadId+"/complete",json.writeValueAsString(java.util.Map.of("writerToken",writer)))).path("data");
+        awaitState(java.util.UUID.fromString(completed.path("validationTaskId").asText()),"SUCCEEDED");
+        var asset=java.util.UUID.fromString(completed.path("assetId").asText());
+        var analysis=db.queryForObject("SELECT analysis_id FROM asset_analysis_heads WHERE asset_id=?",java.util.UUID.class,asset);
+        // Controlled existing-analysis fixture; the plan is validated and saved through M2 HTTP.
+        var frame=db.queryForMap("SELECT id,sha256,observed_at_ms FROM vision_frames WHERE analysis_id=? ORDER BY ordinal LIMIT 1",analysis);
+        var call=java.util.UUID.randomUUID();var evidence=java.util.UUID.randomUUID();
+        db.update("INSERT INTO vision_model_calls(id,analysis_id,task_id,frame_sha256,model,parameters_json,status) VALUES (?,?,?,?,'fixture','{}','SUCCEEDED')",call,analysis,java.util.UUID.fromString(completed.path("validationTaskId").asText()),frame.get("sha256"));
+        db.update("INSERT INTO evidence_segments(id,project_id,asset_id,analysis_id,source_kind,ordinal,text,start_ms,end_ms,observation_json,frame_id,vision_call_id) VALUES (?,?,?,?,'VISUAL',0,'红色矩形',?,?,'{}',?,?)",evidence,project,asset,analysis,frame.get("observed_at_ms"),frame.get("observed_at_ms"),frame.get("id"),call);
+        db.update("UPDATE analysis_stages SET status='SUCCEEDED' WHERE analysis_id=? AND stage_key='VISION'",analysis);
+        var scope=internal("POST","/questions/scopes",java.util.Map.of("project_id",project,"asset_ids",java.util.List.of(asset))).path("scope_id").asText();
+        var production=java.util.UUID.randomUUID();String path="/questions/productions/"+production;
+        internal("PUT",path,java.util.Map.of("project_id",project,"scope_id",scope));
+        internalTool("/questions/scopes/"+scope,"read_video_range",java.util.Map.of("asset_id",asset,"start_ms",0,"end_ms",2000,"cursor",0));
+        var draft=java.util.Map.of("title","静音竖屏","outputs",java.util.List.of(java.util.Map.of("output_key","out-1","title","静音竖屏","clips",java.util.List.of(java.util.Map.of("asset_id",asset,"source_in_ms",0,"source_out_ms",2000,"evidence_ids",java.util.List.of(evidence),"reason","已读观察画面")))));
+        var conditions=json.createObjectNode().put("output_key","out-1").putNull("duration_min_ms").putNull("duration_max_ms");
+        var requirements=java.util.Map.of("topic","红色矩形","asset_ids",java.util.List.of(asset),"profile","PORTRAIT_720","subtitles_enabled",false,"require_complete_subtitles",false,"forbidden_content",java.util.List.of(),"outputs",java.util.List.of(conditions));
+        String draftHash=com.agenticvideo.business.tools.ToolJson.hash(json.valueToTree(draft)),requirementsHash=com.agenticvideo.business.tools.ToolJson.hash(json.valueToTree(requirements));
+        var validation=internalTool(path,"validate_edit_draft",java.util.Map.of("draft",draft,"requirements",requirements,"draft_hash",draftHash,"requirements_hash",requirementsHash));
+        assertTrue(validation.path("data").path("valid").asBoolean(),validation.toString());
+        var saved=internal("POST",path+"/save",java.util.Map.of("project_id",project,"requirement_id",production,"scope_id",scope,"validation_id",validation.path("data").path("validation_id").asText(),"draft_hash",draftHash,"requirements_hash",requirementsHash,"requirements_sources",java.util.Map.of("topic",java.util.Map.of("kind","USER","message_id","m4-silent","text","红色矩形"))));
+        var preview=internal("POST","/productions/"+production+"/previews",java.util.Map.of());
+        assertEquals(saved.path("revision_id"),preview.path("revision_id"));
+        var task=java.util.UUID.fromString(preview.path("task_id").asText());awaitState(task,"SUCCEEDED");
+        var detail=internal("GET","/previews/"+preview.path("request_id").asText(),null);
+        assertEquals("AVAILABLE",detail.path("artifact").path("state").asText());assertEquals(300,detail.path("playback").path("expires_in_seconds").asInt());
+        verifyRendered(browser,task,360,640);
+        var audio=new ProcessBuilder("ffmpeg","-v","info","-i","target/m1-media/360x640.mp4","-af","volumedetect","-f","null","-").redirectErrorStream(true).start();
+        String audioReport=new String(audio.getInputStream().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);assertEquals(0,audio.waitFor());
+        assertTrue(audioReport.contains("max_volume: -91.0 dB"),audioReport);
+        assertEquals(saved,internal("GET",path+"/save",null));
+    }
+    private JsonNode internal(String method,String path,Object body) throws Exception {
+        var request=HttpRequest.newBuilder(URI.create("http://localhost:"+port+"/internal/v1"+path)).header("Authorization","Bearer internal-integration-worker-token").header("Content-Type","application/json")
+            .method(method,body==null?HttpRequest.BodyPublishers.noBody():HttpRequest.BodyPublishers.ofString(new ObjectMapper().writeValueAsString(body)));
+        var response=HttpClient.newHttpClient().send(request.build(),HttpResponse.BodyHandlers.ofString());
+        assertTrue(response.statusCode()==200 || response.statusCode()==201 || response.statusCode()==202,response.body());return json(response);
+    }
+    private JsonNode internalTool(String path,String name,Object arguments) throws Exception {
+        var json=new ObjectMapper();var args=json.valueToTree(arguments);
+        return internal("POST",path+"/tools",java.util.Map.of("call_id",java.util.UUID.randomUUID().toString(),"tool_name",name,"arguments",args,"request_hash",com.agenticvideo.business.tools.ToolJson.hash(json.valueToTree(java.util.Map.of("tool",name,"args",args)))));
+    }
+    @Test
     void uploadExecutesInConsumerAndDuplicateDeliveryReusesDurableResult() throws Exception {
         BrowserApi browser=signedIn("local-media-owner");
         String project=json(browser.post("/projects","{\"name\":\"本机媒体\"}")).path("data").path("id").asText();

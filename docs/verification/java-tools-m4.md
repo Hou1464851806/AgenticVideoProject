@@ -1,6 +1,6 @@
 # M4 实施与验证记录
 
-当前已完成步骤 1～3；最新范围、验证和下一步见本文末尾的步骤 3 记录。
+当前已完成步骤 1～3及步骤 4 的真实视频／故障自动验收；步骤 4 尚待人工完整观看与试听，不能视为全部退出条件通过。最新范围、验证和下一步见本文末尾。
 
 日期：2026-10-15（Asia/Shanghai）。本轮仅实施 [最终设计](../java-tools-m4-design.md)的步骤 1，不是整个 M4 阶段交付。基准 `2aca5d1`，分支 `main`，起始工作区干净。已核对系统临时目录中的 M4 设计交接。
 
@@ -161,3 +161,96 @@ agent-service/.venv/bin/python -m compileall -q agent-service/agent_service/prev
 从步骤 4 继续，复用 M2 已分析素材及真实保存方案，通过新 CLI 执行真实视频与响应丢失、取消、文件失效、Java 进程重启恢复验收。现有测试不替代真实 CLI→MQ→FFmpeg 的媒体验收或人工观看；步骤 5 再对 Q1～Q13 做阶段收尾、最终 Java／Python 完整非付费回归与后端打包。
 
 未运行：整个 Java／Python 非付费全量、后端打包（步骤 5）；M4 真实视频／故障与进程重启端到端验收（步骤 4）；付费模型；前端类型检查／构建与浏览器回归（本步无前端变更）。Python 客户端不管理 retry_of 或 Java 重试回执，不新增本地预览任务库。
+
+## 步骤 4：真实视频与故障联调
+
+日期：2026-10-15（Asia/Shanghai）。基准 `cca323202d7d11a4fea68a2547ace35b2a4cac9c`，分支 `main`，起始工作区干净。已核对最终设计、本文最新步骤 3 交接及系统临时目录中的历史交接。按本次授权继续步骤 4，未提前实施步骤 5。
+
+### 范围与实际结果
+
+新增 [视频验收脚本](../../agent-service/scripts/verify_java_m4.py)及[故障实验脚本](../../agent-service/scripts/verify_java_m4_faults.py)。前者读取 M2 真实 CLI 的既有 runs.json／SQLite，逐条调用新 CLI；后者单独编排本机 Compose 故障，避免将故障控制混入正常视频核验。不修改 Java／Python 业务实现、保存版本、模型、预算、认证、MQ 或任务状态机。
+
+原 Compose 服务已停止，数据卷仍在；本轮恢复 PostgreSQL／Silo／RabbitMQ／Qdrant，重建当前后端镜像并启动，保留原数据。镜像构建跳过测试的 package 只是部署准备，不是步骤 5 的最终 verify。没有重新上传、基础分析或模型调用。
+
+完整可分享证据见 [步骤 4 JSON](java-tools-m4-step4.json)，包括保存输出、请求／任务／产物身份、媒体探测、Outbox、执行尝试、故障检查点及签名过期验证；没有 Bearer 凭据或签名 URL。原 CLI 命令、stdout、stderr、视频、备份与数据库明细保存在本机 `agent-service/.local/m4-step4-*`。视频文件路径已记录在 JSON，不提交二进制视频。
+
+| 场景与 M2 来源 | 保存版本 | 输出与实际时长 |
+| --- | --- | --- |
+| 横屏字幕：m2-stage5-single-accepted | `21a23388-d415-4105-a816-74afaf7c55c8` | out-1：8160ms → 8167ms |
+| 多素材、多输出：m2-stage5-multi-four | `d1ead956-1120-4361-b4d0-25f4cd97d90e` | 按保存顺序 out-2：4000ms → 4000ms；out-1：9440ms → 9440ms |
+| 多素材单输出：m2-stage5-multi-single-fixed | `da38d61b-5a17-45bd-a998-eab1fbe793ee` | out-1：9440ms → 9440ms |
+| 竖屏无字幕：m2-stage5-visual-final | `3cc6e1e5-55d5-49c1-b044-31f10536df16` | out-1：3000ms → 3000ms |
+
+以上五条均经 CLI→内部 HTTP→真实数据库／Outbox／RabbitMQ→FFmpeg→Silo 产生并取得可下载播放的 MP4。核对发布产物 SHA-256／字节数、640×360／360×640、30fps、H.264、AAC、48kHz 双声道和 100ms 时长容差；重复提交、详情刷新与成功终态取消没有新增执行尝试或完成回执。命令前后 Agent inspect 完全一致，基础分析调用数、head 及保存版本完全一致。
+
+另用早期成功详情中的真实签名 URL 验证：超过 300 秒后 GET 为 403，重新 CLI 查询同一请求取得的 URL 为 200，产物身份相同，没有重新渲染。证据仅保留 HTTP 状态及身份。
+
+已抽帧核对[横屏字幕](assets/m4-step4-captions.png)、[多素材切换](assets/m4-step4-montage.png)、[竖屏留边](assets/m4-step4-portrait.png)：可见上传→核查→导出字幕、绿底讲话→蓝底另一素材的顺序，以及红／蓝矩形和“证据42／画面17”，竖屏无叠加字幕。额外逐片段从源文件独立 seek 解码至 8kHz 单声道，与预览音轨作样本匹配：12 个讲话片段相关性 0.9737～0.9975，偏移 0～26.625ms，未超过 100ms。本机复查脚本为 `.local/m4-step4-audio-check.py`，匹配值已收入 JSON；这是信号核对，不冒充人工试听。
+
+**人工完整观看、试听与主观音画核对尚未执行。** 抽帧和信号结果不能替代最终设计 M4-A04 的这部分要求。因此步骤 4 自动验收通过，但整个步骤 4 退出条件仍有未完成项；不得据此宣称整个 M4 已交付。
+
+### 真实故障证据
+
+故障使用另一份 M2 保存版本 `4ed1278d-77cc-47fe-9df1-eedd6114c430`，最终完整运行针对 out-2。没有插入测试方案或直接修改业务任务状态。临时 FFmpeg 包装仅在容器文件系统添加 `-re`／非法选项；SIGSTOP 针对实际 FFmpeg 进程，SIGKILL 针对真实 Java 容器。退出时移除包装、恢复服务及预览对象备份，原始素材未改。
+
+| 行为 | 最终证据 |
+| --- | --- |
+| 提交响应丢失 | 代理先取得 Java 202 再断开 TCP；CLI 返回 PREVIEW_TRANSPORT_UNCERTAIN，列表找回原请求；重复提交同一 request／task |
+| 排队取消 | 暂停 RabbitMQ app 后提交；取消为 CANCELLED，执行尝试数 0，普通提交仍返回取消记录 |
+| 重试丢响应、并发重放 | retry(A) 首次 202 后断连接；两次并发 HTTP 重试及后续 CLI 重放均为同一固定后继 B，无新任务 |
+| 执行中取消 | 实际 FFmpeg RUNNING 后 SIGSTOP；CLI 先返回 CANCEL_REQUESTED，后确认 CANCELLED，FFmpeg 已退出 |
+| Java 中断恢复 | 同一 request／task 的第 1 次尝试 EXPIRED，第 2 次 SUCCEEDED，Outbox／MQ 恢复发布产物 |
+| 存储停机 | 停止 Silo；CLI 返回 PREVIEW_STORAGE_UNAVAILABLE，数据库任务仍 SUCCEEDED、产物仍 AVAILABLE；恢复后可查询播放 |
+| 文件缺失 | 备份并删除本轮预览对象；详情保持 SUCCEEDED，产物 UNAVAILABLE，无播放地址，可显式重试；普通提交不新建任务，实验后恢复对象 |
+| 恢复耗尽 | 同一任务连续 3 次真实 Java SIGKILL；3 条 EXPIRED，最终 FAILED／EXECUTION_RECOVERY_EXHAUSTED；普通请求及 retry(原前驱) 不复活任务 |
+| 取消中重启 | CANCEL_REQUESTED 后 SIGKILL；恢复为 CANCELLED，只有 1 次尝试，未重新运行 FFmpeg |
+| 明确失败与显式重试 | 实际 FFmpeg 非法选项引发 UNDECODABLE_MEDIA，仅 1 次 FAILED；Java 重启仍 FAILED；retry(该失败请求) 才新建并成功 |
+
+首轮 out-1 实验已覆盖至三次中断，但脚本在 HTTP 刚就绪时过早要求恢复终态而失败；改为查询到目标状态后，在 out-2 完整重跑通过。保留首轮 `.local/m4-step4-faults-v2`，不将其记为完整通过。新增无音轨集成夹具也曾因漏写 M2 条件空值、保存来源而被权威校验拒绝；修正夹具后通过，没有放宽业务契约。
+
+视频脚本早期试跑曾因误读 saved_result 中的项目字段、相对路径转换及数据库排序列而退出，没有产生通过结论；按既有 production 关联、路径和实际表结构修正后完整重跑。五条视频最终又用收尾版本脚本在 `.local/m4-step4-confirmed-*` 复跑通过，发布哈希与此前观看抽帧的视频完全一致。
+
+### 分层测试、审查与未完成项
+
+范围依据：新增验收脚本和 LocalMedia 测试，业务代码未改。先运行新增单条，再运行 LocalMedia 全模块；同时复跑 render 全模块、M2 校验保存及 TaskApi，覆盖新接入的直接调用链。Python 复跑预览客户端／CLI及验收报告模块。未因单个实施步骤执行阶段全量。
+
+新增 `savedSilentProductionRendersThroughInternalPreviewAndMq` 使用真实上传和已生成的代表帧，加受控现有视觉观察；从 M2 HTTP 读取范围、校验、显式保存进入新内部预览，经真实 MQ／FFmpeg 生成 360×640、2000ms、AAC 静音。读取实际音轨的 volumedetect 结果为 -91.0dB（16bit 静音测量下限）。这是受控无音轨补静音回归，与上述真实 M2 模型保存方案验收分别记录。
+
+验收报告新增错误哈希／字节数测试，先复现“可解码同规格文件仍被误接受”，再补发布产物身份校验；另覆盖错误时长、方向及正确文件。仅注入 HTTP／数据库系统边界，FFprobe 解析实际编码样本。
+
+| 检查 | 最终结果与实际范围 |
+| --- | --- |
+| render 全模块、M2 校验保存、TaskApi、原 LocalMedia | 66 项通过，0 失败／错误／跳过；命令见下方。此后 Java 仅增加无音轨测试及其复用 HTTP 辅助方法，没有业务修改 |
+| 新增无音轨单条测试 | 修正夹具后 1 项通过，0 失败／错误／跳过 |
+| 最终 `LocalMediaIntegrationTest` 全模块 | 6 项通过，0 失败／错误／跳过；含新增 M2 保存→内部预览→MQ／FFmpeg、原上传／预览／导出、取消、Outbox 与恢复回归；Java 编译通过 |
+| 最终 Python 预览客户端、CLI、M2／M4 验收报告 | 63 项通过，0 失败／跳过；没有配置新静态类型检查器 |
+| 最终脚本／新测试 compileall、两脚本 --help | 通过；最后的错误码断言还对真实故障 stderr 离线重放，2 次 PREVIEW_TRANSPORT_UNCERTAIN、1 次 PREVIEW_STORAGE_UNAVAILABLE 均匹配 |
+| 收尾五条真实视频复跑 | 正常验收脚本最终版本全部通过；同一 request／task／artifact，下载内容与原视频 SHA-256 相同 |
+| 故障实验 | out-2 完整流程通过；最后只增加更严格的环境前置检查、退出时解冻、固定本机 URL 和错误码断言，没有再执行一次破坏性实验。实际清理命令已复核：服务健康，无临时包装、残留 FFmpeg 或对象备份 |
+| 文档／证据／差异 | 六份 Markdown 的 101 个本地链接存在；证据 JSON 可解析、不含签名和凭据；git diff --check 通过 |
+
+```sh
+mvn -B -ntp -pl backend -am test \
+  '-Dtest=PreviewContractsTest,InternalPreviewApiIntegrationTest,PreviewApiIntegrationTest,ExportApiIntegrationTest,RenderCapacityIntegrationTest,TaskApiIntegrationTest,LocalMediaIntegrationTest,DraftValidationIntegrationTest' \
+  -Dsurefire.failIfNoSpecifiedTests=false
+mvn -B -ntp -pl backend -am test '-Dtest=LocalMediaIntegrationTest' -Dsurefire.failIfNoSpecifiedTests=false
+agent-service/.venv/bin/python -m pytest agent-service/tests/test_preview_client.py agent-service/tests/test_preview_cli.py agent-service/tests/test_live_acceptance_report.py agent-service/tests/test_m4_acceptance_report.py -q
+```
+
+按 code-review 技能，以 `git diff cca323202d7d11a4fea68a2547ace35b2a4cac9c` 审查本轮变更，由两个独立子代理完成。
+
+#### Standards
+
+0 项问题。符合 AGENTS.md、GLOSSARY.md、ADR-0017；脚本职责分离、测试辅助方法有实际复用，没有新增业务抽象或推测功能，证据无凭据／签名泄露。
+
+#### Spec
+
+0 项新增可操作发现。步骤 4 的视频及故障证据、产物身份校验和无音轨回归符合设计，没有越界业务行为。已知未完成的 A04 人工完整观看试听如实列出，没有算作完成；步骤 5 全量及打包不属于本轮缺陷。
+
+两轴均无审查修正。审查后仅更新验证结果、入口文案与收尾重放证据，没有修改业务代码或测试逻辑。最终失败项：无；最终选定自动测试跳过项：0。历史红测及试跑失败已在上文保留，不计入通过。
+
+### 步骤 4 后续交接
+
+人工完整观看试听五条视频并核对选段、顺序、音画和字幕后，才能关闭步骤 4 的 A04 余项。程序验证、抽帧检查和音轨信号匹配已经完成；尚无人工试听结论，不默认代用户确认。之后按步骤 5 对 Q1～Q13 阶段收尾审查，执行 Java／Python 完整非付费回归与后端最终打包。
+
+未运行：人工完整试听、步骤 5 Java／Python 完整非付费回归及后端最终打包、付费模型、前端／浏览器回归（没有前端改动）。原模型回执累计保持 ASR 3、VLM 5、素材 Embedding 10，分析 head 和保存版本一致；本轮未发生模型提交。

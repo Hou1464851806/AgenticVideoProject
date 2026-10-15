@@ -216,3 +216,25 @@ agent-service/.venv/bin/python -m agent_service --java-url http://localhost:8080
 取消影响共享的实际渲染任务及所有复用请求，`CANCEL_REQUESTED` 仅表示已请求停止，`CANCELLED` 才表示确认取消；成功终态取消不会删除文件。预览命令不进入模型决策、不改变 SAVED／waiting／预算；退出 CLI 不取消 Java 任务。
 
 stdout 输出协议 JSON，提示写入 stderr。成功接纳、运行中查询、列表及合法取消退出 0；提交／查询／重试取得 FAILED、CANCELLED 或 UNAVAILABLE／REMOVED 产物退出 1；参数／认证／HTTP／网络／协议错误非零，Ctrl-C 为 130。预览访问错误输出 `error`，不伪装成 Java 的任务状态；原有制作命令退出码保持。
+
+### M4 真实媒体与故障验收
+
+在仓库根目录使用已保存的 M2 验收目录；脚本不上传、不分析、不调用模型、不保存新方案。使用新输出目录保留原始日志：
+
+```sh
+agent-service/.venv/bin/python agent-service/scripts/verify_java_m4.py \
+  --source agent-service/.local/m2-stage5-single-accepted \
+  --output agent-service/.local/m4-videos-new
+```
+
+脚本显式轮询、获取播放地址并下载核验规格、时长、发布哈希和字节数；CLI 本身仍不等待或下载。需要本机 ffmpeg／ffprobe、当前 Compose 和源目录下的 runs.json／agent/。视频内容还需完整观看试听。
+
+真实故障实验会中断本机 Java、RabbitMQ 和 Silo；在无其他排队／运行任务时单独执行，选择尚无预览历史的已保存输出：
+
+```sh
+agent-service/.venv/bin/python agent-service/scripts/verify_java_m4_faults.py \
+  --source agent-service/.local/m2-stage5-single-multi --output-key out-2 \
+  --output agent-service/.local/m4-faults-new
+```
+
+该示例的输出已参与本机验收，重跑须选另一条未预览的已保存输出；脚本会明确拒绝历史输出。故障期间保留数据卷和原始素材，备份后移走预览对象，退出时恢复服务、对象及容器内临时 FFmpeg 包装。raw stdout 中的临时播放 URL 只留在忽略的本地目录；分享记录前去除签名和凭据。实际证据与未完成项见 [M4 步骤 4](../docs/verification/java-tools-m4.md#步骤-4真实视频与故障联调)。
