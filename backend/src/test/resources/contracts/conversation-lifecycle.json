@@ -1,0 +1,779 @@
+{
+  "inputs": [
+    {
+      "value": {
+        "schemaVersion": "1.0",
+        "identity": {
+          "projectId": "00000000-0000-4000-8000-000000000001",
+          "conversationId": "00000000-0000-4000-8000-000000000002",
+          "messageId": "00000000-0000-4000-8000-000000000003",
+          "turnId": "00000000-0000-4000-8000-000000000004",
+          "taskId": "00000000-0000-4000-8000-000000000050",
+          "threadId": "00000000-0000-4000-8000-000000000006",
+          "executionId": "00000000-0000-4000-8000-000000000007"
+        },
+        "content": "素材中的设备是什么？\n保留当前草稿。",
+        "history": [
+          {
+            "messageId": "00000000-0000-4000-8000-000000000013",
+            "role": "USER",
+            "content": "介绍设备 🎥\n控制字符\u001b 与字面 \\u001B",
+            "references": []
+          }
+        ],
+        "references": [
+          {
+            "type": "ASSET",
+            "assetId": "00000000-0000-4000-8000-000000000040",
+            "range": [
+              -9223372036854775808,
+              9223372036854775807
+            ]
+          }
+        ],
+        "currentProduction": {
+          "productionId": "00000000-0000-4000-8000-000000000010",
+          "scopeId": "00000000-0000-4000-8000-000000000011",
+          "threadId": "00000000-0000-4000-8000-000000000012",
+          "editGeneration": 2,
+          "requirements": {
+            "topic": "设备介绍",
+            "outputs": [
+              {
+                "output_key": "out-1",
+                "duration_min_ms": 30000,
+                "duration_max_ms": 30000
+              }
+            ]
+          },
+          "requirementsSources": {
+            "topic": {
+              "kind": "USER",
+              "message_id": "00000000-0000-4000-8000-000000000013",
+              "text": "介绍设备 🎥"
+            }
+          },
+          "currentDraft": {
+            "messageId": "00000000-0000-4000-8000-000000000020",
+            "validationId": "00000000-0000-4000-8000-000000000021",
+            "editGeneration": 2,
+            "draftHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "requirementsHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "frozen": false
+        },
+        "pendingQuestions": [
+          {
+            "questionId": "00000000-0000-4000-8000-000000000030",
+            "taskId": "00000000-0000-4000-8000-000000000005",
+            "productionId": "00000000-0000-4000-8000-000000000010",
+            "threadId": "00000000-0000-4000-8000-000000000006",
+            "executionId": "00000000-0000-4000-8000-000000000007",
+            "waitId": "wait-duration-1",
+            "editGeneration": 2,
+            "prompt": "30 秒还是 60 秒？"
+          }
+        ]
+      },
+      "hash": "2287ce01b6d3033e239264764ed2744f775e6c7334cfc4d16a86090977cc1be8"
+    },
+    {
+      "value": {
+        "schemaVersion": "1.0",
+        "identity": {
+          "projectId": "00000000-0000-4000-8000-000000000001",
+          "conversationId": "00000000-0000-4000-8000-000000000002",
+          "messageId": "00000000-0000-4000-8000-000000000003",
+          "turnId": "00000000-0000-4000-8000-000000000004",
+          "taskId": "00000000-0000-4000-8000-000000000050",
+          "threadId": "00000000-0000-4000-8000-000000000006",
+          "executionId": "00000000-0000-4000-8000-000000000007"
+        },
+        "content": "先讨论剪辑思路",
+        "history": [],
+        "references": [
+          {
+            "type": "ASSET",
+            "assetId": "00000000-0000-4000-8000-000000000040"
+          }
+        ],
+        "currentProduction": null,
+        "pendingQuestions": []
+      },
+      "hash": "ae9c65fe5e29887e8b203a1be4faf2f23d2565e7a90de541d4b7a645c18cde64"
+    },
+    {
+      "value": {
+        "schemaVersion": "1.0",
+        "identity": {
+          "projectId": "00000000-0000-4000-8000-000000000001",
+          "conversationId": "00000000-0000-4000-8000-000000000002",
+          "messageId": "00000000-0000-4000-8000-000000000003",
+          "turnId": "00000000-0000-4000-8000-000000000004",
+          "taskId": "00000000-0000-4000-8000-000000000005",
+          "threadId": "00000000-0000-4000-8000-000000000006",
+          "executionId": "00000000-0000-4000-8000-000000000007"
+        },
+        "content": "30 秒",
+        "history": [
+          {
+            "messageId": "00000000-0000-4000-8000-000000000013",
+            "role": "USER",
+            "content": "介绍设备 🎥",
+            "references": []
+          }
+        ],
+        "references": [
+          {
+            "type": "QUESTION",
+            "questionId": "00000000-0000-4000-8000-000000000030"
+          }
+        ],
+        "currentProduction": {
+          "productionId": "00000000-0000-4000-8000-000000000010",
+          "scopeId": "00000000-0000-4000-8000-000000000011",
+          "threadId": "00000000-0000-4000-8000-000000000012",
+          "editGeneration": 2,
+          "requirements": {
+            "topic": "设备介绍",
+            "outputs": [
+              {
+                "output_key": "out-1",
+                "duration_min_ms": 30000,
+                "duration_max_ms": 30000
+              }
+            ]
+          },
+          "requirementsSources": {
+            "topic": {
+              "kind": "USER",
+              "message_id": "00000000-0000-4000-8000-000000000013",
+              "text": "介绍设备 🎥"
+            }
+          },
+          "currentDraft": {
+            "messageId": "00000000-0000-4000-8000-000000000020",
+            "validationId": "00000000-0000-4000-8000-000000000021",
+            "editGeneration": 2,
+            "draftHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "requirementsHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "frozen": false
+        },
+        "pendingQuestions": [
+          {
+            "questionId": "00000000-0000-4000-8000-000000000030",
+            "taskId": "00000000-0000-4000-8000-000000000005",
+            "productionId": "00000000-0000-4000-8000-000000000010",
+            "threadId": "00000000-0000-4000-8000-000000000006",
+            "executionId": "00000000-0000-4000-8000-000000000007",
+            "waitId": "wait-duration-1",
+            "editGeneration": 2,
+            "prompt": "30 秒还是 60 秒？"
+          }
+        ]
+      },
+      "hash": "4f6f98a62178faf85a9f154c25a9db6480877e2d1e99f5a15a136c6147c64452"
+    },
+    {
+      "value": {
+        "schemaVersion": "1.0",
+        "identity": {
+          "projectId": "00000000-0000-4000-8000-000000000001",
+          "conversationId": "00000000-0000-4000-8000-000000000002",
+          "messageId": "00000000-0000-4000-8000-000000000003",
+          "turnId": "00000000-0000-4000-8000-000000000004",
+          "taskId": "00000000-0000-4000-8000-000000000005",
+          "threadId": "00000000-0000-4000-8000-000000000006",
+          "executionId": "00000000-0000-4000-8000-000000000007"
+        },
+        "content": "另做一条视频",
+        "history": [
+          {
+            "messageId": "00000000-0000-4000-8000-000000000013",
+            "role": "USER",
+            "content": "介绍设备 🎥",
+            "references": []
+          }
+        ],
+        "references": [
+          {
+            "type": "ASSET",
+            "assetId": "00000000-0000-4000-8000-000000000040"
+          }
+        ],
+        "currentProduction": {
+          "productionId": "00000000-0000-4000-8000-000000000010",
+          "scopeId": "00000000-0000-4000-8000-000000000011",
+          "threadId": "00000000-0000-4000-8000-000000000012",
+          "editGeneration": 2,
+          "requirements": {
+            "topic": "设备介绍",
+            "outputs": [
+              {
+                "output_key": "out-1",
+                "duration_min_ms": 30000,
+                "duration_max_ms": 30000
+              }
+            ]
+          },
+          "requirementsSources": {
+            "topic": {
+              "kind": "USER",
+              "message_id": "00000000-0000-4000-8000-000000000013",
+              "text": "介绍设备 🎥"
+            }
+          },
+          "currentDraft": {
+            "messageId": "00000000-0000-4000-8000-000000000020",
+            "validationId": "00000000-0000-4000-8000-000000000021",
+            "editGeneration": 2,
+            "draftHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "requirementsHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          },
+          "frozen": true
+        },
+        "pendingQuestions": [
+          {
+            "questionId": "00000000-0000-4000-8000-000000000030",
+            "taskId": "00000000-0000-4000-8000-000000000005",
+            "productionId": "00000000-0000-4000-8000-000000000010",
+            "threadId": "00000000-0000-4000-8000-000000000006",
+            "executionId": "00000000-0000-4000-8000-000000000007",
+            "waitId": "wait-duration-1",
+            "editGeneration": 2,
+            "prompt": "30 秒还是 60 秒？"
+          }
+        ]
+      },
+      "hash": "b5c73f00a2e157700b4239e05299ae04ee3dd7800d24b051843718436431965f"
+    }
+  ],
+  "results": [
+    {
+      "value": {
+        "schemaVersion": "1.0",
+        "identity": {
+          "projectId": "00000000-0000-4000-8000-000000000001",
+          "conversationId": "00000000-0000-4000-8000-000000000002",
+          "messageId": "00000000-0000-4000-8000-000000000003",
+          "turnId": "00000000-0000-4000-8000-000000000004",
+          "taskId": "00000000-0000-4000-8000-000000000005",
+          "threadId": "00000000-0000-4000-8000-000000000006",
+          "executionId": "00000000-0000-4000-8000-000000000007"
+        },
+        "status": "ANSWER",
+        "mode": "QUERY",
+        "content": "设备位于画面中央。",
+        "scopeReceipts": [
+          {
+            "scopeId": "00000000-0000-4000-8000-000000000011",
+            "callId": "read-1",
+            "evidenceIds": [
+              "00000000-0000-4000-8000-000000000041"
+            ]
+          }
+        ],
+        "productionId": null,
+        "editGeneration": null,
+        "draft": null,
+        "question": null,
+        "failure": null
+      },
+      "hash": "645e8cc760aa1c885bc998a0861c7eb3a9d0b0a99d93ca70c95595d76247b034"
+    },
+    {
+      "value": {
+        "schemaVersion": "1.0",
+        "identity": {
+          "projectId": "00000000-0000-4000-8000-000000000001",
+          "conversationId": "00000000-0000-4000-8000-000000000002",
+          "messageId": "00000000-0000-4000-8000-000000000003",
+          "turnId": "00000000-0000-4000-8000-000000000004",
+          "taskId": "00000000-0000-4000-8000-000000000005",
+          "threadId": "00000000-0000-4000-8000-000000000006",
+          "executionId": "00000000-0000-4000-8000-000000000007"
+        },
+        "status": "ANSWER",
+        "mode": "DISCUSS",
+        "content": "可以先展示外观，再解释用途。",
+        "scopeReceipts": [],
+        "productionId": null,
+        "editGeneration": null,
+        "draft": null,
+        "question": null,
+        "failure": null
+      },
+      "hash": "0aef87584344eb66abb1a69d3b706274c8e59a28ae2f6b1e10505f869447df1b"
+    },
+    {
+      "value": {
+        "schemaVersion": "1.0",
+        "identity": {
+          "projectId": "00000000-0000-4000-8000-000000000001",
+          "conversationId": "00000000-0000-4000-8000-000000000002",
+          "messageId": "00000000-0000-4000-8000-000000000003",
+          "turnId": "00000000-0000-4000-8000-000000000004",
+          "taskId": "00000000-0000-4000-8000-000000000005",
+          "threadId": "00000000-0000-4000-8000-000000000006",
+          "executionId": "00000000-0000-4000-8000-000000000007"
+        },
+        "status": "WAITING_INPUT",
+        "mode": "DRAFT",
+        "content": "30 秒还是 60 秒？",
+        "scopeReceipts": [],
+        "productionId": "00000000-0000-4000-8000-000000000010",
+        "editGeneration": 2,
+        "draft": null,
+        "question": {
+          "questionId": "00000000-0000-4000-8000-000000000030",
+          "taskId": "00000000-0000-4000-8000-000000000005",
+          "productionId": "00000000-0000-4000-8000-000000000010",
+          "threadId": "00000000-0000-4000-8000-000000000006",
+          "executionId": "00000000-0000-4000-8000-000000000007",
+          "waitId": "wait-duration-1",
+          "editGeneration": 2,
+          "prompt": "30 秒还是 60 秒？"
+        },
+        "failure": null
+      },
+      "hash": "3eea99f201754178917673e35a2035edf95331496f6bb9fe1f9f48a2fb036cf8"
+    },
+    {
+      "value": {
+        "schemaVersion": "1.0",
+        "identity": {
+          "projectId": "00000000-0000-4000-8000-000000000001",
+          "conversationId": "00000000-0000-4000-8000-000000000002",
+          "messageId": "00000000-0000-4000-8000-000000000003",
+          "turnId": "00000000-0000-4000-8000-000000000004",
+          "taskId": "00000000-0000-4000-8000-000000000005",
+          "threadId": "00000000-0000-4000-8000-000000000006",
+          "executionId": "00000000-0000-4000-8000-000000000007"
+        },
+        "status": "DRAFT_READY",
+        "mode": "DRAFT",
+        "content": "草稿已通过校验。",
+        "scopeReceipts": [
+          {
+            "scopeId": "00000000-0000-4000-8000-000000000011",
+            "callId": "read-1",
+            "evidenceIds": [
+              "00000000-0000-4000-8000-000000000041"
+            ]
+          }
+        ],
+        "productionId": "00000000-0000-4000-8000-000000000010",
+        "editGeneration": 2,
+        "draft": {
+          "messageId": "00000000-0000-4000-8000-000000000020",
+          "validationId": "00000000-0000-4000-8000-000000000021",
+          "editGeneration": 2,
+          "draftHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "requirementsHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "question": null,
+        "failure": null
+      },
+      "hash": "f75ba49092f5389e7416aafc86996038f8a03a0290d4a0023ef6421cb1e0b7c9"
+    },
+    {
+      "value": {
+        "schemaVersion": "1.0",
+        "identity": {
+          "projectId": "00000000-0000-4000-8000-000000000001",
+          "conversationId": "00000000-0000-4000-8000-000000000002",
+          "messageId": "00000000-0000-4000-8000-000000000003",
+          "turnId": "00000000-0000-4000-8000-000000000004",
+          "taskId": "00000000-0000-4000-8000-000000000005",
+          "threadId": "00000000-0000-4000-8000-000000000006",
+          "executionId": "00000000-0000-4000-8000-000000000007"
+        },
+        "status": "INCOMPLETE",
+        "mode": "DRAFT",
+        "content": "设备位于画面中央。",
+        "scopeReceipts": [],
+        "productionId": "00000000-0000-4000-8000-000000000010",
+        "editGeneration": 2,
+        "draft": null,
+        "question": null,
+        "failure": {
+          "code": "BUDGET_EXHAUSTED",
+          "message": "本次执行未完成。",
+          "recoverable": false
+        }
+      },
+      "hash": "d0ef998f238d6bdf34b7c8760d5a2f8f8186e5b65cd0bed4d8d3b2845c44d90a"
+    },
+    {
+      "value": {
+        "schemaVersion": "1.0",
+        "identity": {
+          "projectId": "00000000-0000-4000-8000-000000000001",
+          "conversationId": "00000000-0000-4000-8000-000000000002",
+          "messageId": "00000000-0000-4000-8000-000000000003",
+          "turnId": "00000000-0000-4000-8000-000000000004",
+          "taskId": "00000000-0000-4000-8000-000000000005",
+          "threadId": "00000000-0000-4000-8000-000000000006",
+          "executionId": "00000000-0000-4000-8000-000000000007"
+        },
+        "status": "FAILED",
+        "mode": "DRAFT",
+        "content": "设备位于画面中央。",
+        "scopeReceipts": [],
+        "productionId": "00000000-0000-4000-8000-000000000010",
+        "editGeneration": 2,
+        "draft": null,
+        "question": null,
+        "failure": {
+          "code": "TEMPORARY_NETWORK",
+          "message": "本次执行未完成。",
+          "recoverable": true
+        }
+      },
+      "hash": "ca4356a2c0520c259a3081a4bb584b1a84bf8db9c909eaad4768d17b5404461c"
+    },
+    {
+      "value": {
+        "schemaVersion": "1.0",
+        "identity": {
+          "projectId": "00000000-0000-4000-8000-000000000001",
+          "conversationId": "00000000-0000-4000-8000-000000000002",
+          "messageId": "00000000-0000-4000-8000-000000000003",
+          "turnId": "00000000-0000-4000-8000-000000000004",
+          "taskId": "00000000-0000-4000-8000-000000000005",
+          "threadId": "00000000-0000-4000-8000-000000000006",
+          "executionId": "00000000-0000-4000-8000-000000000007"
+        },
+        "status": "FAILED",
+        "mode": "DRAFT",
+        "content": "设备位于画面中央。",
+        "scopeReceipts": [],
+        "productionId": "00000000-0000-4000-8000-000000000010",
+        "editGeneration": 2,
+        "draft": null,
+        "question": null,
+        "failure": {
+          "code": "SUBMISSION_UNKNOWN",
+          "message": "本次执行未完成。",
+          "recoverable": false
+        }
+      },
+      "hash": "68bb70ee043988906eb9b575bcd6ab3b180678cb279fc93439f2f259ff28b8e6"
+    },
+    {
+      "value": {
+        "schemaVersion": "1.0",
+        "identity": {
+          "projectId": "00000000-0000-4000-8000-000000000001",
+          "conversationId": "00000000-0000-4000-8000-000000000002",
+          "messageId": "00000000-0000-4000-8000-000000000003",
+          "turnId": "00000000-0000-4000-8000-000000000004",
+          "taskId": "00000000-0000-4000-8000-000000000005",
+          "threadId": "00000000-0000-4000-8000-000000000006",
+          "executionId": "00000000-0000-4000-8000-000000000007"
+        },
+        "status": "CANCELLED",
+        "mode": "DRAFT",
+        "content": "设备位于画面中央。",
+        "scopeReceipts": [],
+        "productionId": "00000000-0000-4000-8000-000000000010",
+        "editGeneration": 2,
+        "draft": null,
+        "question": null,
+        "failure": {
+          "code": "USER_STOPPED",
+          "message": "本次执行未完成。",
+          "recoverable": false
+        }
+      },
+      "hash": "be69aba2a0c0d95f72731d01f87374352419e982a1a3231c9ce08e9eb2f1af40"
+    }
+  ],
+  "parsed": [
+    {
+      "mode": "QUERY",
+      "relation": "INDEPENDENT",
+      "questionId": null,
+      "conditionsPatch": {}
+    },
+    {
+      "mode": "DISCUSS",
+      "relation": "INDEPENDENT",
+      "questionId": null,
+      "conditionsPatch": {}
+    },
+    {
+      "mode": "DRAFT",
+      "relation": "CONTINUE_PRODUCTION",
+      "questionId": null,
+      "conditionsPatch": {
+        "outputs": [
+          {
+            "output_key": "out-1",
+            "duration_min_ms": 60000
+          }
+        ]
+      }
+    },
+    {
+      "mode": "DRAFT",
+      "relation": "NEW_PRODUCTION",
+      "questionId": null,
+      "conditionsPatch": {
+        "topic": "另一条视频"
+      }
+    },
+    {
+      "mode": "DRAFT",
+      "relation": "ANSWER_QUESTION",
+      "questionId": "00000000-0000-4000-8000-000000000030",
+      "conditionsPatch": {
+        "duration_min_ms": 30000
+      }
+    },
+    {
+      "mode": "QUERY",
+      "relation": "CLARIFY",
+      "questionId": null,
+      "conditionsPatch": {}
+    }
+  ],
+  "invalid": [
+    {
+      "name": "unsupported version",
+      "target": "input",
+      "path": [
+        "schemaVersion"
+      ],
+      "value": "2.0"
+    },
+    {
+      "name": "missing identity",
+      "target": "input",
+      "path": [
+        "identity",
+        "taskId"
+      ],
+      "remove": true
+    },
+    {
+      "name": "unknown field",
+      "target": "input",
+      "path": [
+        "leaseToken"
+      ],
+      "value": "must-not-be-fixed-input"
+    },
+    {
+      "name": "coerced generation",
+      "target": "input",
+      "path": [
+        "currentProduction",
+        "editGeneration"
+      ],
+      "value": "2"
+    },
+    {
+      "name": "fractional generation",
+      "target": "input",
+      "path": [
+        "currentProduction",
+        "editGeneration"
+      ],
+      "value": 1.5
+    },
+    {
+      "name": "null required field",
+      "target": "input",
+      "path": [
+        "references"
+      ],
+      "value": null
+    },
+    {
+      "name": "negative generation",
+      "target": "input",
+      "path": [
+        "currentProduction",
+        "editGeneration"
+      ],
+      "value": -1
+    },
+    {
+      "name": "invalid id",
+      "target": "input",
+      "path": [
+        "identity",
+        "projectId"
+      ],
+      "value": "project"
+    },
+    {
+      "name": "missing draft",
+      "target": "result",
+      "path": [
+        "status"
+      ],
+      "value": "DRAFT_READY"
+    },
+    {
+      "name": "missing question",
+      "target": "result",
+      "path": [
+        "status"
+      ],
+      "value": "WAITING_INPUT"
+    },
+    {
+      "name": "missing failure",
+      "target": "result",
+      "path": [
+        "status"
+      ],
+      "value": "FAILED"
+    },
+    {
+      "name": "production without generation",
+      "target": "result",
+      "path": [
+        "productionId"
+      ],
+      "value": "00000000-0000-4000-8000-000000000010"
+    },
+    {
+      "name": "unsupported mode",
+      "target": "result",
+      "path": [
+        "mode"
+      ],
+      "value": "SAVED"
+    },
+    {
+      "name": "unrelated question id",
+      "target": "parsed",
+      "path": [
+        "questionId"
+      ],
+      "value": "00000000-0000-4000-8000-000000000030"
+    },
+    {
+      "name": "query condition mutation",
+      "target": "parsed",
+      "path": [
+        "conditionsPatch"
+      ],
+      "value": {
+        "topic": "change"
+      }
+    },
+    {
+      "name": "floating reference number",
+      "target": "input",
+      "path": [
+        "references"
+      ],
+      "value": [
+        {
+          "score": 1e-07
+        }
+      ]
+    },
+    {
+      "name": "integer overflow in context",
+      "target": "input",
+      "path": [
+        "references"
+      ],
+      "value": [
+        {
+          "sequence": 9223372036854775808
+        }
+      ]
+    },
+    {
+      "name": "question generation without production",
+      "target": "input",
+      "path": [
+        "pendingQuestions"
+      ],
+      "value": [
+        {
+          "questionId": "00000000-0000-4000-8000-000000000030",
+          "taskId": "00000000-0000-4000-8000-000000000005",
+          "productionId": null,
+          "threadId": "00000000-0000-4000-8000-000000000006",
+          "executionId": "00000000-0000-4000-8000-000000000007",
+          "waitId": "wait-duration-1",
+          "editGeneration": 2,
+          "prompt": "30 秒还是 60 秒？"
+        }
+      ]
+    },
+    {
+      "name": "draft generation mismatch",
+      "target": "result",
+      "path": [
+        "draft"
+      ],
+      "value": {
+        "messageId": "00000000-0000-4000-8000-000000000020",
+        "validationId": "00000000-0000-4000-8000-000000000021",
+        "editGeneration": 3,
+        "draftHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "requirementsHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "baseIndex": 3
+    },
+    {
+      "name": "question execution mismatch",
+      "target": "result",
+      "path": [
+        "question",
+        "executionId"
+      ],
+      "value": "00000000-0000-4000-8000-000000000099",
+      "baseIndex": 2
+    },
+    {
+      "name": "null frozen",
+      "target": "input",
+      "path": [
+        "currentProduction",
+        "frozen"
+      ],
+      "value": null
+    },
+    {
+      "name": "missing frozen",
+      "target": "input",
+      "path": [
+        "currentProduction",
+        "frozen"
+      ],
+      "remove": true
+    },
+    {
+      "name": "coerced boolean",
+      "target": "input",
+      "path": [
+        "currentProduction",
+        "frozen"
+      ],
+      "value": "false"
+    },
+    {
+      "name": "non-ASCII JSON field names",
+      "target": "input",
+      "path": [
+        "references"
+      ],
+      "value": [
+        {
+          "": "bmp",
+          "😀": "supplementary"
+        }
+      ]
+    }
+  ]
+}
