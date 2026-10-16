@@ -23,6 +23,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @org.springframework.test.annotation.DirtiesContext(classMode=org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class LocalMediaIntegrationTest {
+    static final int BROWSER_PORT;
+    static {
+        try(var socket=new java.net.ServerSocket(0)) { BROWSER_PORT=socket.getLocalPort(); }
+        catch(java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+    }
     @Container
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:18.6-bookworm");
     @DynamicPropertySource
@@ -30,6 +35,12 @@ class LocalMediaIntegrationTest {
         properties.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         properties.add("spring.datasource.username", POSTGRES::getUsername);
         properties.add("spring.datasource.password", POSTGRES::getPassword);
+        if(Boolean.getBoolean("lifecycle.browser")) {
+            properties.add("server.port",()->BROWSER_PORT);
+            properties.add("app.allowed-origin",()->"http://localhost:"+BROWSER_PORT);
+            properties.add("spring.web.resources.static-locations",
+                    () -> java.nio.file.Path.of("../frontend/dist").toAbsolutePath().normalize().toUri().toString());
+        }
     }
     @Container
     static final org.testcontainers.containers.GenericContainer<?> SILO = new org.testcontainers.containers.GenericContainer<>(
@@ -159,6 +170,21 @@ class LocalMediaIntegrationTest {
         String audioReport=new String(audio.getInputStream().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);assertEquals(0,audio.waitFor());
         assertTrue(audioReport.contains("max_volume: -91.0 dB"),audioReport);
         assertEquals(saved,internal("GET",path+"/save",null));
+        // Opt-in browser seam on the same isolated real media infrastructure and analysed asset.
+        if(Boolean.getBoolean("lifecycle.browser")) {
+            var command=new ProcessBuilder("npm","run","test:e2e","--","conversation-lifecycle-live.spec.ts","--output=../backend/target/lifecycle-browser-results")
+                    .directory(java.nio.file.Path.of("../frontend").toFile()).redirectErrorStream(true)
+                    .redirectOutput(java.nio.file.Path.of("target/conversation-lifecycle-browser.log").toFile());
+            command.environment().put("E2E_BASE_URL","http://localhost:"+port);
+            command.environment().put("E2E_LIFECYCLE_REAL","1");
+            command.environment().put("E2E_LIFECYCLE_TOKEN","internal-integration-worker-token");
+            command.environment().put("E2E_LIFECYCLE_SEED",json.writeValueAsString(java.util.Map.of("projectId",project,"assetId",asset,"evidenceId",evidence)));
+            var process=command.start();
+            try {
+                assertTrue(process.waitFor(240,java.util.concurrent.TimeUnit.SECONDS),"浏览器验收超时");
+                assertEquals(0,process.exitValue(),java.nio.file.Files.readString(java.nio.file.Path.of("target/conversation-lifecycle-browser.log")));
+            } finally { process.destroyForcibly(); }
+        }
     }
     private JsonNode internal(String method,String path,Object body) throws Exception {
         var request=HttpRequest.newBuilder(URI.create("http://localhost:"+port+"/internal/v1"+path)).header("Authorization","Bearer internal-integration-worker-token").header("Content-Type","application/json")

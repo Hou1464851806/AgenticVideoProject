@@ -73,6 +73,8 @@ public class ProjectRecovery {
                         var tasks = database.queryForList("SELECT t.id AS \"taskId\",t.status,t.public_phase AS phase,t.current_attempt_id AS \"attemptId\" FROM conversation_turns r JOIN tasks t ON t.id=r.task_id WHERE r.conversation_id=? ORDER BY r.created_at DESC LIMIT 1", id);
                         for(var task:tasks) {
                             task.put("externalEffects",retries.effects((UUID)task.get("taskId")));
+                            var agentFailure=database.queryForList("SELECT result_json->'failure' AS failure FROM conversation_execution_requests WHERE task_id=? AND schema_version='1.0' AND result_json->'failure' IS NOT NULL AND result_json->'failure'<>'null'::jsonb",task.get("taskId"));
+                            if(!agentFailure.isEmpty())task.put("failure",parse(agentFailure.get(0).get("failure").toString()));
                             if("FAILED".equals(task.get("status"))) {
                                 var failure=database.queryForList("SELECT result_json FROM tasks WHERE id=? AND result_json->>'code'='MODEL_RECORD_TOO_LARGE'",task.get("taskId"));
                                 if(!failure.isEmpty()) {var error=(JsonNode)parse(failure.get(0).get("result_json").toString());task.put("failure",Map.of("code","MODEL_RECORD_TOO_LARGE","message",error.path("message").asText()));}

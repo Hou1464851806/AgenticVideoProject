@@ -94,6 +94,8 @@ class AgentRunsApiIntegrationTest {
         var binding=parsed(run,first,"DISCUSS","INDEPENDENT",Map.of(),null,200);
         var failure=json.valueToTree(Map.of("code","EXECUTION_INTERRUPTED","message","可恢复中断","recoverable",true));
         publish(run,first,result(binding,"FAILED","可恢复中断",null,null,failure),200);
+        var snapshot=response(http.perform(get("/api/v1/conversations/"+conversation+"/snapshot").with(user(owner))),200);
+        assertEquals(failure,snapshot.path("latestTask").path("failure"));
         var retry=browser("/tasks/"+run.path("taskId").asText()+"/retry",Map.of(),"retry",202);
         assertNotEquals(run.path("taskId"),retry.path("taskId"));
         assertEquals(retry,browser("/tasks/"+run.path("taskId").asText()+"/retry",Map.of(),"replay-other-key",202));
@@ -218,10 +220,13 @@ class AgentRunsApiIntegrationTest {
         String artifact=messages.get(0).path("id").asText();
         assertEquals(preview.path("requestId"),messages.get(0).path("requestId"));
         assertEquals("SUCCEEDED",snapshot.path("previews").path("items").get(0).path("status").asText());
+        assertEquals("AVAILABLE",snapshot.path("previews").path("items").get(0).path("artifactState").asText());
         assertEquals(1,db.queryForObject("SELECT count(*) FROM public_events WHERE project_id=? AND type='assistant.completed' AND body->>'taskId'=?",Integer.class,project,preview.path("taskId").asText()));
         for(int i=0;i<2;i++)response(http.perform(post("/api/v1/artifacts/"+artifact+"/playback-access").with(user(owner)).with(csrf())),200);
         org.mockito.Mockito.when(storage.objectSize(local.input().path("artifactObjectKey").asText())).thenReturn(null);
         response(http.perform(post("/api/v1/artifacts/"+artifact+"/playback-access").with(user(owner)).with(csrf())),410);
+        var unavailable=response(http.perform(get("/api/v1/conversations/"+conversation+"/snapshot").with(user(owner))),200);
+        assertEquals("UNAVAILABLE",unavailable.path("previews").path("items").get(0).path("artifactState").asText());
         browser("/drafts/previews/"+preview.path("requestId").asText()+"/retry",Map.of(),"lost-historical",409);
         assertEquals(preview,browser("/drafts/previews",body,"play",202));
         browser("/drafts/previews",body,"new-frozen",409);

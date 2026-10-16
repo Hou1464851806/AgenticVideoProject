@@ -21,6 +21,13 @@ const preview=ref<RenderRequest|null>(null),previewVersion=ref(0),previewUrl=ref
 const exportHistory=ref<RenderRequest[]>([]);
 const exportDeletePending=ref(false);
 const confirmationId=ref(''),exportProfile=ref('HD_720'),exportBusy=ref(false);
+const choosingExport=ref(false),exportOutputId=ref('');
+const pendingExports=new Map<string,string>();
+function chooseExport(){
+  if(!current.value)return;
+  if(current.value.content.outputs.length===1)void exportOutput(current.value.content.outputs[0]!);
+  else choosingExport.value=true;
+}
 const exported=ref<RenderRequest|null>(null),exportVersion=ref(0),exportUrl=ref(''),exportRemoved=ref(false);
 let exportRefreshing=false,exportHistoryReading=false,exportOpenEpoch=0;
 async function confirmVersion(){
@@ -33,7 +40,9 @@ async function confirmVersion(){
 async function exportOutput(output:Output){
   if(!current.value||!confirmationId.value||exportBusy.value)return;
   const revision=current.value.id,version=current.value.revisionNumber;exportBusy.value=true;error.value='';
-  try{const result=await request<RenderRequest>(`/revisions/${revision}/export-requests`,'POST',{outputIds:[output.outputId],confirmationId:confirmationId.value,exportProfile:exportProfile.value,explicitIntent:'EXPORT'},{'Idempotency-Key':crypto.randomUUID()});if(alive){++exportOpenEpoch;exported.value=result;exportVersion.value=version;exportUrl.value='';exportRemoved.value=false;exportDeletePending.value=false;await refreshExportHistory();}}
+  const body={outputIds:[output.outputId],confirmationId:confirmationId.value,exportProfile:exportProfile.value,explicitIntent:'EXPORT'};
+  const identity=JSON.stringify({revision,...body}),key=pendingExports.get(identity)??crypto.randomUUID();pendingExports.set(identity,key);
+  try{const result=await request<RenderRequest>(`/revisions/${revision}/export-requests`,'POST',body,{'Idempotency-Key':key});pendingExports.delete(identity);if(alive){choosingExport.value=false;++exportOpenEpoch;exported.value=result;exportVersion.value=version;exportUrl.value='';exportRemoved.value=false;exportDeletePending.value=false;await refreshExportHistory();}}
   catch(failure){if(alive)error.value=failure instanceof Error?failure.message:'无法导出成片';}
   finally{if(alive)exportBusy.value=false;}
 }
@@ -111,7 +120,7 @@ async function openRevision(planId: string, revisionId: string, persist = true) 
   const operation = ++epoch;
   const previousPlan = selectedPlan.value, previousRevision = selectedRevision.value;
   selectedPlan.value = planId; selectedRevision.value = revisionId;
-  loading.value = true; error.value = ''; confirmationId.value=''; exportHistory.value=[]; emit('base', null);
+  loading.value = true; error.value = ''; choosingExport.value=false;exportOutputId.value='';confirmationId.value=''; exportHistory.value=[]; emit('base', null);
   try {
     const [revision, history] = await Promise.all([
       request<Revision>(`/revisions/${revisionId}`), request<{items:Version[]}>(`/plans/${planId}/revisions`),
@@ -196,7 +205,7 @@ onUnmounted(() => { alive = false; ++epoch; clearInterval(timer); });
   <section aria-label="编排剪辑方案">
     <h3>编排剪辑方案</h3>
     <p v-if="error" role="alert">{{ error }}</p>
-    <p v-if="!plans.length">暂无方案，选择“生成讲话方案”并明确主题和时长后发送需求。</p>
+    <p v-if="!plans.length">暂无方案。在对话中提出制作需求，确认草稿后会出现在这里。</p>
     <template v-else>
       <label for="plan-select">查看方案</label><select id="plan-select" :value="selectedPlan" @change="choosePlan(($event.target as HTMLSelectElement).value)">
         <option value="">选择方案</option><option v-for="plan in plans" :key="plan.id" :value="plan.id">{{ plan.title }}</option>
@@ -230,10 +239,15 @@ onUnmounted(() => { alive = false; ++epoch; clearInterval(timer); });
             <p>选取依据：{{ clip.reason }}</p><button class="secondary" @click="emit('reference',{type:'PLAN_REVISION',id:current.id,outputId:output.outputId,clipId:clip.clipId})">引用片段 {{index+1}}</button><button class="secondary" @click="play(clip)">播放源片段</button>
           </article>
           <button class="secondary" :disabled="previewBusy" @click="generatePreview(output)">生成低清效果预览</button>
-          <button class="secondary" :disabled="!confirmationId || exportBusy" @click="exportOutput(output)">导出正式成片</button>
+
           <details><summary>映射后的原文字幕</summary><p v-for="(cue,index) in output.subtitles.cues" :key="index">{{ (cue.startMs/1000).toFixed(3) }}–{{ (cue.endMs/1000).toFixed(3) }} 秒 · {{ cue.text }}</p></details>
         </div>
-        <p>当前为编排方案；核查后再决定制作。生成方案不会自动预览或导出。</p>
+        <button class="secondary" :disabled="!confirmationId || exportBusy" @click="chooseExport">导出正式成片</button>
+        <template v-if="choosingExport">
+          <label for="export-output-select">选择导出输出</label><select id="export-output-select" v-model="exportOutputId"><option value="">选择一条输出</option><option v-for="output in current.content.outputs" :key="output.outputId" :value="output.outputId">{{ output.title }}</option></select>
+          <button :disabled="!confirmationId || exportBusy || !exportOutputId" @click="exportOutput(current.content.outputs.find(output=>output.outputId===exportOutputId)!)">导出所选输出</button>
+        </template>
+        <p>确认的方案不会自动预览或导出。</p>
       </div>
     </template>
     <section v-if="exported" aria-label="正式成片导出">

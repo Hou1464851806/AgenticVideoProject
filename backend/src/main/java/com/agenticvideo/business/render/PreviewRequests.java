@@ -155,7 +155,10 @@ public class PreviewRequests {
         }
         result.put("createdAt",((java.sql.Timestamp)request.get("created_at")).toInstant().toString());
         if(request.get("confirmation_id")!=null)result.put("confirmationId",request.get("confirmation_id"));
-        if(request.get("artifact_id")!=null)result.put("artifactId",request.get("artifact_id"));
+        if(request.get("artifact_id")!=null) {
+            result.put("artifactId",request.get("artifact_id"));
+            result.put("artifactState",database.queryForObject("SELECT state FROM artifacts WHERE id=?",String.class,request.get("artifact_id")));
+        }
         if("FAILED".equals(status)) {
             Object failure=database.queryForObject("SELECT result_json FROM tasks WHERE id=?",Object.class,request.get("task_id"));
             if(failure!=null)result.put("error",parse(failure));
