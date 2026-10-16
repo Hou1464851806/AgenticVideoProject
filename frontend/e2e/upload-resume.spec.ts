@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { test, expect } from './fixtures/current-frontend';
 import { execFileSync } from 'node:child_process';
 
 async function openProject(page: Page, username: string) {
@@ -10,7 +11,9 @@ async function openProject(page: Page, username: string) {
   await expect(page.getByRole('status')).toHaveText('账号已创建，请登录');
   await page.getByLabel('密码', { exact: true }).fill('project-browser-password');
   await page.getByRole('button', { name: '登录', exact: true }).click();
+  await page.getByText('账户', { exact: true }).click();
   await expect(page.getByText(`已登录：${username}`, { exact: true })).toBeVisible();
+  await page.getByText('账户', { exact: true }).click();
   await page.getByLabel('项目名称', { exact: true }).fill('可恢复上传');
   await page.getByRole('button', { name: '创建项目', exact: true }).click();
   await page.getByRole('button', { name: '可恢复上传', exact: true }).click();

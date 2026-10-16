@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { test, expect, serveCurrentFrontend } from './fixtures/current-frontend';
 
 async function signIn(page: Page, username: string) {
   await page.goto('/');
@@ -9,10 +10,12 @@ async function signIn(page: Page, username: string) {
   await expect(page.getByRole('status')).toHaveText('账号已创建，请登录');
   await page.getByLabel('密码', { exact: true }).fill('project-browser-password');
   await page.getByRole('button', { name: '登录', exact: true }).click();
+  await page.getByText('账户', { exact: true }).click();
   await expect(page.getByText(`已登录：${username}`, { exact: true })).toBeVisible();
+  await page.getByText('账户', { exact: true }).click();
 }
 
-test('local MQ consumer validates an uploaded video before authenticated playback', async ({ page, browser }) => {
+test('local MQ consumer validates an uploaded video before authenticated playback', async ({ page, browser, baseURL }) => {
   await signIn(page, `media-browser-${Date.now()}`);
   await page.getByLabel('项目名称', { exact: true }).fill('媒体验证与播放');
   await page.getByRole('button', { name: '创建项目', exact: true }).click();
@@ -29,6 +32,7 @@ test('local MQ consumer validates an uploaded video before authenticated playbac
   expect(ranged.headers()['content-range']).toMatch(/^bytes 0-15\//);
   const player = page.getByLabel('视频播放器', { exact: true });
   await expect(player).toBeVisible();
+  await page.getByText('媒体详情与精确定位', { exact: true }).click();
   await expect(page.getByText('160 × 90', { exact: true })).toBeVisible();
   await expect(page.getByText('H.264', { exact: true })).toBeVisible();
   await expect.poll(() => player.evaluate((video: HTMLVideoElement) => video.readyState)).toBeGreaterThanOrEqual(1);
@@ -52,12 +56,14 @@ test('local MQ consumer validates an uploaded video before authenticated playbac
     }
     await route.fulfill({ response, json: body });
   });
+  await page.getByRole('button', { name: '返回素材列表', exact: true }).click();
   await page.getByRole('button', { name: '播放 short-video.mp4', exact: true }).click();
   await expect.poll(() => accessRequests).toBe(2);
   await expect.poll(() => player.evaluate((video: HTMLVideoElement) => video.readyState)).toBeGreaterThanOrEqual(2);
   await page.unroute('**/playback-access');
   const outsider = await browser.newContext();
   const outsiderPage = await outsider.newPage();
+  await serveCurrentFrontend(outsiderPage, baseURL!);
   await signIn(outsiderPage, `media-outsider-${Date.now()}`);
   const csrf = (await (await outsiderPage.request.get('/api/v1/auth/csrf')).json()).data.csrfToken;
   const denied = await outsiderPage.request.post(`/api/v1/assets/${access.assetId}/playback-access`, { headers: { 'X-XSRF-TOKEN': csrf }, data: {} });

@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
+import { resolve } from 'node:path';
+const screenshots = resolve(process.env.E2E_REDESIGN_SCREENSHOTS ?? 'test-results/frontend-redesign');
 
 // Current HTTP boundary only: no uploads, model calls or service restarts.
 test.beforeEach(async ({ page }) => {
@@ -56,7 +58,7 @@ test('empty projects and invalid preferences fall back to assets and forbidden p
   await expect(page.getByRole('button', { name: '播放 素材甲.mp4', exact: true })).toBeVisible();
   await expect(page.getByRole('tab', { name: '素材', exact: true })).toHaveAttribute('aria-selected', 'true');
   await page.goto('/?project=b');
-  await expect(page.getByText('暂无素材。', { exact: true })).toBeVisible();
+  await expect(page.getByText('暂无素材。选择视频，开始整理内容。', { exact: true })).toBeVisible();
   await expect(page.getByRole('tab', { name: '素材', exact: true })).toHaveAttribute('aria-selected', 'true');
   await page.goto('/?project=denied');
   await expect(page.getByRole('alert')).toContainText('项目不存在或无权访问');
@@ -143,8 +145,8 @@ for (const viewport of [{ width: 1366, height: 768 }, { width: 768, height: 1024
     await expect(usage).toContainText('缺价格的调用 1 次');
     await expect(usage.getByRole('button', { name: '保存预警阈值', exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    mkdirSync('../docs/verification/frontend-redesign-step2', { recursive: true });
-    await page.screenshot({ path: `../docs/verification/frontend-redesign-step2/controlled-usage-${viewport.width}x${viewport.height}.png`, fullPage: true });
+    mkdirSync(screenshots, { recursive: true });
+    await page.screenshot({ path: `${screenshots}/controlled-usage-${viewport.width}x${viewport.height}.png`, fullPage: true });
     await page.keyboard.press('Escape');
     await expect(usage).toHaveCount(0);
     await expect(page.getByRole('button', { name: '用量', exact: true })).toBeFocused();

@@ -5,6 +5,7 @@ import { test as base, expect, type Page } from '@playwright/test';
 export async function serveCurrentFrontend(page: Page, baseURL: string) {
   if (!process.env.E2E_UI_ORIGIN) return;
   const origin = new URL(baseURL).origin;
+  await page.context().grantPermissions(['local-network-access'], { origin });
   await page.route(`${origin}/**`, async route => {
     const url = new URL(route.request().url());
     if (url.pathname.startsWith('/api/')) { await route.continue(); return; }

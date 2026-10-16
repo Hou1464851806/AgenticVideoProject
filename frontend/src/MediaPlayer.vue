@@ -3,7 +3,9 @@ import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
 import { request } from './api';
 import AnalysisStatus from './AnalysisStatus.vue';
 import type { Playback } from './AssetLibrary.vue';
-const props = defineProps<{ playback: Playback }>();
+const props = defineProps<{ playback: Playback; returnLabel?: string }>();
+const emit = defineEmits<{ close: [] }>();
+const detailsOpen = ref(false);
 type Stream = { codec_type: string; codec_name: string; width?: number; height?: number; avg_frame_rate?: string; r_frame_rate?: string };
 const information = ref<{ mediaInfo: { streams: Stream[] }; timeMapping: { hasAudio: boolean }; analysis?: { stages: Record<string, string>; errors: Record<string,{ message: string }> } } | null>(null);
 const error = ref('');
@@ -62,11 +64,11 @@ function applyInitialPosition() {
     video.value.currentTime = position;
     seconds.value = String(position);
     initialSeconds = undefined;
-    void video.value.play().catch(() => {});
+    void video.value.play().catch(failure => { error.value = failure instanceof Error ? failure.message : '请点击视频播放按钮开始播放'; });
   }
 }
 function loaded() {
-  if (!restore) applyInitialPosition();
+  if (initialSeconds !== undefined) { restore = undefined; applyInitialPosition(); return; }
   if (restore && video.value) {
     video.value.currentTime = restore.seconds;
     if (restore.playing) void video.value.play();
@@ -88,20 +90,22 @@ function enforceClipEnd() {
 }
 </script>
 <template>
-  <div>
-    <p>{{ playback.filename }} · {{ (playback.durationMs / 1000).toFixed(2) }} 秒</p>
-    <dl v-if="stream" class="media-information">
-      <dt>画面</dt><dd>{{ stream.width }} × {{ stream.height }}</dd>
-      <dt>编码</dt><dd>{{ codec }}</dd>
-      <dt>声音</dt><dd>{{ information?.timeMapping.hasAudio ? '有音轨' : '无音轨' }}</dd>
-      <dt v-if="stream.r_frame_rate !== stream.avg_frame_rate">帧率</dt><dd v-if="stream.r_frame_rate !== stream.avg_frame_rate">可变帧率</dd>
-    </dl>
-    <p v-if="error" role="alert">{{ error }}</p>
-    <AnalysisStatus :asset-id="playback.assetId" />
+  <section class="source-player" aria-label="原片回看" tabindex="-1">
+    <div class="player-heading"><div><p class="eyebrow">原始素材</p><h3>{{ playback.filename }}</h3><p>{{ (playback.durationMs / 1000).toFixed(2) }} 秒</p></div><button class="text-button" @click="emit('close')">{{ returnLabel ?? '关闭原片回看' }}</button></div>
     <video ref="video" :src="source" controls preload="metadata" aria-label="视频播放器"
       @error="refreshAccess" @loadedmetadata="loaded" @loadeddata="refreshed = false" @timeupdate="enforceClipEnd"></video>
-    <form @submit.prevent="seek"><label for="seek-seconds">定位秒数</label><input id="seek-seconds" v-model="seconds" type="number" min="0" step="0.1"><button type="submit">定位播放</button></form>
-    <section v-if="evidence?.observations.length">
+    <p v-if="error" role="alert">{{ error }}</p>
+    <details @toggle="detailsOpen = ($event.target as HTMLDetailsElement).open"><summary>媒体详情与精确定位</summary>
+      <dl v-if="stream" class="media-information">
+        <dt>画面</dt><dd>{{ stream.width }} × {{ stream.height }}</dd>
+        <dt>编码</dt><dd>{{ codec }}</dd>
+        <dt>声音</dt><dd>{{ information?.timeMapping.hasAudio ? '有音轨' : '无音轨' }}</dd>
+        <dt v-if="stream.r_frame_rate !== stream.avg_frame_rate">帧率</dt><dd v-if="stream.r_frame_rate !== stream.avg_frame_rate">可变帧率</dd>
+      </dl>
+      <form @submit.prevent="seek"><label for="seek-seconds">定位秒数</label><input id="seek-seconds" v-model="seconds" type="number" min="0" step="0.1"><button type="submit">定位播放</button></form>
+      <AnalysisStatus v-if="detailsOpen" :asset-id="playback.assetId" />
+    </details>
+    <section v-if="evidence?.observations.length" class="speech-evidence">
       <h3>语音证据</h3>
       <p v-if="evidence.summary.text">原文提要（用于导航）：{{ evidence.summary.text }}</p>
       <button v-for="observation in evidence.observations" :key="observation.id" type="button" :aria-label="`核查语音：${observation.text}`" @click="inspectSpeech(observation)">
@@ -109,11 +113,20 @@ function enforceClipEnd() {
       </button>
       <p>模型时间戳供核查，剪辑边界仍需回看原视频。</p>
     </section>
-  </div>
+  </section>
 </template>
 <style scoped>
-.media-information { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; font-size: 12px; color: #69766e; }
+.source-player { scroll-margin-top: 96px; }
+.player-heading { display: flex; align-items: start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.player-heading h3 { margin: 4px 0; font-size: 20px; }
+.player-heading p { margin: 0; }
+.player-heading button { margin: 0; flex-shrink: 0; }
+.media-information { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; font-size: 13px; color: var(--muted); }
 dd { margin: 0; }
-video { width: 100%; max-height: 300px; background: #18271f; border-radius: 10px; }
+video { width: 100%; max-height: min(60vh, 560px); background: #18271f; border-radius: 8px; }
 p { font-size: 13px; overflow-wrap: anywhere; }
+summary { cursor: pointer; padding: 16px 0; min-height: 44px; }
+form { max-width: 400px; }
+.speech-evidence { border-top: 1px solid var(--line); margin-top: 24px; }
+@media (max-width: 720px) { .player-heading { flex-direction: column; gap: 8px; } }
 </style>

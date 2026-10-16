@@ -9,7 +9,7 @@ Q58 已确认首期 MVP 整体设计；2026-10-12 补充确认统一自然语言
 | 首版用户能力、完整需求与验收边界 | [完整需求](requirements.md) |
 | 已确认的统一聊天流程、九项决定与代码职责 | [统一自然语言设计](natural-language-workflow-design.md) |
 | 当前实际功能与待实施进度 | [功能清单](current-features.md)、[实施状态](implementation-status.md) |
-| 已认可方向的前端布局、交互与 UI 重构设计，以及逐步改动范围、验收和回归要求（步骤 1～2 已完成，步骤 3～6 待实施） | [前端重构设计](frontend-redesign-design.md)、[分步实施计划](frontend-redesign-implementation-plan.md)、[步骤 1 基线](verification/frontend-redesign-step1.md)、[步骤 2 验证](verification/frontend-redesign-step2.md) |
+| 已认可方向的前端布局、交互与 UI 重构设计，以及逐步改动范围、验收和回归要求（步骤 1～3 已完成，步骤 4～6 待实施） | [前端重构设计](frontend-redesign-design.md)、[分步实施计划](frontend-redesign-implementation-plan.md)、[步骤 1 基线](verification/frontend-redesign-step1.md)、[步骤 2 验证](verification/frontend-redesign-step2.md)、[步骤 3 验证](verification/frontend-redesign-step3.md) |
 | 目标、服务与完整链路 | [系统架构](architecture.md) |
 | 术语与决定依据 | [领域术语](../GLOSSARY.md)、[访谈记录](design-interview.md)、[ADR](adr/) |
 | Agent自治、工具与智能验收 | [Agent设计](agent-design.md) |

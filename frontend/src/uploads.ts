@@ -1,7 +1,7 @@
 import { reactive } from 'vue';
 import { ApiFailure, request } from './api';
 
-type Upload = { uploadId: string; filename: string; status: string; reservedBytes: number; declaredBytes: number; reservedSlots: number; partSizeBytes: number; expectedParts: number; expiresAt: string; writerToken?: string; confirmedBytes?: number; confirmedParts?: Array<{ partNumber: number; sizeBytes: number }>; validationStatus?: string; error?: { code: string; message: string }; cleanupStatus?: string };
+type Upload = { uploadId: string; assetId?: string; filename: string; status: string; reservedBytes: number; declaredBytes: number; reservedSlots: number; partSizeBytes: number; expectedParts: number; expiresAt: string; writerToken?: string; confirmedBytes?: number; confirmedParts?: Array<{ partNumber: number; sizeBytes: number }>; validationStatus?: string; error?: { code: string; message: string }; cleanupStatus?: string };
 type Row = { key: string; projectId: string; filename: string; size: number; confirmed: number; hashing: number; state: string; error: string; hasFile?: boolean; paused?: boolean; running?: boolean; cancelRequested?: boolean; upload?: Upload };
 export const uploadRows = reactive<Row[]>([]);
 const queue: Array<{ file: File; row: Row }> = [];

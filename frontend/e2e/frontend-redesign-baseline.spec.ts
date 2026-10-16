@@ -3,7 +3,7 @@ import { readFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 // Baseline evidence only: no model calls, uploads, render requests or Compose changes.
-const screenshots = resolve('../docs/verification/frontend-redesign-step2');
+const screenshots = resolve(process.env.E2E_REDESIGN_SCREENSHOTS ?? 'test-results/frontend-redesign');
 const viewports = [{ width: 1366, height: 768 }, { width: 768, height: 1024 }, { width: 390, height: 844 }];
 
 for (const viewport of viewports) {

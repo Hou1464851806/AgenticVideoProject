@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
 import { enqueueFiles, loadUploads, uploadRows, pauseUpload, continueUpload, reselectFile, cancelUpload } from './uploads';
-const props = defineProps<{ projectId: string }>();
+const props = defineProps<{ projectId: string; availableAssetIds: string[] }>();
 const error = ref('');
-const rows = computed(() => uploadRows.filter(row => row.projectId === props.projectId));
+const rows = computed(() => uploadRows.filter(row => row.projectId === props.projectId && !(row.upload?.status === 'COMPLETED' && row.upload.assetId && props.availableAssetIds.includes(row.upload.assetId))));
 watch(() => props.projectId, async id => {
   try { await loadUploads(id); } catch (failure) { error.value = failure instanceof Error ? failure.message : '无法查询上传'; }
 }, { immediate: true });
@@ -29,17 +29,19 @@ function reselect(event: Event, key: string) {
 }
 </script>
 <template>
-  <div class="upload-panel">
+  <section class="upload-panel" aria-label="导入视频">
+    <h3>导入视频</h3><p class="upload-hint">可同时选择多个视频。上传完成后将验证媒体，验证通过后可播放。</p>
     <label :for="`video-files-${projectId}`">选择视频</label>
     <input :id="`video-files-${projectId}`" type="file" multiple accept="video/*" @change="select">
     <p v-if="error" role="alert">{{ error }}</p>
-    <article v-for="row in rows" :key="row.key">
-      <strong>{{ row.filename }}</strong>
+    <article v-for="row in rows" :key="row.key" :aria-label="`上传：${row.filename}`">
+      <div class="upload-title"><strong>{{ row.filename }}</strong><span>上传记录</span></div>
       <p>{{ row.state }}</p>
       <button v-if="row.upload?.status !== 'COMPLETED' && row.upload?.status !== 'CANCELLED' && row.upload?.status !== 'EXPIRED'" type="button" :aria-label="`${row.filename} 取消上传`" @click="cancelUpload(row.key)">取消上传</button>
       <button v-if="!row.cancelRequested && row.hasFile && !row.paused && row.upload?.status !== 'COMPLETED'" type="button" :aria-label="`${row.filename} 暂停上传`" @click="pauseUpload(row.key)">暂停</button>
       <button v-if="!row.cancelRequested && row.hasFile && (row.paused || row.state === '上传失败') && !row.running" type="button" :aria-label="`${row.filename} 继续上传`" @click="continueUpload(row.key)">继续上传</button>
       <template v-if="!row.cancelRequested && row.upload && row.upload.status !== 'COMPLETED' && !row.running">
+        <p v-if="!row.hasFile" class="upload-hint">刷新后浏览器无法保留原文件，请重选同一个文件以继续已确认的分片。</p>
         <label :for="`resume-file-${row.key}`">{{ row.filename }} 重选原文件继续</label>
         <input :id="`resume-file-${row.key}`" type="file" accept="video/*" @change="reselect($event, row.key)">
         <small>可恢复至 {{ new Date(row.upload.expiresAt).toLocaleString() }}</small>
@@ -47,15 +49,18 @@ function reselect(event: Event, key: string) {
       <progress :value="row.confirmed" :max="row.size" :aria-label="`${row.filename} 上传进度`"></progress>
       <small>{{ Math.floor(row.confirmed / Math.max(1, row.size) * 100) }}% 已确认</small>
       <small v-if="row.state === '正在计算文件校验值'">校验 {{ Math.floor(row.hashing / Math.max(1, row.size) * 100) }}%</small>
-      <small v-if="row.upload?.status === 'CANCELLED' || row.upload?.status === 'EXPIRED'">{{ row.upload.cleanupStatus==='CLEANED'?'残留清理完成，占用已释放':'残留正在清理，字节占用尚未释放' }}</small>
+      <small v-if="row.upload?.status === 'CANCELLED' || row.upload?.status === 'EXPIRED'">{{ row.upload.cleanupStatus==='CLEANED'?'残留清理完成，占用已释放':'上传已停止，残留正在清理，字节占用尚未释放' }}</small>
       <small v-else-if="row.upload?.cleanupStatus === 'CLEANED'">失败对象已清理</small>
       <small v-else-if="row.upload?.cleanupStatus">失败对象正在清理，占用尚未释放</small>
       <p v-if="row.error" role="alert">{{ row.error }}</p>
     </article>
-    <p v-if="rows.length === 0" class="empty">暂无素材。</p>
-  </div>
+  </section>
 </template>
 <style scoped>
+h3 { margin: 0; font-size: 18px; }
+.upload-panel { margin-bottom: 24px; }
+.upload-title { display: flex; justify-content: space-between; gap: 16px; }
+.upload-title span, .upload-hint { color: var(--muted); font-size: 13px; }
 input { padding: 10px 0; border: 0; font-size: 13px; }
 article { border-top: 1px solid #dce5de; padding: 18px 0; overflow-wrap: anywhere; }
 article strong { font-size: 14px; }

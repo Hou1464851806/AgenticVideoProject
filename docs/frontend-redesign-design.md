@@ -1,6 +1,6 @@
 # 前端工作区重构设计
 
-日期：2026-10-16（Asia/Shanghai）。状态：用户已认可重构方向；步骤 1 基线及步骤 2 基础视觉与项目导航已完成，步骤 3～6 尚未实施。实施顺序、逐步验收和回归要求见[分步实施计划](frontend-redesign-implementation-plan.md)。
+日期：2026-10-16（Asia/Shanghai）。状态：用户已认可重构方向；步骤 1～3 已完成，步骤 4～6 尚未实施。实施顺序、逐步验收和回归要求见[分步实施计划](frontend-redesign-implementation-plan.md)。
 
 ## 目标与设计原则
 

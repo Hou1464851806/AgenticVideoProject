@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/current-frontend';
 import { createServer } from 'node:http';
 import { execFileSync } from 'node:child_process';
 
@@ -53,7 +53,9 @@ test('a verified silent video exposes independent stages and never invents speec
   expect(evidence.status()).toBe(200);
   expect((await evidence.json()).data.observations).toEqual([]);
   await page.getByRole('button', { name: '播放 variable-frame-rate.mp4', exact: true }).click();
-  await expect(page.getByText('无音轨，不能进行语音分析', { exact: true })).toBeVisible();
+  await page.getByText('媒体详情与精确定位', { exact: true }).click();
+  await expect(page.getByText(/无音轨，不能进行语音分析/)).toBeVisible();
+  await page.getByText('完整分析阶段', { exact: true }).click();
   await expect(page.getByText('媒体：已就绪', { exact: true })).toBeVisible();
   await expect(page.getByText('语音：不适用', { exact: true })).toBeVisible();
   await expect(page.getByText('索引：不适用', { exact: true })).toBeVisible();
