@@ -1,6 +1,6 @@
 # 前端工作区重构分步实施计划
 
-日期：2026-10-16（Asia/Shanghai）。状态：步骤 1～3 已完成，步骤 4～6 未实施。步骤 1 已建立真实服务及受控状态实屏、字段追溯和有效测试清单，见[验证记录](verification/frontend-redesign-step1.md)；未修改业务逻辑、运行配置或触发部署、付费模型调用。
+日期：2026-10-16（Asia/Shanghai）。状态：步骤 1～4 已完成，步骤 5～6 未实施。步骤 1 已建立真实服务及受控状态实屏、字段追溯和有效测试清单，见[验证记录](verification/frontend-redesign-step1.md)；未修改业务逻辑、运行配置或触发部署、付费模型调用。
 
 依据[重构设计](frontend-redesign-design.md)、[当前功能](current-features.md)、[已确认生命周期](conversation-lifecycle-browser-design.md)和根 [AGENTS.md](../AGENTS.md)。本计划细化已认可的“信息与基础样式、布局与主流程、状态与验收”三个切片，不扩大业务能力。
 
@@ -17,7 +17,7 @@
 | 1 | 实屏与数据基线、有效测试清单、页面状态清单 | 现行部署和契约 | 已完成（[记录](verification/frontend-redesign-step1.md)） |
 | 2 | 基础视觉、项目外壳、三个主视图及窄屏导航 | 步骤 1 | 已完成（[记录](verification/frontend-redesign-step2.md)） |
 | 3 | 素材、上传、能力状态、内容查找和原片回看 | 步骤 2 | 已完成（[记录](verification/frontend-redesign-step3.md)） |
-| 4 | 对话、引用、草稿、预览与确认双栏流程 | 步骤 2～3 | 未开始 |
+| 4 | 对话、引用、草稿、预览与确认双栏流程 | 步骤 2～3 | 已完成（[记录](verification/frontend-redesign-step4.md)） |
 | 5 | 作品、正式导出、用量及诊断分层 | 步骤 3～4 | 未开始 |
 | 6 | 跨模块体验、代码审查、阶段回归与验收记录 | 步骤 1～5 | 未开始 |
 
@@ -133,6 +133,8 @@ RUN_LIVE_JAVA_ANALYSIS=0 mvn -B -ntp -pl backend '-Dtest=LocalMediaIntegrationTe
 `uploads.spec.ts`、`upload-resume.spec.ts`、`upload-cancel.spec.ts`、分析和搜索相关文件仅选择步骤 1 核对过的当前非付费用例；涉及真实 ASR、Compose 参数变更的项改用隔离或受控场景，另列有条件验收。若动到上传核心，扩大到全部受影响上传行为，并针对实际改动补 `UploadApiIntegrationTest`、配额／过期／空间相关模块。纯展示调整不重复运行所有 Java 分析和检索测试。
 
 ## 步骤 4 重构对话与草稿制作
+
+完成记录：[双栏制作、来源回看、真实媒体及审查](verification/frontend-redesign-step4.md)。
 
 ### 改动范围
 

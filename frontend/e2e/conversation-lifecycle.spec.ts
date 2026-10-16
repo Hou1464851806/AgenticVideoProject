@@ -36,6 +36,7 @@ test('plain chat sends text and references and restores the published answer', a
   await page.reload();
   await page.getByRole('tab', { name: '制作', exact: true }).click();
   await expect(page.getByRole('article', { name: '助手答复', exact: true })).toContainText('先确定故事主线');
+  await page.getByText('引用素材', { exact: true }).click();
   await page.getByLabel('素材.mp4', { exact: true }).check();
   await page.getByLabel('对话输入', { exact: true }).fill('先讨论剪辑思路');
   await page.getByRole('button', { name: '发送需求', exact: true }).click();
@@ -121,7 +122,7 @@ test('Agent stop and media stop stay independent and historical retry stays read
   });
   await page.goto('/?project=project');
   await page.getByRole('tab', { name: '制作', exact: true }).click();
-  await page.getByRole('button', { name: '停止当前 Agent', exact: true }).click();
+  await page.getByRole('button', { name: '停止回复', exact: true }).click();
   await expect(page.getByRole('button', { name: '停止此预览', exact: true })).toBeVisible();
   await expect.poll(() => cancelled).toEqual(['/tasks/agent/cancel']);
   await page.getByRole('button', { name: '停止此预览', exact: true }).click();
@@ -196,6 +197,7 @@ test('confirmed artifact loss offers an explicit retry only for the current draf
   await page.goto('/?project=project');
   await page.getByRole('tab', { name: '制作', exact: true }).click();
   await expect(page.getByRole('button', { name: '重试此预览', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '预览记录', exact: true }).click();
   await page.getByRole('button', { name: '播放草稿预览', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('预览产物不可用');
   await expect(page.getByRole('button', { name: '重试此预览', exact: true })).toBeEnabled();

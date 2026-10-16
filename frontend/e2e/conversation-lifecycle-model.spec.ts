@@ -60,8 +60,9 @@ test('real model understands discussion, evidence question, production and modif
   expect(state.agent.currentProduction.requirements.outputs[0].duration_max_ms).toBe(1500);
   expect(state.agent.currentProduction.requirements.profile).toBe('PORTRAIT_720');
   expect(state.agent.currentProduction.requirements.subtitles_enabled).toBe(false);
-  await expect(page.getByText(/历史草稿.*只读/)).toBeVisible();
-  await page.getByRole('button', { name: '预览草稿', exact: true }).last().click();
+  await expect(page.getByText(/ · 只读$/)).toBeVisible();
+  await page.getByRole('button', { name: '当前草稿', exact: true }).click();
+  await page.getByRole('button', { name: '预览草稿', exact: true }).click();
   await page.getByRole('button', { name: '播放草稿预览', exact: true }).click({ timeout: 60000 });
   const video = page.getByLabel('聊天草稿预览播放器', { exact: true });
   await expect.poll(() => video.evaluate((node: HTMLVideoElement) => node.readyState)).toBeGreaterThanOrEqual(1);

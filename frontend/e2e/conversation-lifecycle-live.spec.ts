@@ -75,6 +75,7 @@ test('browser lifecycle uses real Java, persistent drafts and MQ media without C
   await expect.poll(() => page.getByLabel('视频播放器', { exact: true }).evaluate((node: HTMLVideoElement) => node.readyState)).toBeGreaterThanOrEqual(1);
   const a = await draft(await bind(await send('制作两条静音竖屏短片'), 'DRAFT', 'NEW_PRODUCTION', { topic: '红色矩形', profile: 'PORTRAIT_720', subtitles_enabled: false, output_count: 2 }), 2000, '草稿 A');
   expect(await plans()).toHaveLength(baselinePlans);
+  await page.getByRole('button', { name: '当前草稿', exact: true }).click();
   await page.getByRole('button', { name: '预览草稿', exact: true }).click();
   await page.getByLabel('选择预览输出', { exact: true }).selectOption('out-2');
   await page.getByRole('button', { name: '预览所选输出', exact: true }).click();
@@ -90,15 +91,19 @@ test('browser lifecycle uses real Java, persistent drafts and MQ media without C
   await page.screenshot({ path: '../backend/target/conversation-lifecycle-preview.png', fullPage: true });
   await page.reload();
   await expect(page.getByRole('button', { name: '确认全部输出', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: '预览记录', exact: true }).click();
   await expect(page.getByRole('button', { name: '播放草稿预览', exact: true })).toBeVisible();
   await publish(await bind(await send('只讨论开场是否简洁'), 'DISCUSS', 'INDEPENDENT'), 'ANSWER', '可以保持简洁开场。');
+  await page.getByRole('button', { name: '当前草稿', exact: true }).click();
   await expect(page.getByRole('button', { name: '确认全部输出', exact: true })).toBeEnabled();
   const editRun = await send('将第二条缩短，其他条件保留');
   await expect(page.getByRole('button', { name: '确认全部输出', exact: true })).toBeDisabled();
   const b = await draft(await bind(editRun, 'DRAFT', 'CONTINUE_PRODUCTION'), 1500, '草稿 B');
   expect(b.messageId).not.toBe(a.messageId);
-  await expect(page.getByText(`历史草稿 · ${a.messageId} · 只读`, { exact: true })).toBeVisible();
-  await expect(page.getByText(new RegExp(`来源草稿：${a.messageId}.*历史预览`))).toBeVisible();
+  await expect(page.getByRole('article', { name: '助手答复', exact: true }).filter({ hasText: '草稿 A' }).getByText(/只读/)).toBeVisible();
+  await page.getByRole('button', { name: '预览记录', exact: true }).click();
+  await expect(page.getByRole('article', { name: '预览请求', exact: true }).filter({ hasText: '草稿 A-out-2' })).toContainText('历史草稿预览');
+  await page.getByRole('button', { name: '当前草稿', exact: true }).click();
   await page.getByRole('button', { name: '确认全部输出', exact: true }).click();
   await expect.poll(async () => (await plans()).length).toBe(baselinePlans + 1);
   await expect(page.getByRole('button', { name: '确认全部输出', exact: true })).toBeDisabled();
@@ -185,6 +190,7 @@ test('browser lifecycle uses real Java, persistent drafts and MQ media without C
   await expect(page.getByRole('region', { name: '编排剪辑方案', exact: true }).getByRole('alert')).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('tab', { name: '制作', exact: true }).click();
+  await page.getByRole('tab', { name: '对话', exact: true }).click();
   await expect(page.getByLabel('对话输入', { exact: true })).toBeVisible();
   await page.screenshot({ path: '../backend/target/conversation-lifecycle-mobile.png', fullPage: true });
 });

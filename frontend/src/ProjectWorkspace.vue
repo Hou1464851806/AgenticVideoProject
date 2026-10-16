@@ -23,8 +23,8 @@ const planSelection = ref<PlanSelection | null>(null), sessionId = ref('');
 function viewPlan(selection: PlanSelection) { planSelection.value = selection; setPane('results'); }
 function chooseSession(id: string) { sessionId.value = id; planSelection.value = null;editReference.value=null; }
 const playback = ref<Playback | null>(null);
-const playbackPane = ref<'assets' | 'results'>('results');
-async function playAsset(value: Playback, pane: 'assets' | 'results' = 'results') {
+const playbackPane = ref<'assets' | 'conversation' | 'results'>('results');
+async function playAsset(value: Playback, pane: 'assets' | 'conversation' | 'results' = 'results') {
   playback.value = value; playbackPane.value = pane; setPane(pane);
   await nextTick();
   const player = document.querySelector<HTMLElement>('[aria-label="原片回看"]');
@@ -211,7 +211,7 @@ onUnmounted(() => { mounted = false; ++selectionRequest; window.removeEventListe
           <MediaPlayer v-if="playback && playbackPane === 'assets'" :key="playback.assetId" :playback="playback" return-label="返回素材列表" @close="closePlayback" />
           <div v-show="!playback || playbackPane !== 'assets'"><AssetLibrary :project-id="selected.id" @loaded="assetsLoaded" @play="playAsset($event, 'assets')" /><SpeechSearch :project-id="selected.id" @play="playAsset($event, 'assets')" /></div>
         </section>
-        <section id="panel-conversation" v-show="activePane === 'conversation'" class="panel" role="tabpanel" aria-labelledby="tab-conversation" tabindex="0"><h2>制作</h2><p class="view-description">与助手讨论内容，生成并确认剪辑草稿。</p><ConversationPanel :project-id="selected.id" :edit-reference="editReference" @play="playAsset" @plan="viewPlan" @session="chooseSession" /></section>
+        <section id="panel-conversation" v-show="activePane === 'conversation'" class="panel" role="tabpanel" aria-labelledby="tab-conversation" tabindex="0"><h2>制作</h2><p class="view-description">与助手讨论内容，生成并确认剪辑草稿。</p><ConversationPanel :project-id="selected.id" :edit-reference="editReference" :has-source="!!playback && playbackPane === 'conversation'" @play="playAsset($event, 'conversation')" @plan="viewPlan" @session="chooseSession"><template #source><MediaPlayer v-if="playback && playbackPane === 'conversation'" :key="playback.assetId" :playback="playback" return-label="返回草稿" @close="closePlayback" /></template></ConversationPanel></section>
         <section id="panel-results" v-show="activePane === 'results'" class="panel" role="tabpanel" aria-labelledby="tab-results" tabindex="0"><h2>作品</h2><p class="view-description">查看已确认方案，导出与管理成片。</p><MediaPlayer v-if="playback && playbackPane === 'results'" :key="playback.assetId" :playback="playback" @close="closePlayback" /><div v-else class="player-empty">选择素材或结果即可播放</div><PlanPanel :project-id="selected.id" :session-id="sessionId" :selection="planSelection" @play="playAsset" @reference="referencePlan" /></section>
       </div>
     </template>

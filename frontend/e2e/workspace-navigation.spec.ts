@@ -34,6 +34,7 @@ test('view switches preserve chat input and references while hidden panels canno
   await page.goto('/?project=a');
   await page.getByRole('tab', { name: '制作', exact: true }).click();
   await page.getByLabel('对话输入', { exact: true }).fill('尚未发送的剪辑思路');
+  await page.getByText('引用素材', { exact: true }).click();
   await page.getByLabel('素材甲.mp4', { exact: true }).check();
   await page.getByRole('tab', { name: '素材', exact: true }).click();
   await expect(page.getByLabel('对话输入', { exact: true })).toBeHidden();
@@ -74,6 +75,7 @@ test('project navigation and browser history isolate old input, references and p
   await page.getByRole('button', { name: '项目甲', exact: true }).click();
   await page.getByRole('tab', { name: '制作', exact: true }).click();
   await page.getByLabel('对话输入', { exact: true }).fill('甲的未发送输入');
+  await page.getByText('引用素材', { exact: true }).click();
   await page.getByLabel('素材甲.mp4', { exact: true }).check();
   await page.getByRole('tab', { name: '素材', exact: true }).click();
   await page.getByRole('button', { name: '播放 素材甲.mp4', exact: true }).click();
@@ -90,6 +92,7 @@ test('project navigation and browser history isolate old input, references and p
   await expect(page.getByRole('heading', { name: '项目甲', exact: true })).toBeVisible();
   await page.getByRole('tab', { name: '制作', exact: true }).click();
   await expect(page.getByLabel('对话输入', { exact: true })).toHaveValue('');
+  await page.getByText('引用素材', { exact: true }).click();
   await expect(page.getByLabel('素材甲.mp4', { exact: true })).not.toBeChecked();
   await expect(page.locator('video')).toHaveCount(0);
   await page.goForward();
@@ -138,7 +141,7 @@ for (const viewport of [{ width: 1366, height: 768 }, { width: 768, height: 1024
     for (const view of ['素材', '制作', '作品']) {
       await page.getByRole('tab', { name: view, exact: true }).click();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-      await expect(page.getByRole('tabpanel')).toHaveCount(1);
+      await expect(page.getByRole('tabpanel', { name: /^(素材|制作|作品)$/ })).toHaveCount(1);
     }
     await page.getByRole('button', { name: '用量', exact: true }).click();
     const usage = page.getByRole('complementary', { name: '项目用量', exact: true });
