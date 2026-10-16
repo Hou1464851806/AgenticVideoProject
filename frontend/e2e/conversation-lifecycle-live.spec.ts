@@ -135,12 +135,26 @@ test('browser lifecycle uses real Java, persistent drafts and MQ media without C
   await page.getByRole('button', { name: '播放正式成片', exact: true }).click({ timeout: 60000 });
   await expect.poll(() => finalVideo.evaluate((node: HTMLVideoElement) => node.readyState)).toBeGreaterThanOrEqual(1);
   expect(await finalVideo.evaluate((node: HTMLVideoElement) => [node.videoWidth, node.videoHeight])).toEqual([1080, 1920]);
+  await page.screenshot({ path: '../backend/target/conversation-lifecycle-export.png', fullPage: true });
   await finalVideo.evaluate(async (node: HTMLVideoElement) => { await node.play(); });
   await expect.poll(() => finalVideo.evaluate((node: HTMLVideoElement) => node.currentTime)).toBeGreaterThan(0.1);
   await finalVideo.evaluate((node: HTMLVideoElement) => node.pause());
+  const fullHdDownload = page.waitForEvent('download');
+  await page.getByRole('button', { name: '下载正式成片', exact: true }).click();
+  expect(await (await fullHdDownload).failure()).toBeNull();
   await page.reload();
   await expect(page.getByText('当前版本已确认；导出仍需另行操作。', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '播放正式成片', exact: true })).toBeVisible();
+  const removePublished = page.waitForResponse(response => response.url().includes('/artifacts/') && response.request().method() === 'DELETE');
+  await page.getByRole('button', { name: '删除成片文件', exact: true }).click();
+  await expect(page.getByRole('alertdialog', { name: '确认删除成片文件', exact: true })).toContainText('草稿 B-out-2');
+  await page.getByRole('button', { name: '确认删除此成片', exact: true }).click();
+  const removedPublished = await removePublished;
+  expect(removedPublished.status()).toBe(200);
+  expect((await removedPublished.json()).data.removedBytes).toBeGreaterThan(0);
+  await expect(page.getByText('成片文件已删除，原始素材保留。', { exact: true })).toBeVisible();
+  const original = await post(`/assets/${seed.assetId}/playback-access`, {});
+  expect((await page.request.get(original.url, { headers: { Range: 'bytes=0-1023' } })).status()).toBe(206);
   await publish(await bind(await send('接受后继续讨论下一条'), 'DISCUSS', 'INDEPENDENT'), 'ANSWER', '可以开始新的制作需求。');
   const failed = await bind(await send('继续讨论但执行中断'), 'DISCUSS', 'INDEPENDENT');
   await publish(failed, 'FAILED', '执行中断，可恢复', { failure: { code: 'EXECUTION_INTERRUPTED', message: '执行中断，可恢复', recoverable: true } });
@@ -169,7 +183,7 @@ test('browser lifecycle uses real Java, persistent drafts and MQ media without C
   // An externally lost export must still restore its record without a server error.
   await page.getByRole('tab', { name: '作品', exact: true }).click();
   await page.getByLabel('查看方案', { exact: true }).selectOption(seed.missingPlanId);
-  await page.getByLabel('查看版本', { exact: true }).selectOption({ label: 'V1' });
+  await expect(page.getByRole('heading', { name: /^V1 ·/ })).toBeVisible();
   await expect(page.getByLabel('查看正式导出记录', { exact: true })).toBeVisible();
   const artifactRead = page.waitForResponse(response => response.url().endsWith(`/artifacts/${seed.missingArtifactId}`) && response.request().method() === 'GET');
   await page.getByLabel('查看正式导出记录', { exact: true }).selectOption(seed.missingExportId);
@@ -181,6 +195,7 @@ test('browser lifecycle uses real Java, persistent drafts and MQ media without C
   await expect(page.getByRole('region', { name: '编排剪辑方案', exact: true }).getByRole('alert')).toContainText('产物不可用');
   const deletion = page.waitForResponse(response => response.url().endsWith(`/artifacts/${seed.missingArtifactId}`) && response.request().method() === 'DELETE');
   await page.getByRole('button', { name: '删除成片文件', exact: true }).click();
+  await page.getByRole('button', { name: '确认删除此成片', exact: true }).click();
   const deleted = await deletion; expect(deleted.status()).toBe(200);
   expect((await deleted.json()).data.removedBytes).toBe(0);
   await expect(page.getByText('成片文件已删除，原始素材保留。', { exact: true })).toBeVisible();

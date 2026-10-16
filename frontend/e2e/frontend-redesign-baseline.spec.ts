@@ -41,7 +41,7 @@ for (const viewport of viewports) {
     if (view.planId && view.revisionId) {
       await page.getByRole('tab', { name: '作品', exact: true }).click();
       await expect(page.getByLabel('查看方案', { exact: true })).toHaveValue(view.planId);
-      await expect(page.getByLabel('查看版本', { exact: true })).toHaveValue(view.revisionId);
+      if (await page.getByLabel('查看版本', { exact: true }).count()) await expect(page.getByLabel('查看版本', { exact: true })).toHaveValue(view.revisionId);
       await expect(page.getByRole('heading', { level: 4, name: /^V[0-9]+ ·/, includeHidden: true })).toHaveCount(1);
     }
     await page.getByRole('tab', { name: '素材', exact: true }).click();

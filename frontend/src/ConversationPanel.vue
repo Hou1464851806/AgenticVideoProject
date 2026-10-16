@@ -7,7 +7,7 @@ import DraftContent from './DraftContent.vue';
 import DraftCard, { type EditDraft, type DraftBinding } from './DraftCard.vue';
 import type { Playback } from './AssetLibrary.vue';
 import type { PlanSelection, PlanReference } from './PlanPanel.vue';
-const props = defineProps<{ projectId: string; editReference?: PlanReference | null; hasSource?: boolean }>();
+const props = defineProps<{ projectId: string; editReference?: PlanReference | null; hasSource?: boolean; diagnostics?: boolean }>();
 const emit = defineEmits<{ play: [value: Playback]; plan: [value: PlanSelection]; session: [value: string] }>();
 type Session = { id: string; title: string; assetIds: string[] };
 type Asset = { id: string; filename: string };
@@ -246,6 +246,7 @@ onUnmounted(() => { alive = false; });
     <div class="conversation-toolbar"><div><label class="sr-only" for="session-select">制作会话</label><select v-if="sessions.length" id="session-select" :value="selected" @change="choose(($event.target as HTMLSelectElement).value)"><option v-for="item in sessions" :key="item.id" :value="item.id">{{ item.title }}</option></select><span v-else>{{ loading ? '正在读取聊天…' : '还没有聊天' }}</span></div><button type="button" :disabled="creating || loading" @click="createChat">新聊天</button></div>
     <p v-if="!sessions.length && !loading">新建聊天后，可以问答、讨论或提出制作需求。</p>
     <p v-if="error" role="alert">{{ error }}</p>
+    <aside v-if="diagnostics && history" aria-label="制作诊断"><p v-if="history.agent.currentProduction">制作 {{history.agent.currentProduction.productionId}} · 编辑代次 {{history.agent.currentProduction.editGeneration}}</p><p v-if="history.agent.currentProduction?.currentDraft">校验 {{history.agent.currentProduction.currentDraft.validationId}} · 草稿 {{history.agent.currentProduction.currentDraft.messageId}}</p><p v-if="history.latestTask">任务 {{history.latestTask.taskId}}</p><p v-for="item in history.previews.items" :key="item.requestId">预览请求 {{item.requestId}} · 任务 {{item.taskId}}</p></aside>
     <template v-if="session && history">
       <div class="production-tabs" role="tablist" aria-label="制作区域"><button id="production-chat-tab" role="tab" :aria-selected="narrowPane === 'conversation'" aria-controls="production-chat" :tabindex="narrowPane === 'conversation' ? 0 : -1" @keydown="navigateProduction" @click="narrowPane = 'conversation'">对话</button><button id="production-preview-tab" role="tab" :aria-selected="narrowPane === 'preview'" aria-controls="production-preview" :tabindex="narrowPane === 'preview' ? 0 : -1" @keydown="navigateProduction" @click="narrowPane = 'preview'">预览</button></div>
       <div class="production-layout">

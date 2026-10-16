@@ -64,7 +64,7 @@ test('partial analysis retains speech and retries only the failed stage; mainten
   expect(writes).toEqual([]);
   await status.getByRole('button', { name: '仅重试失败的 画面', exact: true }).click();
   await expect.poll(() => writes).toEqual(['/api/v1/assets/a/analysis-stages/VISION/retry']);
-  await page.getByText('诊断与高级维护', { exact: true }).click();
+  await page.getByRole('button', { name: '诊断与高级维护', exact: true }).click();
   await page.getByLabel('维护素材', { exact: true }).selectOption('a');
   await expect(page.getByLabel('索引 Embedding 模型', { exact: true })).toBeVisible();
   expect(writes).toHaveLength(1);
@@ -263,7 +263,7 @@ test('source clips from a saved plan stop at their original end boundary', async
   await page.goto('/?project=assets');
   await page.getByRole('tab', { name: '作品', exact: true }).click();
   await page.getByLabel('查看方案', { exact: true }).selectOption('plan');
-  await page.getByLabel('查看版本', { exact: true }).selectOption('revision');
+  await page.getByText('片段与选取依据（1）', { exact: true }).click();
   await page.getByRole('button', { name: '播放源片段', exact: true }).click();
   const player = page.getByLabel('视频播放器', { exact: true });
   await expect.poll(() => player.evaluate((video: HTMLVideoElement) => video.currentTime)).toBeGreaterThanOrEqual(.2);

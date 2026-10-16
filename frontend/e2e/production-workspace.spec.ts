@@ -215,7 +215,7 @@ test('named plan references send only the existing revision and output identity'
   await page.goto('/?project=project');
   await page.getByRole('tab', { name: '作品', exact: true }).click();
   await page.getByLabel('查看方案', { exact: true }).selectOption('plan');
-  await page.getByLabel('查看版本', { exact: true }).selectOption('revision');
+  await expect(page.getByRole('heading', { name: 'V1 · 正式短片', exact: true })).toBeVisible();
   await page.getByRole('button', { name: '引用成片 1', exact: true }).click();
   await expect(page.getByLabel('本轮引用', { exact: true })).toContainText('V1 · 正式短片');
   await page.getByLabel('对话输入', { exact: true }).fill('讨论这条输出');

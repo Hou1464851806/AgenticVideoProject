@@ -5,7 +5,7 @@ import { uploadRows } from './uploads';
 import UploadPanel from './UploadPanel.vue';
 import AnalysisStatus from './AnalysisStatus.vue';
 export type Playback = { assetId: string; filename: string; url: string; durationMs: number; expiresAt: string; startMs?: number; endMs?: number };
-const props = defineProps<{ projectId: string }>();
+const props = defineProps<{ projectId: string; diagnostics?: boolean }>();
 const emit = defineEmits<{ play: [value: Playback]; loaded: [count: number] }>();
 type Asset = { id: string; filename: string; validationStatus: string };
 const items = ref<Asset[]>([]);
@@ -57,7 +57,7 @@ onUnmounted(() => clearInterval(timer));
       </div>
       <div v-if="selectedStatus === asset.id" class="asset-details"><AnalysisStatus :key="asset.id" :asset-id="asset.id" /></div>
     </article>
-    <details v-if="items.length" class="maintenance">
+    <details v-if="items.length" class="maintenance" :open="diagnostics">
       <summary>诊断与高级维护</summary><p>仅在需要维护检索索引时使用。打开入口不会执行分析或重建。</p>
       <label for="maintenance-asset">维护素材</label><select id="maintenance-asset" v-model="maintenanceAsset"><option value="">选择素材</option><option v-for="asset in items" :key="asset.id" :value="asset.id">{{ asset.filename }}</option></select>
       <AnalysisStatus v-if="maintenanceAsset" :key="`maintenance-${maintenanceAsset}`" :asset-id="maintenanceAsset" maintenance />

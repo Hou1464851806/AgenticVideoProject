@@ -9,7 +9,7 @@ import SpeechSearch from './SpeechSearch.vue';
 import ConversationPanel from './ConversationPanel.vue';
 import PlanPanel, { type PlanSelection, type PlanReference } from './PlanPanel.vue';
 const props = defineProps<{ userId: string }>();
-const showUsage = ref(false);
+const showUsage = ref(false), diagnostics = ref(false);
 const usageButton = ref<HTMLButtonElement | null>(null);
 const usageClose = ref<HTMLButtonElement | null>(null);
 async function toggleUsage() {
@@ -85,7 +85,7 @@ async function navigateTabs(event: KeyboardEvent, index: number) {
 }
 function clearSelection() {
   selected.value = null;
-  showUsage.value = false;
+  showUsage.value = false; diagnostics.value = false;
   sessionId.value = '';
   planSelection.value = null;
   editReference.value = null;
@@ -180,6 +180,7 @@ onUnmounted(() => { mounted = false; ++selectionRequest; window.removeEventListe
       </template>
       <span v-else class="header-spacer"></span>
       <button v-if="selected" ref="usageButton" class="text-button" :aria-expanded="showUsage" aria-controls="project-usage" @click="toggleUsage">用量</button>
+      <button v-if="selected" class="text-button" aria-label="诊断与高级维护" :aria-expanded="diagnostics" @click="diagnostics = !diagnostics">诊断</button>
       <slot name="account" />
     </header>
     <p v-if="error" role="alert" class="error">{{ error }}</p>
@@ -199,9 +200,10 @@ onUnmounted(() => { mounted = false; ++selectionRequest; window.removeEventListe
       <button v-if="nextCursor" class="secondary" :disabled="busy" @click="loadProjects(true)">加载更多项目</button>
     </template>
     <template v-else>
+      <aside v-if="diagnostics" class="diagnostics-notice" aria-label="项目诊断与高级维护"><p>诊断已开启：制作、作品与用量中可查看业务标识和回执。</p><button class="text-button" @click="setPane('assets')">前往素材索引维护</button><p>进入不会执行分析、重建或模型调用。维护操作仍需明确提交。</p></aside>
       <aside v-if="showUsage" id="project-usage" class="usage-drawer" aria-label="项目用量" @keydown.esc="toggleUsage">
         <div class="usage-heading"><h2>项目用量</h2><button ref="usageClose" class="text-button" @click="toggleUsage">关闭用量</button></div>
-        <UsagePanel :key="`usage-${selected.id}`" :project-id="selected.id" />
+        <UsagePanel :key="`usage-${selected.id}`" :project-id="selected.id" :diagnostics="diagnostics" />
       </aside>
       <div class="workspace-tabs" role="tablist" aria-label="工作区区域">
         <button v-for="(pane, index) in panes" :id="`tab-${pane.id}`" :key="pane.id" role="tab" :aria-selected="activePane === pane.id" :aria-controls="`panel-${pane.id}`" :tabindex="activePane === pane.id ? 0 : -1" @click="setPane(pane.id)" @keydown="navigateTabs($event, index)">{{ pane.label }}</button>
@@ -209,16 +211,17 @@ onUnmounted(() => { mounted = false; ++selectionRequest; window.removeEventListe
       <div :key="selected.id" class="workspace">
         <section id="panel-assets" v-show="activePane === 'assets'" class="panel" role="tabpanel" aria-labelledby="tab-assets" tabindex="0"><h2>素材库</h2><p class="view-description">导入视频，查找内容，回看原始素材。</p>
           <MediaPlayer v-if="playback && playbackPane === 'assets'" :key="playback.assetId" :playback="playback" return-label="返回素材列表" @close="closePlayback" />
-          <div v-show="!playback || playbackPane !== 'assets'"><AssetLibrary :project-id="selected.id" @loaded="assetsLoaded" @play="playAsset($event, 'assets')" /><SpeechSearch :project-id="selected.id" @play="playAsset($event, 'assets')" /></div>
+          <div v-show="!playback || playbackPane !== 'assets'"><AssetLibrary :project-id="selected.id" :diagnostics="diagnostics" @loaded="assetsLoaded" @play="playAsset($event, 'assets')" /><SpeechSearch :project-id="selected.id" @play="playAsset($event, 'assets')" /></div>
         </section>
-        <section id="panel-conversation" v-show="activePane === 'conversation'" class="panel" role="tabpanel" aria-labelledby="tab-conversation" tabindex="0"><h2>制作</h2><p class="view-description">与助手讨论内容，生成并确认剪辑草稿。</p><ConversationPanel :project-id="selected.id" :edit-reference="editReference" :has-source="!!playback && playbackPane === 'conversation'" @play="playAsset($event, 'conversation')" @plan="viewPlan" @session="chooseSession"><template #source><MediaPlayer v-if="playback && playbackPane === 'conversation'" :key="playback.assetId" :playback="playback" return-label="返回草稿" @close="closePlayback" /></template></ConversationPanel></section>
-        <section id="panel-results" v-show="activePane === 'results'" class="panel" role="tabpanel" aria-labelledby="tab-results" tabindex="0"><h2>作品</h2><p class="view-description">查看已确认方案，导出与管理成片。</p><MediaPlayer v-if="playback && playbackPane === 'results'" :key="playback.assetId" :playback="playback" @close="closePlayback" /><div v-else class="player-empty">选择素材或结果即可播放</div><PlanPanel :project-id="selected.id" :session-id="sessionId" :selection="planSelection" @play="playAsset" @reference="referencePlan" /></section>
+        <section id="panel-conversation" v-show="activePane === 'conversation'" class="panel" role="tabpanel" aria-labelledby="tab-conversation" tabindex="0"><h2>制作</h2><p class="view-description">与助手讨论内容，生成并确认剪辑草稿。</p><ConversationPanel :project-id="selected.id" :diagnostics="diagnostics" :edit-reference="editReference" :has-source="!!playback && playbackPane === 'conversation'" @play="playAsset($event, 'conversation')" @plan="viewPlan" @session="chooseSession"><template #source><MediaPlayer v-if="playback && playbackPane === 'conversation'" :key="playback.assetId" :playback="playback" return-label="返回草稿" @close="closePlayback" /></template></ConversationPanel></section>
+        <section id="panel-results" v-show="activePane === 'results'" class="panel" role="tabpanel" aria-labelledby="tab-results" tabindex="0"><h2>作品</h2><p class="view-description">查看已确认方案，导出与管理成片。</p><MediaPlayer v-if="playback && playbackPane === 'results'" :key="playback.assetId" :playback="playback" @close="closePlayback" /><PlanPanel :project-id="selected.id" :diagnostics="diagnostics" :session-id="sessionId" :selection="planSelection" @play="playAsset" @reference="referencePlan" /></section>
       </div>
     </template>
   </section>
 </template>
 
 <style scoped>
+.diagnostics-notice { padding: 12px 20px; border: 1px solid var(--line); background: #edf3ee; font-size: 13px; }
 .workspace-header { display: flex; align-items: center; gap: 8px; min-height: 88px; border-bottom: 1px solid var(--line); }
 .workspace-brand { display: flex; gap: 12px; align-items: center; text-decoration: none; font-weight: 600; flex-shrink: 0; }
 .workspace-header h1 { flex: 1; min-width: 0; font-size: 20px; margin: 0 16px; }
@@ -247,7 +250,7 @@ onUnmounted(() => { mounted = false; ++selectionRequest; window.removeEventListe
 @media (max-width: 720px) {
   .workspace-header { flex-wrap: wrap; padding: 12px 0; gap: 4px; }
   .workspace-header h1 { order: 1; flex-basis: 100%; margin: 8px 0 0; }
-  .back-button { flex: 1; text-align: left; }
+  .back-button { flex: 1; text-align: left; white-space: nowrap; }
   .project-create { flex-direction: column; align-items: stretch; gap: 12px; }
   .workspace-tabs { margin: 16px 0; }
   .workspace-tabs button { flex: 1; min-width: 0; }

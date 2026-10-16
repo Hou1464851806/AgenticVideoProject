@@ -1,6 +1,6 @@
 # 前端工作区重构分步实施计划
 
-日期：2026-10-16（Asia/Shanghai）。状态：步骤 1～4 已完成，步骤 5～6 未实施。步骤 1 已建立真实服务及受控状态实屏、字段追溯和有效测试清单，见[验证记录](verification/frontend-redesign-step1.md)；未修改业务逻辑、运行配置或触发部署、付费模型调用。
+日期：2026-10-16（Asia/Shanghai）。状态：步骤 1～5 已完成，步骤 6 未实施。步骤 1 已建立真实服务及受控状态实屏、字段追溯和有效测试清单，见[验证记录](verification/frontend-redesign-step1.md)；未修改业务逻辑、运行配置或触发部署、付费模型调用。
 
 依据[重构设计](frontend-redesign-design.md)、[当前功能](current-features.md)、[已确认生命周期](conversation-lifecycle-browser-design.md)和根 [AGENTS.md](../AGENTS.md)。本计划细化已认可的“信息与基础样式、布局与主流程、状态与验收”三个切片，不扩大业务能力。
 
@@ -18,7 +18,7 @@
 | 2 | 基础视觉、项目外壳、三个主视图及窄屏导航 | 步骤 1 | 已完成（[记录](verification/frontend-redesign-step2.md)） |
 | 3 | 素材、上传、能力状态、内容查找和原片回看 | 步骤 2 | 已完成（[记录](verification/frontend-redesign-step3.md)） |
 | 4 | 对话、引用、草稿、预览与确认双栏流程 | 步骤 2～3 | 已完成（[记录](verification/frontend-redesign-step4.md)） |
-| 5 | 作品、正式导出、用量及诊断分层 | 步骤 3～4 | 未开始 |
+| 5 | 作品、正式导出、用量及诊断分层 | 步骤 3～4 | 已完成（[记录](verification/frontend-redesign-step5.md)） |
 | 6 | 跨模块体验、代码审查、阶段回归与验收记录 | 步骤 1～5 | 未开始 |
 
 ## 验证环境与测试选择
@@ -162,6 +162,8 @@ RUN_LIVE_JAVA_ANALYSIS=0 mvn -B -ntp -pl backend '-Dtest=LocalMediaIntegrationTe
 草稿展示与作品导出共享来源身份，补作品选中版本、确认状态及从聊天前往作品的回归。若修改公共事件或请求协议，补 `ConversationRecoveryApiIntegrationTest`、`AgentRunsApiIntegrationTest` 等直接模块；跨语言契约或哈希改动则扩大到 Java/Python 双方契约和工具调用。此类业务协议改动不是本步预定范围，必须记录原因和实际扩大范围。
 
 ## 步骤 5 重构作品与用量诊断
+
+完成记录：[作品导出、用量诊断、真实媒体及审查](verification/frontend-redesign-step5.md)。
 
 ### 改动范围
 
