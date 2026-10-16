@@ -12,6 +12,7 @@ test('real model understands discussion, evidence question, production and modif
   const login = await page.request.post(`${base}/api/v1/auth/login`, { headers: { 'X-XSRF-TOKEN': csrf }, data: { username: 'm4-silent-owner', password: 'project-strong-password' } });
   expect(login.status()).toBe(200);
   await page.goto(`/?project=${seed.projectId}`);
+  await page.getByRole('tab', { name: '制作', exact: true }).click();
   const created = page.waitForResponse(response => response.url().endsWith('/conversations') && response.request().method() === 'POST');
   await page.getByRole('button', { name: '新聊天', exact: true }).click();
   const conversation = (await (await created).json()).data.id;
@@ -22,6 +23,7 @@ test('real model understands discussion, evidence question, production and modif
   };
   const runs: unknown[] = [];
   const send = async (content: string) => {
+    await page.getByRole('tab', { name: '制作', exact: true }).click();
     await page.getByLabel('对话输入', { exact: true }).fill(content);
     const response = page.waitForResponse(response => response.url().endsWith('/turns') && response.request().method() === 'POST');
     await page.getByRole('button', { name: '发送需求', exact: true }).click();

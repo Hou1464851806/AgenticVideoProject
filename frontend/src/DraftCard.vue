@@ -51,7 +51,7 @@ async function preview() {
       <select :id="`draft-output-${binding.messageId}`" v-model="outputKey"><option value="">选择一条输出</option><option v-for="output in draft.normalizedContent.outputs" :key="output.output_key" :value="output.output_key">{{ output.title }}</option></select>
       <button type="button" :disabled="busy || !canPreview || !outputKey" @click="preview">预览所选输出</button>
     </template>
-    <button type="button" :disabled="busy || !canAccept" @click="accept">确认全部输出</button>
+    <button class="primary" type="button" :disabled="busy || !canAccept" @click="accept">确认全部输出</button>
   </section>
 </template>
 <style scoped>

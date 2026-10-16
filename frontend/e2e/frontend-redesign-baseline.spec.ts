@@ -1,9 +1,9 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures/current-frontend';
 import { readFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 // Baseline evidence only: no model calls, uploads, render requests or Compose changes.
-const screenshots = resolve('../docs/verification/frontend-redesign-step1');
+const screenshots = resolve('../docs/verification/frontend-redesign-step2');
 const viewports = [{ width: 1366, height: 768 }, { width: 768, height: 1024 }, { width: 390, height: 844 }];
 
 for (const viewport of viewports) {
@@ -15,12 +15,16 @@ for (const viewport of viewports) {
     await page.setViewportSize(viewport);
     await page.goto('/');
     await expect(page.getByRole('heading', { name: '登录工作区', exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: `${screenshots}/real-login-${size}.png`, fullPage: true });
     await page.getByLabel('用户名', { exact: true }).fill(seed.username);
     await page.getByLabel('密码', { exact: true }).fill('analysis-browser-password');
     await page.getByRole('button', { name: '登录', exact: true }).click();
     await expect(page.getByRole('heading', { name: '我的项目', exact: true })).toBeVisible();
+    await page.getByText('账户', { exact: true }).click();
     await expect(page.getByRole('button', { name: '退出登录', exact: true })).toBeVisible();
+    await page.getByText('账户', { exact: true }).click();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: `${screenshots}/real-projects-${size}.png`, fullPage: true });
     const project = await page.request.get(`/api/v1/projects/${seed.projectId}`);
     expect(project.status()).toBe(200);
@@ -35,15 +39,19 @@ for (const viewport of viewports) {
     expect(saved.status()).toBe(200);
     const view = (await saved.json()).data.view;
     if (view.planId && view.revisionId) {
+      await page.getByRole('tab', { name: '作品', exact: true }).click();
       await expect(page.getByLabel('查看方案', { exact: true })).toHaveValue(view.planId);
       await expect(page.getByLabel('查看版本', { exact: true })).toHaveValue(view.revisionId);
       await expect(page.getByRole('heading', { level: 4, name: /^V[0-9]+ ·/, includeHidden: true })).toHaveCount(1);
     }
+    await page.getByRole('tab', { name: '素材', exact: true }).click();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: `${screenshots}/real-assets-${size}.png`, fullPage: true });
-    for (const [tab, label] of [['对话', 'conversation'], ['播放器与结果', 'results']]) {
-      if (viewport.width <= 720) await page.getByRole('tab', { name: tab, exact: true }).click();
+    for (const [tab, label] of [['制作', 'conversation'], ['作品', 'results']]) {
+      await page.getByRole('tab', { name: tab, exact: true }).click();
       await expect(page.getByRole('heading', { name: tab, exact: true })).toBeVisible();
       await expect(page.getByLabel('制作会话', { exact: true })).toBeAttached();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await page.screenshot({ path: `${screenshots}/real-${label}-${size}.png`, fullPage: true });
     }
   });
@@ -90,28 +98,31 @@ for (const viewport of viewports) {
       await route.fulfill({ json: { data } });
     });
     await page.goto('/?project=baseline');
-    if (viewport.width <= 720) await page.getByRole('tab', { name: '对话', exact: true }).click();
+    await page.getByRole('tab', { name: '制作', exact: true }).click();
     await expect(page.getByRole('region', { name: '剪辑草稿', exact: true })).toContainText('竖屏结尾');
     await expect(page.getByRole('button', { name: '确认全部输出', exact: true })).toBeEnabled();
     await expect(page.getByText('历史草稿 · draft-old · 只读', { exact: true })).toBeVisible();
     await expect(page.getByText(/来源草稿：draft-old.*历史预览/)).toBeVisible();
     await expect(page.getByRole('alert')).toContainText('模型提交状态未知');
     await expect(page.getByRole('button', { name: '重试原需求', exact: true })).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: `${screenshots}/controlled-draft-history-unknown-${size}.png`, fullPage: true });
     readonly = true; failure = 'BUDGET_EXHAUSTED';
     await page.reload();
-    if (viewport.width <= 720) await page.getByRole('tab', { name: '对话', exact: true }).click();
+    await page.getByRole('tab', { name: '制作', exact: true }).click();
     await expect(page.getByRole('button', { name: '确认全部输出', exact: true })).toBeDisabled();
     await expect(page.getByRole('button', { name: '预览草稿', exact: true })).toBeDisabled();
     await expect(page.getByRole('alert')).toContainText('预算已耗尽');
     await expect(page.getByRole('button', { name: '重试原需求', exact: true })).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: `${screenshots}/controlled-readonly-budget-${size}.png`, fullPage: true });
-    if (viewport.width <= 720) await page.getByRole('tab', { name: '素材', exact: true }).click();
+    await page.getByRole('tab', { name: '素材', exact: true }).click();
     await page.getByRole('button', { name: '查看分析状态 讲话素材.mp4', exact: true }).click();
     const analysis = page.getByRole('region', { name: '素材分析状态', exact: true });
     await expect(analysis).toContainText('语音：已就绪');
     await expect(analysis).toContainText('画面：失败');
     await expect(analysis.getByRole('button', { name: '仅重试失败的 画面', exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: `${screenshots}/controlled-partial-analysis-${size}.png`, fullPage: true });
     expect(unexpected).toEqual([]);
   });

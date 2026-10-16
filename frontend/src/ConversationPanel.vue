@@ -217,7 +217,7 @@ onUnmounted(() => { alive = false; });
 </template>
 
 <style scoped>
-select, textarea { width: 100%; padding: 10px; border: 1px solid #c9d8ce; border-radius: 8px; font: inherit; }
+select, textarea { width: 100%; padding: 10px; border: 1px solid var(--control-border); border-radius: 8px; font: inherit; }
 textarea { min-height: 100px; resize: vertical; }
 article { border-bottom: 1px solid #dce5de; padding: 14px 0; font-size: 14px; }
 p, dd { overflow-wrap: anywhere; }

@@ -260,7 +260,7 @@ onUnmounted(() => { alive = false; ++epoch; clearInterval(timer); });
       <template v-else-if="exported.status==='SUCCEEDED'">
         <button @click="artifactAction('playback-access')">播放正式成片</button>
         <button @click="artifactAction('download-access')">下载正式成片</button>
-        <button @click="deleteExport">删除成片文件</button>
+        <button class="danger" @click="deleteExport">删除成片文件</button>
       </template>
       <video v-if="exportUrl" :src="exportUrl" controls aria-label="正式成片播放器" style="width:100%;max-height:420px" />
     </section>

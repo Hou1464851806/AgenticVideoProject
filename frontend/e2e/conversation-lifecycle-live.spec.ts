@@ -22,6 +22,7 @@ test('browser lifecycle uses real Java, persistent drafts and MQ media without C
   const hash = (value: unknown) => createHash('sha256').update(canonical(value)).digest('hex');
   await post('/auth/login', { username: 'm4-silent-owner', password: 'project-strong-password' });
   await page.goto(`/?project=${seed.projectId}`);
+  await page.getByRole('tab', { name: '制作', exact: true }).click();
   const created = page.waitForResponse(response => response.url().endsWith('/conversations') && response.request().method() === 'POST');
   await page.getByRole('button', { name: '新聊天', exact: true }).click();
   const newChat = await created; expect(newChat.status()).toBe(201);
@@ -31,6 +32,7 @@ test('browser lifecycle uses real Java, persistent drafts and MQ media without C
   const plans = async () => (await (await page.request.get(`${base}/api/v1/projects/${seed.projectId}/plans`)).json()).data.items;
   const baselinePlans = (await plans()).length;
   const send = async (content: string) => {
+    await page.getByRole('tab', { name: '制作', exact: true }).click();
     await page.getByLabel('对话输入', { exact: true }).fill(content);
     const response = page.waitForResponse(response => response.url().endsWith('/turns') && response.request().method() === 'POST');
     await page.getByRole('button', { name: '发送需求', exact: true }).click();
@@ -160,6 +162,7 @@ test('browser lifecycle uses real Java, persistent drafts and MQ media without C
   expect(await plans()).toHaveLength(baselinePlans + 1);
   await page.screenshot({ path: '../backend/target/conversation-lifecycle-desktop.png', fullPage: true });
   // An externally lost export must still restore its record without a server error.
+  await page.getByRole('tab', { name: '作品', exact: true }).click();
   await page.getByLabel('查看方案', { exact: true }).selectOption(seed.missingPlanId);
   await page.getByLabel('查看版本', { exact: true }).selectOption({ label: 'V1' });
   await expect(page.getByLabel('查看正式导出记录', { exact: true })).toBeVisible();
@@ -181,7 +184,7 @@ test('browser lifecycle uses real Java, persistent drafts and MQ media without C
   await expect(page.getByText('成片文件已删除，原始素材保留。', { exact: true })).toBeVisible();
   await expect(page.getByRole('region', { name: '编排剪辑方案', exact: true }).getByRole('alert')).toHaveCount(0);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole('tab', { name: '对话', exact: true }).click();
+  await page.getByRole('tab', { name: '制作', exact: true }).click();
   await expect(page.getByLabel('对话输入', { exact: true })).toBeVisible();
   await page.screenshot({ path: '../backend/target/conversation-lifecycle-mobile.png', fullPage: true });
 });

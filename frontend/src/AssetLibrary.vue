@@ -5,12 +5,12 @@ import AnalysisStatus from './AnalysisStatus.vue';
 const selectedStatus = ref<string | null>(null);
 export type Playback = { assetId: string; filename: string; url: string; durationMs: number; expiresAt: string; startMs?: number; endMs?: number };
 const props = defineProps<{ projectId: string }>();
-const emit = defineEmits<{ play: [value: Playback] }>();
+const emit = defineEmits<{ play: [value: Playback]; loaded: [count: number] }>();
 const items = ref<Array<{ id: string; filename: string; validationStatus: string }>>([]);
 const error = ref('');
 let timer: ReturnType<typeof setInterval> | undefined;
 async function refresh() {
-  try { items.value = (await request<{ items: typeof items.value }>(`/projects/${props.projectId}/assets?includePending=true`)).items; }
+  try { items.value = (await request<{ items: typeof items.value }>(`/projects/${props.projectId}/assets?includePending=true`)).items; emit('loaded', items.value.length); }
   catch (failure) { error.value = failure instanceof Error ? failure.message : '无法查询素材'; }
 }
 async function play(id: string) {

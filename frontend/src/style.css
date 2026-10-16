@@ -1,0 +1,66 @@
+:root {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  color: #15251f;
+  background: #f3f5f0;
+  font-synthesis: none;
+  font-size: 15px;
+  line-height: 1.6;
+  font-variant-numeric: tabular-nums;
+  --accent: #245c45;
+  --line: #ccd7cf;
+  --control-border: #7d9384;
+  --muted: #53665b;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, input, select, textarea { font: inherit; max-width: 100%; }
+button, summary, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+button {
+  width: auto; min-height: 44px; margin: 8px 8px 0 0; padding: 10px 16px;
+  border: 1px solid var(--control-border); border-radius: 8px; background: white; color: #245c45;
+  cursor: pointer; line-height: 1.4; overflow-wrap: anywhere;
+  transition: transform 150ms;
+}
+button:hover:not(:disabled), .secondary:hover:not(:disabled) { background: #e5ede7; }
+button:active:not(:disabled) { transform: translateY(1px); }
+button:disabled { opacity: .6; cursor: not-allowed; }
+button.primary, button[type='submit'] { background: var(--accent); border-color: var(--accent); color: white; }
+button.primary:hover:not(:disabled), button[type='submit']:hover:not(:disabled) { background: #194a35; }
+button.secondary { background: #edf3ee; color: var(--accent); }
+button.text-button { background: transparent; border-color: transparent; }
+button.danger { background: #fff4f3; border-color: #b02d29; color: #a02a26; }
+:focus-visible { outline: 2px solid #245c45; outline-offset: 3px; }
+input, select, textarea { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--control-border); border-radius: 8px; background: white; color: inherit; }
+input[type='checkbox'], input[type='radio'] { width: 20px; min-height: 20px; accent-color: var(--accent); flex-shrink: 0; }
+label { display: block; margin: 16px 0 8px; font-size: 14px; }
+fieldset { min-width: 0; border: 1px solid var(--line); border-radius: 8px; }
+h1, h2, h3, h4 { line-height: 1.35; font-weight: 600; overflow-wrap: anywhere; }
+h1 { font-size: clamp(28px, 4vw, 48px); letter-spacing: -.03em; margin: 24px 0; }
+h2 { font-size: 23px; margin: 0 0 24px; }
+p, dd, strong, summary { overflow-wrap: anywhere; }
+video { display: block; max-width: 100%; }
+a { color: var(--accent); }
+.brand-header { display: flex; align-items: center; gap: 12px; padding: 24px 5vw; font-weight: 600; }
+.mark { display: grid; place-items: center; width: 36px; height: 36px; flex-shrink: 0; border-radius: 8px; background: var(--accent); color: white; font-size: 13px; letter-spacing: .02em; }
+.sign-in { max-width: 1120px; min-height: 72vh; margin: auto; padding: 48px 32px; display: grid; grid-template-columns: 1.2fr 1fr; align-items: center; gap: 64px; }
+.authenticated { max-width: 1440px; margin: auto; padding: 0 32px 32px; }
+.eyebrow { color: var(--muted); font-size: 13px; }
+.intro > p:last-child { color: var(--muted); }
+.account { background: white; padding: 32px; border: 1px solid #dce5de; border-radius: 12px; }
+.account form button, .account > button { width: 100%; margin-right: 0; margin-top: 16px; }
+.hint { font-size: 12px; color: var(--muted); }
+.error, [role='alert'] { color: #a02a26; }
+.notice { color: var(--accent); }
+.account-menu { position: relative; }
+.account-menu summary { min-height: 44px; padding: 10px 12px; cursor: pointer; white-space: nowrap; border-radius: 8px; }
+.account-popover { position: absolute; z-index: 3; right: 0; top: 100%; width: 240px; padding: 16px; background: white; border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px #18352614; }
+.account-popover p { margin: 0 0 8px; }
+.skip-link { position: fixed; top: 8px; left: 8px; padding: 12px; background: white; z-index: 5; transform: translateY(-180%); }
+.skip-link:focus { transform: none; }
+@media (max-width: 720px) {
+  .sign-in { grid-template-columns: 1fr; gap: 24px; padding: 24px 16px; }
+  .account { padding: 24px; }
+  .authenticated { padding: 0 16px 24px; }
+  .brand-header { padding: 20px 16px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }

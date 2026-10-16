@@ -1,22 +1,30 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { provideProjectEvents } from './projectEvents';
 import { request } from './api';
 import UploadPanel from './UploadPanel.vue';
 import UsagePanel from './UsagePanel.vue';
-const showUsage=ref(false);
 import AssetLibrary, { type Playback } from './AssetLibrary.vue';
 import MediaPlayer from './MediaPlayer.vue';
 import SpeechSearch from './SpeechSearch.vue';
 import ConversationPanel from './ConversationPanel.vue';
 import PlanPanel, { type PlanSelection, type PlanReference } from './PlanPanel.vue';
+const props = defineProps<{ userId: string }>();
+const showUsage = ref(false);
+const usageButton = ref<HTMLButtonElement | null>(null);
+const usageClose = ref<HTMLButtonElement | null>(null);
+async function toggleUsage() {
+  showUsage.value = !showUsage.value;
+  await nextTick();
+  (showUsage.value ? usageClose.value : usageButton.value)?.focus();
+}
 const editReference=ref<PlanReference|null>(null);
-function referencePlan(value:PlanReference){editReference.value=value;activePane.value='conversation';}
+function referencePlan(value:PlanReference){editReference.value=value;setPane('conversation');}
 const planSelection = ref<PlanSelection | null>(null), sessionId = ref('');
-function viewPlan(selection: PlanSelection) { planSelection.value = selection; activePane.value = 'results'; }
+function viewPlan(selection: PlanSelection) { planSelection.value = selection; setPane('results'); }
 function chooseSession(id: string) { sessionId.value = id; planSelection.value = null;editReference.value=null; }
 const playback = ref<Playback | null>(null);
-function playAsset(value: Playback) { playback.value = value; activePane.value = 'results'; }
+function playAsset(value: Playback) { playback.value = value; setPane('results'); }
 
 type Project = { id: string; name: string; rowVersion: number };
 type ProjectPage = { items: Project[]; nextCursor: string | null };
@@ -27,7 +35,54 @@ const nextCursor = ref<string | null>(null);
 const name = ref('');
 const busy = ref(false);
 const error = ref('');
-const activePane = ref('assets');
+type Pane = 'assets' | 'conversation' | 'results';
+const panes: { id: Pane; label: string }[] = [{ id: 'assets', label: '素材' }, { id: 'conversation', label: '制作' }, { id: 'results', label: '作品' }];
+const activePane = ref<Pane>('assets');
+const preferenceNotice = ref('');
+let restorePane = false;
+let selectionRequest = 0;
+let mounted = true;
+
+function preferenceKey() { return `workspace-view:${props.userId}:${selected.value!.id}`; }
+function setPane(pane: Pane) {
+  activePane.value = pane;
+  restorePane = false;
+  try { localStorage.setItem(preferenceKey(), pane); }
+  catch { preferenceNotice.value = '浏览器无法保存视图偏好，本次仍可正常切换。'; }
+}
+function assetsLoaded(count: number) {
+  if (!restorePane) return;
+  restorePane = false;
+  if (count === 0) return;
+  try {
+    const saved = localStorage.getItem(preferenceKey());
+    const pane = panes.find(pane => pane.id === saved);
+    if (pane) activePane.value = pane.id;
+  } catch { preferenceNotice.value = '浏览器无法读取视图偏好，已进入素材。'; }
+}
+async function navigateTabs(event: KeyboardEvent, index: number) {
+  let target: number;
+  if (event.key === 'ArrowRight') target = (index + 1) % panes.length;
+  else if (event.key === 'ArrowLeft') target = (index + panes.length - 1) % panes.length;
+  else if (event.key === 'Home') target = 0;
+  else if (event.key === 'End') target = panes.length - 1;
+  else return;
+  event.preventDefault();
+  setPane(panes[target]!.id);
+  await nextTick();
+  document.getElementById(`tab-${activePane.value}`)!.focus();
+}
+function clearSelection() {
+  selected.value = null;
+  showUsage.value = false;
+  sessionId.value = '';
+  planSelection.value = null;
+  editReference.value = null;
+  playback.value = null;
+  activePane.value = 'assets';
+  preferenceNotice.value = '';
+  restorePane = false;
+}
 
 function showError(failure: unknown) {
   error.value = failure instanceof Error ? failure.message : '项目暂时不可用';
@@ -59,26 +114,26 @@ async function createProject() {
 async function openProject(id: string, updateLocation = true) {
   busy.value = true;
   error.value = '';
-  selected.value = null;
-  showUsage.value=false;
-  sessionId.value = ''; planSelection.value = null;editReference.value=null;
+  const currentRequest = ++selectionRequest;
+  clearSelection();
   try {
-    selected.value = await request<Project>(`/projects/${encodeURIComponent(id)}`);
-    activePane.value = 'assets';
-    playback.value = null;
+    const project = await request<Project>(`/projects/${encodeURIComponent(id)}`);
+    if (currentRequest !== selectionRequest) return;
+    selected.value = project;
+    restorePane = true;
     if (updateLocation) {
       const url = new URL(location.href);
       url.searchParams.set('project', id);
       history.pushState(null, '', url);
     }
-  } catch (failure) { showError(failure); }
-  finally { busy.value = false; }
+  } catch (failure) { if (currentRequest === selectionRequest) showError(failure); }
+  finally { if (currentRequest === selectionRequest) busy.value = false; }
 }
 
 function backToProjects() {
-  selected.value = null;
-  showUsage.value=false;
-  sessionId.value = ''; planSelection.value = null;editReference.value=null;
+  ++selectionRequest;
+  clearSelection();
+  busy.value = false;
   error.value = '';
   const url = new URL(location.href);
   url.searchParams.delete('project');
@@ -88,23 +143,40 @@ function backToProjects() {
 async function restoreSelection() {
   const id = new URL(location.href).searchParams.get('project');
   if (id) await openProject(id, false);
-  else selected.value = null;
+  else {
+    ++selectionRequest;
+    clearSelection();
+    error.value = '';
+    busy.value = false;
+  }
 }
 
 onMounted(async () => {
   window.addEventListener('popstate', restoreSelection);
   await loadProjects();
-  await restoreSelection();
+  if (mounted) await restoreSelection();
 });
-onUnmounted(() => window.removeEventListener('popstate', restoreSelection));
+onUnmounted(() => { mounted = false; ++selectionRequest; window.removeEventListener('popstate', restoreSelection); });
 </script>
 
 <template>
-  <p v-if="eventStatus" role="status">{{ eventStatus }}</p>
-  <section class="projects">
+  <section class="projects" :aria-busy="busy">
+    <header class="workspace-header">
+      <a class="workspace-brand" href="/" @click.prevent="backToProjects"><span class="mark">AV</span><span v-if="!selected">视频工作区</span></a>
+      <template v-if="selected">
+        <button class="text-button back-button" @click="backToProjects">← 项目列表</button>
+        <h1>{{ selected.name }}</h1>
+      </template>
+      <span v-else class="header-spacer"></span>
+      <button v-if="selected" ref="usageButton" class="text-button" :aria-expanded="showUsage" aria-controls="project-usage" @click="toggleUsage">用量</button>
+      <slot name="account" />
+    </header>
     <p v-if="error" role="alert" class="error">{{ error }}</p>
+    <p v-if="eventStatus" role="status">{{ eventStatus }}</p>
+    <p v-if="preferenceNotice" role="status">{{ preferenceNotice }}</p>
+    <p v-if="busy" role="status">正在加载项目…</p>
     <template v-if="!selected">
-      <h1>我的项目</h1>
+      <div class="list-heading"><p class="eyebrow">私有工作空间</p><h1>我的项目</h1><p>选择一个项目，继续整理素材与制作视频。</p></div>
       <form class="project-create" @submit.prevent="createProject">
         <div><label for="project-name">项目名称</label><input id="project-name" v-model="name" required maxlength="120" placeholder="例如：演讲短视频"></div>
         <button :disabled="busy" type="submit">创建项目</button>
@@ -116,49 +188,56 @@ onUnmounted(() => window.removeEventListener('popstate', restoreSelection));
       <button v-if="nextCursor" class="secondary" :disabled="busy" @click="loadProjects(true)">加载更多项目</button>
     </template>
     <template v-else>
-      <div class="project-header"><div><p class="eyebrow">私有项目</p><h1>{{ selected.name }}</h1></div><button class="secondary" @click="backToProjects">返回项目列表</button></div>
-      <button @click="showUsage=!showUsage">{{showUsage?'收起存储与模型用量':'查看存储与模型用量'}}</button>
-      <UsagePanel v-if="showUsage" :key="`usage-${selected.id}`" :project-id="selected.id" />
+      <aside v-if="showUsage" id="project-usage" class="usage-drawer" aria-label="项目用量" @keydown.esc="toggleUsage">
+        <div class="usage-heading"><h2>项目用量</h2><button ref="usageClose" class="text-button" @click="toggleUsage">关闭用量</button></div>
+        <UsagePanel :key="`usage-${selected.id}`" :project-id="selected.id" />
+      </aside>
       <div class="workspace-tabs" role="tablist" aria-label="工作区区域">
-        <button id="tab-assets" role="tab" :aria-selected="activePane === 'assets'" aria-controls="panel-assets" @click="activePane = 'assets'">素材</button>
-        <button id="tab-conversation" role="tab" :aria-selected="activePane === 'conversation'" aria-controls="panel-conversation" @click="activePane = 'conversation'">对话</button>
-        <button id="tab-results" role="tab" :aria-selected="activePane === 'results'" aria-controls="panel-results" @click="activePane = 'results'">播放器与结果</button>
+        <button v-for="(pane, index) in panes" :id="`tab-${pane.id}`" :key="pane.id" role="tab" :aria-selected="activePane === pane.id" :aria-controls="`panel-${pane.id}`" :tabindex="activePane === pane.id ? 0 : -1" @click="setPane(pane.id)" @keydown="navigateTabs($event, index)">{{ pane.label }}</button>
       </div>
-      <div class="workspace">
-        <section id="panel-assets" class="panel" :class="{ active: activePane === 'assets' }" role="tabpanel" aria-labelledby="tab-assets"><h2>素材库</h2><UploadPanel :project-id="selected.id" /><AssetLibrary :key="selected.id" :project-id="selected.id" @play="playAsset" /><SpeechSearch :key="`search-${selected.id}`" :project-id="selected.id" @play="playAsset" /></section>
-        <section id="panel-conversation" class="panel" :class="{ active: activePane === 'conversation' }" role="tabpanel" aria-labelledby="tab-conversation"><h2>对话</h2><ConversationPanel :key="`conversation-${selected.id}`" :project-id="selected.id" :edit-reference="editReference" @play="playAsset" @plan="viewPlan" @session="chooseSession" /></section>
-        <section id="panel-results" class="panel" :class="{ active: activePane === 'results' }" role="tabpanel" aria-labelledby="tab-results"><h2>播放器与结果</h2><MediaPlayer v-if="playback" :key="playback.assetId" :playback="playback" /><div v-else class="player-empty">选择素材或结果即可播放</div><PlanPanel :key="`plans-${selected.id}`" :project-id="selected.id" :session-id="sessionId" :selection="planSelection" @play="playAsset" @reference="referencePlan" /></section>
+      <div :key="selected.id" class="workspace">
+        <section id="panel-assets" v-show="activePane === 'assets'" class="panel" role="tabpanel" aria-labelledby="tab-assets" tabindex="0"><h2>素材库</h2><p class="view-description">导入视频，查找内容，回看原始素材。</p><UploadPanel :project-id="selected.id" /><AssetLibrary :project-id="selected.id" @loaded="assetsLoaded" @play="playAsset" /><SpeechSearch :project-id="selected.id" @play="playAsset" /></section>
+        <section id="panel-conversation" v-show="activePane === 'conversation'" class="panel" role="tabpanel" aria-labelledby="tab-conversation" tabindex="0"><h2>制作</h2><p class="view-description">与助手讨论内容，生成并确认剪辑草稿。</p><ConversationPanel :project-id="selected.id" :edit-reference="editReference" @play="playAsset" @plan="viewPlan" @session="chooseSession" /></section>
+        <section id="panel-results" v-show="activePane === 'results'" class="panel" role="tabpanel" aria-labelledby="tab-results" tabindex="0"><h2>作品</h2><p class="view-description">查看已确认方案，导出与管理成片。</p><MediaPlayer v-if="playback" :key="playback.assetId" :playback="playback" /><div v-else class="player-empty">选择素材或结果即可播放</div><PlanPanel :project-id="selected.id" :session-id="sessionId" :selection="planSelection" @play="playAsset" @reference="referencePlan" /></section>
       </div>
     </template>
   </section>
 </template>
 
 <style scoped>
-.projects h1 { font-size: 28px; margin: 20px 0 28px; }
+.workspace-header { display: flex; align-items: center; gap: 8px; min-height: 88px; border-bottom: 1px solid var(--line); }
+.workspace-brand { display: flex; gap: 12px; align-items: center; text-decoration: none; font-weight: 600; flex-shrink: 0; }
+.workspace-header h1 { flex: 1; min-width: 0; font-size: 20px; margin: 0 16px; }
+.workspace-header button { margin: 0; flex-shrink: 0; }
+.header-spacer { flex: 1; }
+.list-heading { padding: 32px 0 16px; }
+.list-heading h1 { font-size: 32px; margin: 8px 0; }
+.list-heading p { color: var(--muted); }
 .project-create { display: flex; align-items: end; gap: 16px; max-width: 640px; }
-.project-create > div { flex: 1; }
+.project-create > div { flex: 1; min-width: 0; }
 .project-create label { margin-top: 0; }
-.project-create button { width: auto; white-space: nowrap; }
-.project-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; margin-top: 28px; }
-.project-list button { margin: 0; padding: 24px; background: white; color: #245c45; border: 1px solid #d5dfd7; text-align: left; }
-.project-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-.project-header button { width: auto; margin: 0; }
-.project-header h1 { margin-top: 0; }
-.workspace { display: grid; grid-template-columns: 1fr 1.1fr 1.2fr; gap: 18px; }
-.panel { background: white; border: 1px solid #dce5de; border-radius: 14px; padding: 22px; min-height: 400px; }
-.panel h2 { font-size: 18px; margin: 0 0 20px; }
-.empty { color: #69766e; line-height: 1.7; }
-.player-empty { display: grid; place-items: center; min-height: 170px; border-radius: 10px; background: #e9efea; color: #69766e; font-size: 14px; }
-.workspace-tabs { display: none; }
+.project-create button { white-space: nowrap; margin: 0; }
+.project-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(230px, 100%), 1fr)); gap: 16px; margin-top: 32px; }
+.project-list button { margin: 0; min-height: 100px; padding: 24px; background: white; text-align: left; font-size: 18px; }
+.workspace-tabs { position: sticky; top: 0; z-index: 2; background: #f3f5f0; display: flex; gap: 8px; margin: 20px 0; border-bottom: 1px solid var(--line); }
+.workspace-tabs button { min-width: 88px; margin: 0 0 -1px; border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: transparent; color: var(--muted); }
+.workspace-tabs button[aria-selected='true'] { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.panel { background: white; border: 1px solid #dce5de; border-radius: 12px; padding: 24px; min-height: 400px; min-width: 0; overflow-wrap: anywhere; }
+.panel h2 { font-size: 22px; margin: 0 0 8px; }
+.view-description { color: var(--muted); margin: 0 0 24px; font-size: 14px; }
+.empty { color: var(--muted); }
+.player-empty { display: grid; place-items: center; min-height: 170px; border-radius: 8px; background: #e9efea; color: var(--muted); font-size: 14px; }
+.usage-drawer { position: fixed; z-index: 4; inset: 16px 16px 16px auto; width: min(560px, calc(100% - 32px)); padding: 24px; overflow-y: auto; background: #f3f5f0; border: 1px solid #9eafa3; border-radius: 12px; box-shadow: 0 12px 48px #18352626; }
+.usage-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.usage-heading h2, .usage-heading button { margin: 0; }
 @media (max-width: 720px) {
-  .project-create { flex-direction: column; align-items: stretch; gap: 0; }
-  .project-header { align-items: start; }
-  .project-header button { padding: 10px; font-size: 13px; }
-  .workspace { display: block; }
-  .panel { display: none; min-height: 350px; }
-  .panel.active { display: block; }
-  .workspace-tabs { display: flex; gap: 6px; margin: 0 0 16px; }
-  .workspace-tabs button { padding: 10px 6px; margin: 0; font-size: 13px; color: #245c45; background: #e7eee8; }
-  .workspace-tabs button[aria-selected="true"] { color: white; background: #245c45; }
+  .workspace-header { flex-wrap: wrap; padding: 12px 0; gap: 4px; }
+  .workspace-header h1 { order: 1; flex-basis: 100%; margin: 8px 0 0; }
+  .back-button { flex: 1; text-align: left; }
+  .project-create { flex-direction: column; align-items: stretch; gap: 12px; }
+  .workspace-tabs { margin: 16px 0; }
+  .workspace-tabs button { flex: 1; min-width: 0; }
+  .panel { padding: 16px; }
+  .usage-drawer { padding: 16px; }
 }
 </style>

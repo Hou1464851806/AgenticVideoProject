@@ -27,12 +27,14 @@ test('plain chat sends text and references and restores the published answer', a
     await route.fulfill({ json: { data } });
   });
   await page.goto('/?project=project');
+  await page.getByRole('tab', { name: '制作', exact: true }).click();
   await expect(page.getByLabel('需求类型', { exact: true })).toHaveCount(0);
   await page.getByLabel('对话输入', { exact: true }).fill('先讨论剪辑思路');
   await page.getByRole('button', { name: '发送需求', exact: true }).click();
   await expect(page.getByRole('article', { name: '助手答复', exact: true })).toContainText('先确定故事主线');
   expect(sent).toEqual({ content: '先讨论剪辑思路', references: [] });
   await page.reload();
+  await page.getByRole('tab', { name: '制作', exact: true }).click();
   await expect(page.getByRole('article', { name: '助手答复', exact: true })).toContainText('先确定故事主线');
   await page.getByLabel('素材.mp4', { exact: true }).check();
   await page.getByLabel('对话输入', { exact: true }).fill('先讨论剪辑思路');
@@ -73,6 +75,7 @@ test('multi-output draft previews one selected output and accepts the whole seen
     await route.fulfill({ json: { data } });
   });
   await page.goto('/?project=project');
+  await page.getByRole('tab', { name: '制作', exact: true }).click();
   // Current draft is not in the message window; its structured snapshot must still be operable.
   await expect(page.getByRole('region', { name: '剪辑草稿', exact: true })).toContainText('竖屏结尾');
   await page.getByRole('button', { name: '预览草稿', exact: true }).click();
@@ -86,6 +89,7 @@ test('multi-output draft previews one selected output and accepts the whole seen
   expect(acceptBodies[0]).toEqual(binding);
   await expect(page.getByRole('button', { name: '确认全部输出', exact: true })).toBeDisabled();
   await page.reload();
+  await page.getByRole('tab', { name: '制作', exact: true }).click();
   await expect(page.getByRole('button', { name: '预览草稿', exact: true })).toBeDisabled();
 });
 
@@ -116,6 +120,7 @@ test('Agent stop and media stop stay independent and historical retry stays read
     await route.fulfill({ json: { data } });
   });
   await page.goto('/?project=project');
+  await page.getByRole('tab', { name: '制作', exact: true }).click();
   await page.getByRole('button', { name: '停止当前 Agent', exact: true }).click();
   await expect(page.getByRole('button', { name: '停止此预览', exact: true })).toBeVisible();
   await expect.poll(() => cancelled).toEqual(['/tasks/agent/cancel']);
@@ -124,6 +129,7 @@ test('Agent stop and media stop stay independent and historical retry stays read
   expect(cancelled).toEqual(['/tasks/agent/cancel', '/tasks/media/cancel']);
   current = false;
   await page.reload();
+  await page.getByRole('tab', { name: '制作', exact: true }).click();
   await expect(page.getByRole('button', { name: '重试此预览', exact: true })).toBeDisabled();
   expect(cancelled).toHaveLength(2);
 });
@@ -154,6 +160,7 @@ test('expired chat playback renews access to the same artifact without rendering
     await route.fulfill({ json: { data } });
   });
   await page.goto('/?project=project');
+  await page.getByRole('tab', { name: '制作', exact: true }).click();
   await page.getByRole('button', { name: '播放草稿预览', exact: true }).click();
   await expect.poll(() => page.getByLabel('聊天草稿预览播放器', { exact: true }).evaluate((node: HTMLVideoElement) => node.readyState)).toBeGreaterThanOrEqual(1);
   expect(accesses).toBe(2);
@@ -187,6 +194,7 @@ test('confirmed artifact loss offers an explicit retry only for the current draf
     await route.fulfill({ json: { data } });
   });
   await page.goto('/?project=project');
+  await page.getByRole('tab', { name: '制作', exact: true }).click();
   await expect(page.getByRole('button', { name: '重试此预览', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '播放草稿预览', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('预览产物不可用');
