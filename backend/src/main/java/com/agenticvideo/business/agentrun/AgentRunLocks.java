@@ -22,7 +22,11 @@ public class AgentRunLocks {
     /** Also used before shared task cancellation/heartbeat methods acquire their task lock. */
     public void beforeTask(UUID task) {
         var rows=db.queryForList("SELECT conversation_id,production_id FROM conversation_execution_requests WHERE task_id=? AND schema_version='1.0'",task);
-        if(rows.isEmpty())return;
+        if(rows.isEmpty()) {
+            var media=db.queryForList("SELECT conversation_id FROM render_requests WHERE task_id=? AND conversation_id IS NOT NULL",task);
+            if(!media.isEmpty())conversation((UUID)media.get(0).get("conversation_id"));
+            return;
+        }
         conversation((UUID)rows.get(0).get("conversation_id"));
         if(rows.get(0).get("production_id")!=null)db.queryForMap("SELECT id FROM edit_productions WHERE id=? FOR UPDATE",rows.get(0).get("production_id"));
     }

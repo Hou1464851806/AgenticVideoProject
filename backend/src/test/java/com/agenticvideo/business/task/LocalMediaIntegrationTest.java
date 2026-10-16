@@ -73,7 +73,7 @@ class LocalMediaIntegrationTest {
     @org.springframework.beans.factory.annotation.Autowired LocalTaskRunner runtime;
 
     @Test
-    void savedSilentProductionRendersThroughInternalPreviewAndMq() throws Exception {
+    void unacceptedAndSavedSilentDraftsRenderThroughMqWithTheirOwnSources() throws Exception {
         var browser=signedIn("m4-silent-owner");var json=new ObjectMapper();
         var project=java.util.UUID.fromString(json(browser.post("/projects","{\"name\":\"M4 静音保存方案\"}")).path("data").path("id").asText());
         byte[] bytes=java.nio.file.Files.readAllBytes(java.nio.file.Path.of("../frontend/e2e/fixtures/labelled-vision-vfr.mp4"));
@@ -92,6 +92,52 @@ class LocalMediaIntegrationTest {
         db.update("INSERT INTO vision_model_calls(id,analysis_id,task_id,frame_sha256,model,parameters_json,status) VALUES (?,?,?,?,'fixture','{}','SUCCEEDED')",call,analysis,java.util.UUID.fromString(completed.path("validationTaskId").asText()),frame.get("sha256"));
         db.update("INSERT INTO evidence_segments(id,project_id,asset_id,analysis_id,source_kind,ordinal,text,start_ms,end_ms,observation_json,frame_id,vision_call_id) VALUES (?,?,?,?,'VISUAL',0,'红色矩形',?,?,'{}',?,?)",evidence,project,asset,analysis,frame.get("observed_at_ms"),frame.get("observed_at_ms"),frame.get("id"),call);
         db.update("UPDATE analysis_stages SET status='SUCCEEDED' WHERE analysis_id=? AND stage_key='VISION'",analysis);
+        // New browser lifecycle: actual validated draft -> MQ -> FFmpeg -> chat playback, before any save.
+        var conversationReply=browser.post("/projects/"+project+"/conversations",json.writeValueAsString(java.util.Map.of("title","草稿媒体验收","assetIds",java.util.List.of(asset))));
+        assertEquals(201,conversationReply.statusCode(),conversationReply.body());
+        String conversation=json(conversationReply).path("data").path("id").asText();
+        var sent=browser.post("/conversations/"+conversation+"/turns","{\"content\":\"制作两条静音竖屏短片\"}");assertEquals(202,sent.statusCode(),sent.body());
+        String agent=json(sent).path("data").path("taskId").asText(),agentPath="/agent-runs/"+agent;
+        var claimed=internal("POST",agentPath+"/claim",java.util.Map.of("executorId","draft-media-fixture","claimRequestId",java.util.UUID.randomUUID())).path("data");
+        var credentials=java.util.Map.of("attemptId",claimed.path("attemptId").asText(),"leaseToken",claimed.path("leaseToken").asText());
+        var bindingBody=new java.util.LinkedHashMap<String,Object>(credentials);
+        var parsed=json.createObjectNode().put("mode","DRAFT").put("relation","NEW_PRODUCTION").putNull("questionId");
+        parsed.set("conditionsPatch",json.valueToTree(java.util.Map.of("topic","红色矩形","profile","PORTRAIT_720","subtitles_enabled",false,"output_count",2)));
+        bindingBody.put("parsed",parsed);
+        var binding=internal("POST",agentPath+"/parsed",bindingBody).path("data");
+        var draftOutputs=new java.util.ArrayList<Object>();
+        for(String outputKey:java.util.List.of("out-1","out-2"))draftOutputs.add(java.util.Map.of("output_key",outputKey,"title",outputKey,"clips",java.util.List.of(java.util.Map.of("asset_id",asset,"source_in_ms",0,"source_out_ms",2000,"evidence_ids",java.util.List.of(evidence),"reason","已读画面"))));
+        var edit=json.valueToTree(java.util.Map.of("title","未接受双输出","outputs",draftOutputs));
+        String editHash=com.agenticvideo.business.tools.ToolJson.hash(edit),conditionsHash=com.agenticvideo.business.tools.ToolJson.hash(binding.path("production").path("requirements"));
+        JsonNode checked=null;
+        for(String tool:java.util.List.of("read_video_range","validate_edit_draft")) {
+            var arguments=tool.equals("read_video_range")?json.valueToTree(java.util.Map.of("asset_id",asset,"start_ms",0,"end_ms",2000)):json.valueToTree(java.util.Map.of("draft",edit,"requirements",binding.path("production").path("requirements"),"draft_hash",editHash,"requirements_hash",conditionsHash));
+            var toolRequest=java.util.Map.of("call_id",tool,"tool_name",tool,"arguments",arguments,"request_hash",com.agenticvideo.business.tools.ToolJson.hash(json.valueToTree(java.util.Map.of("tool",tool,"args",arguments))));
+            var toolBody=new java.util.LinkedHashMap<String,Object>(credentials);toolBody.put("editGeneration",binding.path("production").path("editGeneration").asLong());toolBody.put("request",toolRequest);
+            checked=internal("POST",agentPath+"/tools",toolBody).path("data");
+        }
+        assertTrue(checked.path("data").path("valid").asBoolean(),checked.toString());
+        var draftBinding=json.valueToTree(java.util.Map.of("messageId",java.util.UUID.randomUUID(),"validationId",checked.path("data").path("validation_id").asText(),"editGeneration",binding.path("production").path("editGeneration").asLong(),"draftHash",editHash,"requirementsHash",conditionsHash));
+        var result=json.createObjectNode().put("schemaVersion","1.0").put("status","DRAFT_READY").put("mode","DRAFT").put("content","未接受双输出草稿");
+        result.set("identity",binding.path("identity"));result.set("productionId",binding.path("production").path("productionId"));result.set("editGeneration",binding.path("production").path("editGeneration"));result.set("draft",draftBinding);result.putArray("scopeReceipts");result.putNull("question");result.putNull("failure");
+        var published=new java.util.LinkedHashMap<String,Object>(credentials);published.put("result",result);internal("POST",agentPath+"/result",published);
+        var previewBody=json.writeValueAsString(java.util.Map.of("draft",draftBinding,"outputKey","out-2","previewProfile","LOW_360"));
+        var admitted=browser.post("/conversations/"+conversation+"/drafts/previews",previewBody);assertEquals(202,admitted.statusCode(),admitted.body());
+        var draftPreview=json(admitted).path("data");var draftTask=java.util.UUID.fromString(draftPreview.path("taskId").asText());
+        awaitState(draftTask,"SUCCEEDED");verifyRendered(browser,draftTask,360,640);
+        assertEquals(0,db.queryForObject("SELECT count(*) FROM plan_revisions WHERE project_id=?",Integer.class,project));
+        assertEquals(0,db.queryForObject("SELECT count(*) FROM plan_confirmations WHERE project_id=?",Integer.class,project));
+        assertEquals(draftPreview.path("requestId"),json(browser.post("/conversations/"+conversation+"/drafts/previews",previewBody)).path("data").path("requestId"));
+        broker.convertAndSend("media.v1",json.writeValueAsBytes(java.util.Map.of("taskId",draftTask.toString())));
+        Thread.sleep(1000);
+        var snapshot=json(browser.get("/conversations/"+conversation+"/snapshot")).path("data");int playbackCount=0;
+        for(var item:snapshot.path("items"))for(var ref:item.path("references"))if("PREVIEW_RESULT".equals(ref.path("type").asText())) {
+            playbackCount++;assertEquals(draftBinding.path("messageId"),ref.path("sourceDraftMessageId"));assertEquals("out-2",ref.path("outputKey").asText());
+            assertEquals(200,browser.post("/artifacts/"+ref.path("id").asText()+"/playback-access","{}").statusCode());
+        }
+        assertEquals(1,playbackCount);assertEquals(1,tasks.attemptCount(draftTask));
+        assertEquals(1,db.queryForObject("SELECT count(*) FROM execution_reports WHERE task_id=? AND report_kind='COMPLETE'",Integer.class,draftTask));
+
         var scope=internal("POST","/questions/scopes",java.util.Map.of("project_id",project,"asset_ids",java.util.List.of(asset))).path("scope_id").asText();
         var production=java.util.UUID.randomUUID();String path="/questions/productions/"+production;
         internal("PUT",path,java.util.Map.of("project_id",project,"scope_id",scope));

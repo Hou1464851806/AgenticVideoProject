@@ -261,6 +261,16 @@ public class AgentRuns {
         }
         result.put("pendingQuestions",pending(conversation));return result;
     }
+    public Map<String,Object> requireCurrentDraft(Map<String,Object> session,DraftBinding draft) {
+        UUID conversation=(UUID)session.get("id");
+        var rows=db.queryForList("SELECT p.*,d.validation_id,d.draft_hash,d.requirements_hash,d.edit_generation AS draft_generation FROM edit_productions p JOIN conversation_edit_drafts d ON d.message_id=p.current_draft_message_id WHERE p.id=? AND d.message_id=? AND p.conversation_id=?",session.get("current_production_id"),UUID.fromString(draft.messageId()),conversation);
+        if(rows.isEmpty())throw conflict("所见草稿已不是当前草稿");var p=rows.get(0);UUID production=(UUID)p.get("id");
+        if(!draft.validationId().equals(p.get("validation_id").toString())||!draft.draftHash().equals(p.get("draft_hash"))||!draft.requirementsHash().equals(p.get("requirements_hash"))
+                ||!draft.editGeneration().equals(p.get("edit_generation"))||!draft.editGeneration().equals(p.get("draft_generation"))||frozen(production))throw conflict("草稿已变化或封存");
+        // Undecided messages and production mutations suspend buttons; independent answers keep them available.
+        if(hasPendingMutation(conversation))throw conflict("尚有未决消息或制作修改");
+        return p;
+    }
     public boolean hasPendingMutation(UUID conversation){return db.queryForObject("SELECT EXISTS(SELECT 1 FROM conversation_execution_requests r JOIN tasks t ON t.id=r.task_id WHERE r.conversation_id=? AND t.status IN ('PENDING','RUNNING','CANCEL_REQUESTED') AND (r.parsed_json IS NULL OR r.production_id IS NOT NULL))",Boolean.class,conversation);}
     public boolean frozen(UUID production){return db.queryForObject("SELECT EXISTS(SELECT 1 FROM plan_revisions WHERE source_production_id=?)",Boolean.class,production);}
     public boolean busy(UUID conversation){return db.queryForObject("SELECT EXISTS(SELECT 1 FROM tasks t JOIN conversation_turns r ON r.task_id=t.id WHERE r.conversation_id=? AND t.status IN ('PENDING','RUNNING','CANCEL_REQUESTED'))",Boolean.class,conversation);}

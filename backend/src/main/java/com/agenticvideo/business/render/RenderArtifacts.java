@@ -29,8 +29,8 @@ public class RenderArtifacts {
             UUID id=UUID.randomUUID(),request=UUID.fromString(input.path("requestId").asText());
             String kind="EXPORT_RENDER".equals(task.get("type"))?"EXPORT":"PREVIEW";
             String key=("EXPORT".equals(kind)?"exports/":"previews/")+request+"/"+attempt+".mp4";
-            database.update("INSERT INTO artifacts(id,project_id,request_id,revision_id,output_id,task_id,attempt_id,kind,object_key) VALUES (?,?,?,?,?,?,?,?,?)",
-                    id,task.get("project_id"),request,UUID.fromString(input.path("revisionId").asText()),UUID.fromString(input.path("outputId").asText()),task.get("id"),attempt,kind,key);
+            database.update("INSERT INTO artifacts(id,project_id,request_id,revision_id,output_id,source_draft_message_id,output_key,task_id,attempt_id,kind,object_key) SELECT ?,project_id,id,revision_id,output_id,source_draft_message_id,output_key,task_id,?,kind,? FROM render_requests WHERE id=? AND task_id=?",
+                    id,attempt,key,request,task.get("id"));
             artifact=row(id);
         } else artifact=existing.get(0);
         ObjectNode granted=(ObjectNode)input.deepCopy();
@@ -64,6 +64,14 @@ public class RenderArtifacts {
                     size,result.path("sha256").asText(),duration,json.writeValueAsString(result.path("mediaInfo")),artifact.get("id"));
         } catch(java.io.IOException invalid){throw new IllegalStateException(invalid);}
         database.update("UPDATE render_requests SET artifact_id=? WHERE id=? AND task_id=?",artifact.get("id"),artifact.get("request_id"),task.get("id"));
+        var request=database.queryForMap("SELECT * FROM render_requests WHERE id=?",artifact.get("request_id"));
+        if(request.get("source_draft_message_id")!=null) {
+            var refs=json.createArrayNode();
+            refs.addObject().put("type","PREVIEW_RESULT").put("id",artifact.get("id").toString())
+                .put("requestId",request.get("id").toString()).put("sourceDraftMessageId",request.get("source_draft_message_id").toString())
+                .put("outputKey",request.get("output_key").toString());
+            database.update("INSERT INTO conversation_messages(id,conversation_id,message_seq,role,content,references_json,source_task_id) SELECT ?,?,coalesce(max(message_seq),0)+1,'ASSISTANT','草稿预览已完成。',?::jsonb,? FROM conversation_messages WHERE conversation_id=?",UUID.randomUUID(),request.get("conversation_id"),refs.toString(),task.get("id"),request.get("conversation_id"));
+        }
         return Map.of("status","SUCCEEDED","requestId",artifact.get("request_id"),"artifactId",artifact.get("id"));
     }
     public boolean available(UUID id) {

@@ -31,12 +31,7 @@ public class DraftAcceptances {
             if(!Boolean.TRUE.equals(replay.get(0).get("same"))||!actor.equals(replay.get(0).get("actor_user_id")))throw conflict("同一接受键不能改变草稿");
             return runs.parse(replay.get(0).get("response_json"));
         }
-        var rows=db.queryForList("SELECT p.*,d.validation_id,d.draft_hash,d.requirements_hash,d.edit_generation AS draft_generation FROM edit_productions p JOIN conversation_edit_drafts d ON d.message_id=p.current_draft_message_id WHERE p.id=? AND d.message_id=? AND p.conversation_id=?",session.get("current_production_id"),UUID.fromString(draft.messageId()),conversation);
-        if(rows.isEmpty())throw conflict("所见草稿已不是当前草稿");var p=rows.get(0);UUID production=(UUID)p.get("id");
-        if(!draft.validationId().equals(p.get("validation_id").toString())||!draft.draftHash().equals(p.get("draft_hash"))||!draft.requirementsHash().equals(p.get("requirements_hash"))
-                ||!draft.editGeneration().equals(p.get("edit_generation"))||!draft.editGeneration().equals(p.get("draft_generation"))||runs.frozen(production))throw conflict("草稿已变化或封存");
-        // Undecided messages and production mutations suspend buttons; independent answers keep them available.
-        if(runs.hasPendingMutation(conversation))throw conflict("尚有未决消息或制作修改");
+        var p=runs.requireCurrentDraft(session,draft);UUID production=(UUID)p.get("id");
         var request=json.createObjectNode().put("project_id",p.get("project_id").toString()).put("requirement_id",production.toString()).put("scope_id",p.get("scope_id").toString())
             .put("validation_id",draft.validationId()).put("draft_hash",draft.draftHash()).put("requirements_hash",draft.requirementsHash());
         request.set("requirements_sources",runs.parse(p.get("requirements_sources_json")));

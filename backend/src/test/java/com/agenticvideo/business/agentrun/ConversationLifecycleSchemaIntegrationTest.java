@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ConversationLifecycleSchemaIntegrationTest {
     @Container static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:18.6-bookworm");
     private static JdbcTemplate db;
-    private static UUID legacyProduction, legacyTask;
+    private static UUID legacyProduction, legacyTask,legacyPreview,legacyArtifact;
 
     @BeforeAll static void upgradeExistingDatabase() {
         var source = new DriverManagerDataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
@@ -26,6 +26,16 @@ class ConversationLifecycleSchemaIntegrationTest {
         db.update("INSERT INTO edit_productions(id,project_id,scope_id) VALUES (?,?,?)",legacyProduction,fixture.project(),fixture.scope());
         db.update("INSERT INTO tasks(id,project_id,type,input_json) VALUES (?,?,'AGENT_TURN','{}')",legacyTask,fixture.project());
         db.update("INSERT INTO conversation_execution_requests(task_id,requirement_id,request_json,input_json) VALUES (?,?,'{}','{}')",legacyTask,UUID.randomUUID());
+        UUID plan=UUID.randomUUID(),revision=UUID.randomUUID(),output=UUID.randomUUID(),task=UUID.randomUUID(),attempt=UUID.randomUUID();
+        legacyPreview=UUID.randomUUID();legacyArtifact=UUID.randomUUID();
+        db.update("INSERT INTO edit_plans(id,project_id,title,next_revision_number) VALUES (?,?,'legacy',2)",plan,fixture.project());
+        db.update("INSERT INTO plan_revisions(id,project_id,plan_id,revision_number,source_task_id,content_json) VALUES (?,?,?,1,?,'{}')",revision,fixture.project(),plan,legacyTask);
+        db.update("INSERT INTO tasks(id,project_id,type,input_json) VALUES (?,?,'PREVIEW_RENDER','{}')",task,fixture.project());
+        db.update("INSERT INTO task_attempts(id,task_id,attempt_number,executor_id,claim_request_id,lease_token_hash,lease_expires_at) VALUES (?,?,1,'fixture',?,'fixture',now())",attempt,task,UUID.randomUUID());
+        db.update("INSERT INTO render_requests(id,project_id,revision_id,output_id,kind,config_json,renderer_version,cache_key,task_id) VALUES (?,?,?,?,'PREVIEW','{}','legacy',?,?)",legacyPreview,fixture.project(),revision,output,"f".repeat(64),task);
+        db.update("INSERT INTO artifacts(id,project_id,request_id,revision_id,output_id,task_id,attempt_id,kind,object_key) VALUES (?,?,?,?,?,?,?,'PREVIEW',?)",legacyArtifact,fixture.project(),legacyPreview,revision,output,task,attempt,legacyArtifact.toString());
+        db.update("UPDATE render_requests SET artifact_id=? WHERE id=?",legacyArtifact,legacyPreview);
+        db.update("INSERT INTO preview_intents(project_id,idempotency_key,revision_id,request_json,render_request_id,response_json) VALUES (?,'legacy',?,'{}',?,'{}')",fixture.project(),revision,legacyPreview);
         Flyway.configure().dataSource(source).load().migrate();
         Flyway.configure().dataSource(source).load().validate();
     }
@@ -72,6 +82,13 @@ class ConversationLifecycleSchemaIntegrationTest {
         assertThrows(DataIntegrityViolationException.class, () -> db.update("UPDATE conversation_execution_requests SET schema_version=NULL WHERE task_id=?",r.task()));
         assertThrows(DataIntegrityViolationException.class, () -> db.update("UPDATE conversation_execution_requests SET input_hash='bad' WHERE task_id=?",r.task()));
     }
+    @Test void legacyVersionMediaSurvivesUpgradeWithExclusiveSourceConstraints() {
+        assertNotNull(db.queryForObject("SELECT revision_id FROM render_requests WHERE id=?",UUID.class,legacyPreview));
+        assertNotNull(db.queryForObject("SELECT revision_id FROM artifacts WHERE id=?",UUID.class,legacyArtifact));
+        assertThrows(DataIntegrityViolationException.class,()->db.update("UPDATE render_requests SET output_id=NULL WHERE id=?",legacyPreview));
+        assertThrows(DataIntegrityViolationException.class,()->db.update("UPDATE render_requests SET source_draft_message_id=? WHERE id=?",UUID.randomUUID(),legacyPreview));
+        assertThrows(DataIntegrityViolationException.class,()->db.update("UPDATE artifacts SET output_id=NULL WHERE id=?",legacyArtifact));
+    }
     @Test void currentProductionAndRunCannotCrossProjectOrConversation() {
         var c=context(); var other=context(); var p=production(c); var foreign=production(other);
         assertThrows(DataIntegrityViolationException.class, () -> db.update("UPDATE conversations SET current_production_id=? WHERE id=?",foreign,c.conversation()));
@@ -101,6 +118,24 @@ class ConversationLifecycleSchemaIntegrationTest {
                 INSERT INTO conversation_edit_drafts(message_id,conversation_id,project_id,production_id,validation_id,source_task_id,draft_hash,requirements_hash,edit_generation)
                 VALUES (?,?,?,?,?,?,?,?,0)
                 """,message,c.conversation(),c.project(),p,validation,r.task(),"a".repeat(64),"b".repeat(64));
+        UUID preview=UUID.randomUUID(),mediaTask=UUID.randomUUID(),attempt=UUID.randomUUID(),artifact=UUID.randomUUID();
+        db.update("INSERT INTO tasks(id,project_id,type,input_json) VALUES (?,?,'PREVIEW_RENDER','{}')",mediaTask,c.project());
+        db.update("INSERT INTO render_requests(id,project_id,kind,config_json,renderer_version,cache_key,task_id,conversation_id,source_draft_message_id,production_id,validation_id,draft_hash,requirements_hash,output_key) VALUES (?,?,'PREVIEW','{}','fixture',?,?,?,?,?,?,?,?,'out-1')",preview,c.project(),"c".repeat(64),mediaTask,c.conversation(),message,p,validation,"a".repeat(64),"b".repeat(64));
+        for(String column:java.util.List.of("conversation_id","source_draft_message_id","production_id","validation_id"))
+            assertThrows(DataIntegrityViolationException.class,()->db.update("UPDATE render_requests SET "+column+"=? WHERE id=?",UUID.randomUUID(),preview));
+        for(String column:java.util.List.of("draft_hash","requirements_hash"))
+            assertThrows(DataIntegrityViolationException.class,()->db.update("UPDATE render_requests SET "+column+"=? WHERE id=?","d".repeat(64),preview));
+        assertThrows(DataIntegrityViolationException.class,()->db.update("UPDATE render_requests SET kind='EXPORT' WHERE id=?",preview));
+        assertThrows(DataIntegrityViolationException.class,()->db.update("UPDATE render_requests SET validation_id=NULL WHERE id=?",preview));
+        assertThrows(DataIntegrityViolationException.class,()->db.update("UPDATE render_requests SET revision_id=? WHERE id=?",UUID.randomUUID(),preview));
+        db.update("INSERT INTO task_attempts(id,task_id,attempt_number,executor_id,claim_request_id,lease_token_hash,lease_expires_at) VALUES (?,?,1,'fixture',?,'fixture',now())",attempt,mediaTask,UUID.randomUUID());
+        db.update("INSERT INTO artifacts(id,project_id,request_id,source_draft_message_id,output_key,task_id,attempt_id,kind,object_key) VALUES (?,?,?,?,'out-1',?,?,'PREVIEW',?)",artifact,c.project(),preview,message,mediaTask,attempt,artifact.toString());
+        assertThrows(DataIntegrityViolationException.class,()->db.update("UPDATE artifacts SET output_key='out-2' WHERE id=?",artifact));
+        assertThrows(DataIntegrityViolationException.class,()->db.update("UPDATE artifacts SET source_draft_message_id=? WHERE id=?",UUID.randomUUID(),artifact));
+        assertThrows(DataIntegrityViolationException.class,()->db.update("UPDATE artifacts SET task_id=? WHERE id=?",r.task(),artifact));
+        assertThrows(DataIntegrityViolationException.class,()->db.update("UPDATE artifacts SET kind='EXPORT' WHERE id=?",artifact));
+        db.update("INSERT INTO preview_intents(project_id,idempotency_key,source_draft_message_id,request_json,render_request_id,response_json) VALUES (?,'draft',?,'{}',?,'{}')",c.project(),message,preview);
+        assertThrows(DataIntegrityViolationException.class,()->db.update("UPDATE preview_intents SET source_draft_message_id=NULL WHERE render_request_id=?",preview));
         assertThrows(DataIntegrityViolationException.class, () -> db.update("UPDATE conversation_edit_drafts SET source_task_id=? WHERE message_id=?",UUID.randomUUID(),message));
         assertThrows(DataIntegrityViolationException.class, () -> db.update("UPDATE conversation_edit_drafts SET production_id=? WHERE message_id=?",other,message));
         assertThrows(DataIntegrityViolationException.class, () -> db.update("UPDATE conversation_edit_drafts SET draft_hash=? WHERE message_id=?","c".repeat(64),message));

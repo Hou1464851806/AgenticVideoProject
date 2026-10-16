@@ -91,14 +91,9 @@ public class PreviewRequests {
                     if(mode==Mode.PUBLIC)throw new ResponseStatusException(CONFLICT,"方案依赖的原素材不可用");
                     validSources=false;
                 }
-                sources.put(asset,Map.of("assetId",asset,"objectKey",row.get("object_key"),"sizeBytes",row.get("byte_size"),"sha256",row.get("sha256"),
-                        "durationMs",row.get("duration_ms"),"mediaInfo",parse(row.get("media_info_json")),"timeMapping",parse(row.get("time_mapping_json"))));
+                sources.put(asset,source(row));
             }
-            boolean portrait="PORTRAIT_720".equals(output.path("render").path("profile").asText());
-            var configuration=Map.ofEntries(Map.entry("profile","LOW_360"),Map.entry("width",portrait?360:640),Map.entry("height",portrait?640:360),
-                    Map.entry("framesPerSecond",30),Map.entry("container","mp4"),Map.entry("videoCodec","h264"),Map.entry("audioCodec","aac"),
-                    Map.entry("fit","contain"),Map.entry("videoCrf",28),Map.entry("videoMaxRate",800000),Map.entry("audioBitrate",64000),
-                    Map.entry("audioSampleRate",48000),Map.entry("audioChannels",2),Map.entry("subtitleFont","Noto Sans CJK SC"),Map.entry("fontPackage","20230817+repack1-3"));
+            var configuration=lowConfiguration(output);
             String cacheKey=digest(encode(Map.of("revisionId",revisionId,"outputId",outputId,"configuration",configuration,"rendererVersion",RENDERER_VERSION,
                     "sources",sources.values().stream().map(source -> Map.of("assetId",source.get("assetId"),"sha256",source.get("sha256"))).toList())));
             var existing=database.queryForList("SELECT r.*,t.status FROM render_requests r JOIN tasks t ON t.id=r.task_id WHERE r.cache_key=? AND r.kind='PREVIEW' AND t.type='PREVIEW_RENDER' ORDER BY r.created_at DESC,r.id DESC"+(mode==Mode.PUBLIC?" LIMIT 1":""),cacheKey);
@@ -149,8 +144,15 @@ public class PreviewRequests {
     public Object read(UUID requestId) {
         var request=requestRow(requestId);
         String status=database.queryForObject("SELECT status FROM tasks WHERE id=?",String.class,request.get("task_id"));
-        var result=new LinkedHashMap<String,Object>(Map.of("requestId",requestId,"revisionId",request.get("revision_id"),"outputId",request.get("output_id"),"taskId",request.get("task_id"),
+        var result=new LinkedHashMap<String,Object>(Map.of("requestId",requestId,"taskId",request.get("task_id"),
                 "kind",request.get("kind"),"status",status,"configuration",parse(request.get("config_json"))));
+        if(request.get("revision_id")!=null) {
+            result.put("revisionId",request.get("revision_id"));result.put("outputId",request.get("output_id"));
+        } else {
+            result.put("conversationId",request.get("conversation_id"));result.put("sourceDraftMessageId",request.get("source_draft_message_id"));
+            result.put("productionId",request.get("production_id"));result.put("validationId",request.get("validation_id"));
+            result.put("draftHash",request.get("draft_hash"));result.put("requirementsHash",request.get("requirements_hash"));result.put("outputKey",request.get("output_key"));
+        }
         result.put("createdAt",((java.sql.Timestamp)request.get("created_at")).toInstant().toString());
         if(request.get("confirmation_id")!=null)result.put("confirmationId",request.get("confirmation_id"));
         if(request.get("artifact_id")!=null)result.put("artifactId",request.get("artifact_id"));
@@ -166,7 +168,7 @@ public class PreviewRequests {
     }
     /** The internal CLI cannot use this boundary to inspect EXPORT or other task types. */
     public Map<String,Object> previewRow(UUID requestId) {
-        var rows=database.queryForList("SELECT r.*,t.status,t.result_json FROM render_requests r JOIN tasks t ON t.id=r.task_id WHERE r.id=? AND r.kind='PREVIEW' AND t.type='PREVIEW_RENDER'",requestId);
+        var rows=database.queryForList("SELECT r.*,t.status,t.result_json FROM render_requests r JOIN tasks t ON t.id=r.task_id WHERE r.id=? AND r.revision_id IS NOT NULL AND r.kind='PREVIEW' AND t.type='PREVIEW_RENDER'",requestId);
         if(rows.isEmpty())throw new Rejected(NOT_FOUND,"PREVIEW_NOT_FOUND","预览请求不存在");
         return rows.get(0);
     }
@@ -195,6 +197,17 @@ public class PreviewRequests {
         }
         return new PreviewContracts.Result(requestId,(UUID)row.get("project_id"),(UUID)row.get("revision_id"),(UUID)row.get("output_id"),(UUID)row.get("task_id"),
                 status,((java.sql.Timestamp)row.get("created_at")).toInstant().toString(),artifact,playback,retry,error);
+    }
+    static Map<String,Object> lowConfiguration(JsonNode output) {
+        boolean portrait="PORTRAIT_720".equals(output.path("render").path("profile").asText());
+        return Map.ofEntries(Map.entry("profile","LOW_360"),Map.entry("width",portrait?360:640),Map.entry("height",portrait?640:360),
+                    Map.entry("framesPerSecond",30),Map.entry("container","mp4"),Map.entry("videoCodec","h264"),Map.entry("audioCodec","aac"),
+                    Map.entry("fit","contain"),Map.entry("videoCrf",28),Map.entry("videoMaxRate",800000),Map.entry("audioBitrate",64000),
+                    Map.entry("audioSampleRate",48000),Map.entry("audioChannels",2),Map.entry("subtitleFont","Noto Sans CJK SC"),Map.entry("fontPackage","20230817+repack1-3"));
+    }
+    Map<String,Object> source(Map<String,Object> row) {
+        return Map.of("assetId",row.get("id"),"objectKey",row.get("object_key"),"sizeBytes",row.get("byte_size"),"sha256",row.get("sha256"),
+                "durationMs",row.get("duration_ms"),"mediaInfo",parse(row.get("media_info_json")),"timeMapping",parse(row.get("time_mapping_json")));
     }
     private JsonNode parse(Object value) {try{return json.readTree(value.toString());}catch(java.io.IOException invalid){throw new IllegalStateException(invalid);}}
     private String encode(Object value) {try{return json.writer().with(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS).writeValueAsString(value);}catch(java.io.IOException invalid){throw new IllegalStateException(invalid);}}

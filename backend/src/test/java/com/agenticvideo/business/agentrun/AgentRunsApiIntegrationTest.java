@@ -160,6 +160,117 @@ class AgentRunsApiIntegrationTest {
         assertTrue(checked.path("data").path("valid").asBoolean(),checked.toString());
         return json.valueToTree(Map.of("messageId",UUID.randomUUID(),"validationId",checked.path("data").path("validation_id").asText(),"editGeneration",binding.path("production").path("editGeneration").asLong(),"draftHash",args.get("draft_hash"),"requirementsHash",args.get("requirements_hash")));
     }
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    com.agenticvideo.business.upload.MultipartStorage storage;
+
+    @Test void draftPreviewFreezesValidatedContentWithoutSavingAndReplaysAfterModification() throws Exception {
+        org.mockito.Mockito.when(storage.objectSize(org.mockito.ArgumentMatchers.anyString())).thenReturn(1L);
+        var media=media();var run=send("制作主题短片","preview-production");var c=claim(run);
+        var b=parsed(run,c,"DRAFT","NEW_PRODUCTION",Map.of("topic","主题"),null,200);
+        var draft=validatedDraft(run,c,b,media,"preview-validation");
+        publish(run,c,result(b,"DRAFT_READY","草稿 A",draft,null,null),200);
+        var body=Map.of("draft",draft,"outputKey","out-1","previewProfile","LOW_360");
+        var preview=browser("/drafts/previews",body,"preview",202);
+        assertTrue(preview.path("revisionId").isMissingNode());
+        assertEquals(draft.path("messageId"),preview.path("sourceDraftMessageId"));
+        assertEquals("out-1",preview.path("outputKey").asText());
+        assertEquals(preview.path("requestId"),browser("/drafts/previews",body,"reuse",202).path("requestId"));
+        UUID task=UUID.fromString(preview.path("taskId").asText());
+        String frozen=db.queryForObject("SELECT input_json::text FROM tasks WHERE id=?",String.class,task);
+        var input=json.readTree(frozen);
+        assertEquals("先确定主题。",input.path("output").path("subtitles").path("cues").get(0).path("text").asText());
+        assertFalse(input.has("revisionId"));assertFalse(input.path("output").has("outputId"));
+        assertEquals(0,db.queryForObject("SELECT count(*) FROM plan_revisions WHERE project_id=?",Integer.class,project));
+        var modification=send("修改主题","modify-preview");var mc=claim(modification);
+        parsed(modification,mc,"DRAFT","CONTINUE_PRODUCTION",Map.of("topic","新主题"),null,200);
+        assertEquals(preview,browser("/drafts/previews",body,"preview",202));
+        browser("/drafts/previews",body,"obsolete",409);
+        assertEquals(frozen,db.queryForObject("SELECT input_json::text FROM tasks WHERE id=?",String.class,task));
+    }
+
+    @Autowired com.agenticvideo.business.task.TaskExecution mediaTasks;
+
+    @Test void completedHistoricalPreviewPublishesOnePlaybackMessageAndDoesNotRegenerateAfterLoss() throws Exception {
+        org.mockito.Mockito.when(storage.objectSize(org.mockito.ArgumentMatchers.anyString())).thenReturn(1L);
+        org.mockito.Mockito.when(storage.playbackUrl(org.mockito.ArgumentMatchers.anyString())).thenReturn("https://storage.invalid/renewed-access");
+        var m=media();var run=send("制作主题","playable");var c=claim(run);
+        var b=parsed(run,c,"DRAFT","NEW_PRODUCTION",Map.of("topic","主题"),null,200);
+        var d=validatedDraft(run,c,b,m,"play-validation");publish(run,c,result(b,"DRAFT_READY","A",d,null,null),200);
+        var body=Map.of("draft",d,"outputKey","out-1","previewProfile","LOW_360");
+        var preview=browser("/drafts/previews",body,"play",202);
+        var local=mediaTasks.claimLocal(UUID.fromString(preview.path("taskId").asText()));
+        // Accepting while media runs keeps its original draft source.
+        browser("/drafts/accept",d,"accept-during-preview",200);
+        var manifest=Map.of("artifactId",local.input().path("artifactId").asText(),"objectKey",local.input().path("artifactObjectKey").asText(),"byteSize",1,"sha256","b".repeat(64),"durationMs",5000,
+                "mediaInfo",Map.of("streams",List.of(Map.of("codec_type","video","codec_name","h264","width",640,"height",360),Map.of("codec_type","audio","codec_name","aac","channels",2,"sample_rate","48000"))));
+        db.execute("ALTER TABLE execution_reports ADD CONSTRAINT reject_preview_commit CHECK (task_id <> '"+local.taskId()+"'::uuid OR report_kind <> 'COMPLETE') NOT VALID");
+        try {assertThrows(org.springframework.dao.DataIntegrityViolationException.class,()->mediaTasks.completeLocal(local,"PREVIEW_RENDERED",manifest));}
+        finally {db.execute("ALTER TABLE execution_reports DROP CONSTRAINT reject_preview_commit");}
+        assertEquals("RUNNING",mediaTasks.read(local.taskId()).get("status"));
+        assertEquals("STAGED",db.queryForObject("SELECT state FROM artifacts WHERE task_id=?",String.class,local.taskId()));
+        assertEquals(0,db.queryForObject("SELECT count(*) FROM conversation_messages WHERE source_task_id=?",Integer.class,local.taskId()));
+        mediaTasks.completeLocal(local,"PREVIEW_RENDERED",manifest);
+        mediaTasks.completeLocal(local,"PREVIEW_RENDERED",manifest);
+        var snapshot=response(http.perform(get("/api/v1/conversations/"+conversation+"/snapshot").with(user(owner))),200);
+        var messages=new ArrayList<JsonNode>();
+        for(var item:snapshot.path("items"))for(var ref:item.path("references"))if("PREVIEW_RESULT".equals(ref.path("type").asText()))messages.add(ref);
+        assertEquals(1,messages.size());assertEquals(d.path("messageId"),messages.get(0).path("sourceDraftMessageId"));
+        String artifact=messages.get(0).path("id").asText();
+        assertEquals(preview.path("requestId"),messages.get(0).path("requestId"));
+        assertEquals("SUCCEEDED",snapshot.path("previews").path("items").get(0).path("status").asText());
+        assertEquals(1,db.queryForObject("SELECT count(*) FROM public_events WHERE project_id=? AND type='assistant.completed' AND body->>'taskId'=?",Integer.class,project,preview.path("taskId").asText()));
+        for(int i=0;i<2;i++)response(http.perform(post("/api/v1/artifacts/"+artifact+"/playback-access").with(user(owner)).with(csrf())),200);
+        org.mockito.Mockito.when(storage.objectSize(local.input().path("artifactObjectKey").asText())).thenReturn(null);
+        response(http.perform(post("/api/v1/artifacts/"+artifact+"/playback-access").with(user(owner)).with(csrf())),410);
+        browser("/drafts/previews/"+preview.path("requestId").asText()+"/retry",Map.of(),"lost-historical",409);
+        assertEquals(preview,browser("/drafts/previews",body,"play",202));
+        browser("/drafts/previews",body,"new-frozen",409);
+        assertEquals(1,db.queryForObject("SELECT count(*) FROM render_requests WHERE conversation_id=?",Integer.class,conversation));
+    }
+
+    @Test void explicitDraftRetryHasOneSuccessorAndOwnershipAndInputAreEnforced() throws Exception {
+        org.mockito.Mockito.when(storage.objectSize(org.mockito.ArgumentMatchers.anyString())).thenReturn(1L);
+        var m=media();var run=send("制作主题","retry-preview");var c=claim(run);var b=parsed(run,c,"DRAFT","NEW_PRODUCTION",Map.of("topic","主题"),null,200);
+        var d=validatedDraft(run,c,b,m,"retry-validation");publish(run,c,result(b,"DRAFT_READY","A",d,null,null),200);
+        var body=Map.of("draft",d,"outputKey","out-1","previewProfile","LOW_360");
+        var preview=browser("/drafts/previews",body,"retry-original",202);
+        mediaTasks.cancel(UUID.fromString(preview.path("taskId").asText()));
+        assertEquals(preview,browser("/drafts/previews",body,"retry-original",202));
+        browser("/drafts/previews",body,"new-key-is-not-retry",409);
+        var retry=browser("/drafts/previews/"+preview.path("requestId").asText()+"/retry",Map.of(),"retry-1",202);
+        assertNotEquals(preview.path("taskId"),retry.path("taskId"));
+        mediaTasks.cancel(UUID.fromString(retry.path("taskId").asText()));
+        assertEquals(retry.path("requestId"),browser("/drafts/previews/"+preview.path("requestId").asText()+"/retry",Map.of(),"retry-replay",202).path("requestId"));
+        browser("/drafts/previews",Map.of("draft",d,"outputKey","foreign","previewProfile","LOW_360"),"retry-original",409);
+        browser("/drafts/previews",Map.of("draft",d,"outputKey","foreign","previewProfile","LOW_360"),"missing-output",404);
+        browser("/drafts/previews",Map.of("draft",d,"outputKey","out-1","previewProfile","HD_720"),"wrong-profile",400);
+        var forged=d.deepCopy();((com.fasterxml.jackson.databind.node.ObjectNode)forged).put("draftHash","c".repeat(64));
+        browser("/drafts/previews",Map.of("draft",forged,"outputKey","out-1","previewProfile","LOW_360"),"forged",409);
+        UUID outsider=UUID.randomUUID();db.update("INSERT INTO users(id,normalized_username,password_hash) VALUES (?,?,'fixture')",outsider,outsider.toString());
+        response(http.perform(post("/api/v1/conversations/"+conversation+"/drafts/previews").with(user(outsider.toString())).with(csrf()).header("Idempotency-Key","outsider").contentType("application/json").content(json.writeValueAsBytes(body))),404);
+        UUID other=UUID.randomUUID();db.update("INSERT INTO conversations(id,project_id,title) VALUES (?,?,'other')",other,project);
+        response(http.perform(post("/api/v1/conversations/"+other+"/drafts/previews/"+preview.path("requestId").asText()+"/retry").with(user(owner)).with(csrf())),404);
+        db.update("UPDATE assets SET sha256=? WHERE id=?","c".repeat(64),m.asset());
+        browser("/drafts/previews",body,"source-invalid",409);
+        assertEquals(preview,browser("/drafts/previews",body,"retry-original",202));
+        db.update("UPDATE assets SET sha256=? WHERE id=?","b".repeat(64),m.asset());
+        var next=send("修改主题","retry-obsolete");var nc=claim(next);parsed(next,nc,"DRAFT","CONTINUE_PRODUCTION",Map.of("topic","新主题"),null,200);
+        browser("/drafts/previews/"+retry.path("requestId").asText()+"/retry",Map.of(),"reject-later",409);
+        assertEquals(retry.path("requestId"),browser("/drafts/previews/"+preview.path("requestId").asText()+"/retry",Map.of(),"still-original-successor",202).path("requestId"));
+    }
+
+    @Test void draftPreviewRejectsClientContentAndFractionalGenerationAtHttpBoundary() throws Exception {
+        org.mockito.Mockito.when(storage.objectSize(org.mockito.ArgumentMatchers.anyString())).thenReturn(1L);
+        var m=media();var run=send("制作主题","boundary-preview");var c=claim(run);var b=parsed(run,c,"DRAFT","NEW_PRODUCTION",Map.of("topic","主题"),null,200);
+        var d=validatedDraft(run,c,b,m,"boundary-validation");publish(run,c,result(b,"DRAFT_READY","A",d,null,null),200);
+        var body=json.createObjectNode().put("outputKey","out-1").put("previewProfile","LOW_360");body.set("draft",d);
+        body.putObject("output").put("durationMs",1);
+        browser("/drafts/previews",body,"client-content",400);
+        body.remove("output");((com.fasterxml.jackson.databind.node.ObjectNode)body.path("draft")).put("editGeneration",1.5);
+        browser("/drafts/previews",body,"fractional-generation",400);
+        assertEquals(0,db.queryForObject("SELECT count(*) FROM render_requests WHERE conversation_id=?",Integer.class,conversation));
+    }
+
     @Test void currentDraftSurvivesDiscussionAndAcceptanceCreatesAndConfirmsOnlyOneVersion() throws Exception {
         var media=media();var run=send("制作主题短片","production");var claim=claim(run);
         var binding=parsed(run,claim,"DRAFT","NEW_PRODUCTION",Map.of("topic","主题"),null,200);

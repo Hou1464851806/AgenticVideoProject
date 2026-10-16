@@ -18,6 +18,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class ProjectRecovery {
     @org.springframework.beans.factory.annotation.Autowired
     private com.agenticvideo.business.agentrun.AgentRuns agentRuns;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.agenticvideo.business.render.DraftPreviews draftPreviews;
     private final ConversationQuestions questions;
     private final ConversationBriefs briefs;
     private final JdbcTemplate database;
@@ -64,6 +66,7 @@ public class ProjectRecovery {
                         conversation.put("assetIds", parse(row.getString("asset_ids_json")));
                         conversation.put("brief",briefs.snapshot(id));
                         conversation.put("agent",agentRuns.snapshot(id));
+                        conversation.put("previews",draftPreviews.list(id));
                         conversation.put("questions",questions.list(id));
                         conversation.put("items", database.query("SELECT * FROM (SELECT id,message_seq,role,content,references_json FROM conversation_messages WHERE conversation_id=? ORDER BY message_seq DESC LIMIT 100) m ORDER BY message_seq",
                                 (message, n) -> Map.of("id", message.getObject("id", UUID.class), "messageSeq", message.getLong("message_seq"), "role", message.getString("role"), "content", message.getString("content"), "references", parse(message.getString("references_json"))), id));
