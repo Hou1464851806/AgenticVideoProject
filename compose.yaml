@@ -109,9 +109,36 @@ services:
       retries: 30
     mem_limit: 1280m
     cpus: 2
+  agent-worker:
+    build:
+      context: .
+      dockerfile: agent-service/Dockerfile
+    platform: linux/arm64
+    entrypoint: [python, -m, agent_service.worker]
+    environment:
+      JAVA_URL: http://business-api:8080
+      INTERNAL_WORKER_TOKEN: ${INTERNAL_WORKER_TOKEN}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: agentic-worker
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      AGENT_DATA_DIRECTORY: /state
+    volumes:
+      - agent_state:/state
+    depends_on:
+      business-api:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    mem_limit: 768m
+    cpus: 1
+
 volumes:
   qdrant_data:
   postgres_data:
   silo_data:
   rabbitmq_data:
   worker_work:
+  agent_state:

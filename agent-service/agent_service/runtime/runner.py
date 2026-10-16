@@ -257,6 +257,8 @@ class Agent:
                             tracer.result(self._view(thread_id, observed.values, bool(observed.interrupts)))
                     except (Cancelled, LimitReached, SubmissionUnknown) as error:
                         outcome = {"status": "CANCELLED", "content": str(error), "mock": self.mock} if isinstance(error, Cancelled) else incomplete(str(error), mock=self.mock)
+                        outcome["failure"] = {"code": "CANCELLED" if isinstance(error, Cancelled) else "PAID_SUBMISSION_UNKNOWN" if isinstance(error, SubmissionUnknown) else "BUDGET_EXHAUSTED",
+                                              "message": str(error), "recoverable": False}
                         await graph.aupdate_state(config, {"outcome": outcome, "waiting": None}, as_node="finalize")
                     snapshot = await graph.aget_state(config)
                     status = "WAITING" if snapshot.interrupts else (snapshot.values.get("outcome") or {}).get("status", "FAILED")

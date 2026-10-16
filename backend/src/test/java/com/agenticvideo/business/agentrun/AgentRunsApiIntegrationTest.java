@@ -75,6 +75,53 @@ class AgentRunsApiIntegrationTest {
         assertEquals(0,db.queryForObject("SELECT count(*) FROM plan_revisions WHERE project_id=?",Integer.class,project));
         assertEquals(410,responseStatus(post("/internal/v1/tasks/"+run.path("taskId").asText()+"/claim")));
     }
+    @Autowired AgentRunRecovery recovery;
+    @Test void expiredLeaseCreatesNewAttemptAndRejectsLateReports() throws Exception {
+        var run=send("讨论主线","recover");var first=claim(run);
+        var binding=parsed(run,first,"DISCUSS","INDEPENDENT",Map.of(),null,200);
+        db.update("UPDATE task_attempts SET lease_expires_at=now()-interval '1 second' WHERE id=?",UUID.fromString(first.path("attemptId").asText()));
+        recovery.recover();
+        var second=claim(run);
+        assertNotEquals(first.path("attemptId"),second.path("attemptId"));
+        assertEquals(binding,second.path("binding"));
+        assertEquals(first.path("input"),second.path("input"));
+        publish(run,first,result(binding,"ANSWER","迟到",null,null,null),409);
+        publish(run,second,result(binding,"ANSWER","恢复结果",null,null,null),200);
+        assertEquals(2,db.queryForObject("SELECT count(*) FROM task_attempts WHERE task_id=?",Integer.class,UUID.fromString(run.path("taskId").asText())));
+    }
+    @Test void explicitRetryRetainsOriginalExecutionAndReplaysSuccessor() throws Exception {
+        var run=send("讨论主线","retry-source");var first=claim(run);
+        var binding=parsed(run,first,"DISCUSS","INDEPENDENT",Map.of(),null,200);
+        var failure=json.valueToTree(Map.of("code","EXECUTION_INTERRUPTED","message","可恢复中断","recoverable",true));
+        publish(run,first,result(binding,"FAILED","可恢复中断",null,null,failure),200);
+        var retry=browser("/tasks/"+run.path("taskId").asText()+"/retry",Map.of(),"retry",202);
+        assertNotEquals(run.path("taskId"),retry.path("taskId"));
+        assertEquals(retry,browser("/tasks/"+run.path("taskId").asText()+"/retry",Map.of(),"replay-other-key",202));
+        var resumed=claim(retry);
+        assertEquals(first.path("input"),resumed.path("execution").path("input"));
+        assertEquals(binding,resumed.path("execution").path("binding"));
+        assertEquals(binding.path("identity").path("executionId"),resumed.path("binding").path("identity").path("executionId"));
+        publish(retry,resumed,result(resumed.path("binding"),"ANSWER","沿原执行完成",null,null,null),200);
+        assertEquals("FAILED",db.queryForObject("SELECT status FROM tasks WHERE id=?",String.class,UUID.fromString(run.path("taskId").asText())));
+        assertEquals(retry,browser("/tasks/"+run.path("taskId").asText()+"/retry",Map.of(),"after-success",202));
+    }
+    @Test void retryCannotForceUnknownPaymentOrWriteAfterProductionAdvances() throws Exception {
+        var uncertain=send("讨论主线","unknown");var uc=claim(uncertain);
+        var ub=parsed(uncertain,uc,"DISCUSS","INDEPENDENT",Map.of(),null,200);
+        publish(uncertain,uc,result(ub,"INCOMPLETE","提交不确定",null,null,json.valueToTree(Map.of("code","PAID_SUBMISSION_UNKNOWN","message","提交不确定","recoverable",false))),200);
+        browser("/tasks/"+uncertain.path("taskId").asText()+"/retry",Map.of(),"reject-unknown",409);
+        browser("/tasks/"+uncertain.path("taskId").asText()+"/retry",Map.of("acknowledgeUnknownCost",true),"reject-force",409);
+        media();var run=send("制作短片","old-production");var first=claim(run);
+        var binding=parsed(run,first,"DRAFT","NEW_PRODUCTION",Map.of("topic","主题"),null,200);
+        publish(run,first,result(binding,"FAILED","可恢复中断",null,null,json.valueToTree(Map.of("code","EXECUTION_INTERRUPTED","message","可恢复中断","recoverable",true))),200);
+        var newer=send("修改主题","newer");var nc=claim(newer);
+        var nb=parsed(newer,nc,"DRAFT","CONTINUE_PRODUCTION",Map.of("topic","新主题"),null,200);
+        publish(newer,nc,result(nb,"INCOMPLETE","未完成",null,null,json.valueToTree(Map.of("code","CORE_INCOMPLETE","message","未完成","recoverable",false))),200);
+        browser("/tasks/"+run.path("taskId").asText()+"/retry",Map.of(),"reject-obsolete",409);
+        UUID other=UUID.randomUUID();db.update("INSERT INTO conversations(id,project_id,title) VALUES (?,?,'other')",other,project);
+        UUID originalConversation=conversation;conversation=other;
+        try {browser("/tasks/"+run.path("taskId").asText()+"/retry",Map.of(),"wrong-conversation",404);}finally{conversation=originalConversation;}
+    }
     record Media(UUID asset,UUID evidence) {}
     Media media() {
         UUID upload=UUID.randomUUID(),asset=UUID.randomUUID(),analysis=UUID.randomUUID(),task=UUID.randomUUID(),model=UUID.randomUUID(),evidence=UUID.randomUUID();String hash="b".repeat(64);

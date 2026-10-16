@@ -3,7 +3,15 @@
 M4 步骤 1～3 已接通独立的 `agent_service.preview` HTTP 客户端和五个 CLI 预览命令；Java/Python 共用契约样例。步骤 4 真实视频／故障自动验收及用户完整观看试听、步骤 5 两轴审查、Java/Python 完整非付费回归及后端打包均已通过，M4 已收尾。证据与限制见 [M4 实施记录](../docs/verification/java-tools-m4.md)。
 
 
-本目录只负责 LangGraph 决策、条件、证据、草稿、等待、预算和恢复。工具通过 `ToolExecutor` 执行；可使用固定样本 Mock 或 `JavaToolExecutor` 的真实问答／剪辑草稿模式。ASR/VLM/Embedding 与索引由 Java 后端负责，旧 Python 分析适配器已删除。
+Agent 核心负责 LangGraph 决策、条件、证据、草稿、等待、预算和恢复；Worker 适配层单独负责 MQ 与 Java 租约协议。工具通过 `ToolExecutor` 执行；可使用固定样本 Mock 或 `JavaToolExecutor` 的真实问答／剪辑草稿模式。ASR/VLM/Embedding 与索引由 Java 后端负责，旧 Python 分析适配器已删除。
+
+## 浏览器 Agent Worker（对话生命周期第 4 步）
+
+新版任务使用独立 `agent.v1` 队列，经 `/internal/v1/agent-runs/**` 领取固定输入，调用 `Agent.prepare_run/execute_run`，通过当前 attempt／lease／编辑代次执行工具并发布结果。Java 是业务状态权威；Python SQLite 保留原 checkpoint、execution 与付费回执。legacy Agent／Worker 开关继续关闭。草稿预览和前端卡片仍待第 5～6 步，完整记录见[第 4 步验证与交接](../docs/verification/conversation-lifecycle-step4.md)。
+
+在根 `.env` 配置 `DEEPSEEK_API_KEY` 后，从仓库根目录执行 `docker compose up -d --build agent-worker`。Compose 注入 Java 地址、内部 Worker token 和 RabbitMQ 凭据；`agent_state:/state` 持久保存 SQLite。不要删除该卷、手工清理调用回执或扩容此服务；本地文件锁与 MQ exclusive consumer 保证单实例、prefetch=1。CLI 继续使用原入口及自己的数据目录。
+
+Worker 只在 Java 持久收束结果／等待／失败／取消后 ACK。网络中断关闭未 ACK 的通道；Java 租约过期收回旧 attempt 并重新通知，原执行恢复且不重置预算。确定模型回执复用，SUBMITTING／UNKNOWN 明确停止，不自动重付。仅确有未完成恢复点且无不确定付费回执的中断标为 `EXECUTION_INTERRUPTED` 并允许浏览器显式 retry；已经结束的 INCOMPLETE、预算耗尽和未知付费提交不提供重置入口。详细命令与受控验证见交接记录。
 
 ## 安装与运行
 

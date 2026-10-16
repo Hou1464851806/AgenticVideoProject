@@ -27,6 +27,12 @@ public class AgentRunResults {
         if(claimed.path("claimed").asBoolean()) {
             ((com.fasterxml.jackson.databind.node.ObjectNode)claimed).set("input",runs.parse(run.get("input_json")));
             ((com.fasterxml.jackson.databind.node.ObjectNode)claimed).set("binding",run.get("parsed_json")==null?json.nullNode():runs.parse(run.get("request_json")));
+            if(run.get("core_task_id")!=null) {
+                var core=db.queryForMap("SELECT input_json,request_json,parsed_json FROM conversation_execution_requests WHERE task_id=?",run.get("core_task_id"));
+                var execution=json.createObjectNode();execution.set("input",runs.parse(core.get("input_json")));
+                execution.set("binding",core.get("parsed_json")==null?json.nullNode():runs.parse(core.get("request_json")));
+                ((com.fasterxml.jackson.databind.node.ObjectNode)claimed).set("execution",execution);
+            }
         }
         return claimed;
     }
@@ -64,7 +70,7 @@ public class AgentRunResults {
         UUID message=result.draft()==null?UUID.randomUUID():UUID.fromString(result.draft().messageId());
         if(result.draft()!=null) {
             var d=result.draft();
-            var rows=db.queryForList("SELECT * FROM edit_draft_validations WHERE id=? AND production_id=? AND source_task_id=? AND edit_generation=? AND draft_hash=? AND requirements_hash=?",UUID.fromString(d.validationId()),run.get("production_id"),task,run.get("edit_generation"),d.draftHash(),d.requirementsHash());
+            var rows=db.queryForList("SELECT * FROM edit_draft_validations WHERE id=? AND production_id=? AND source_task_id IN (SELECT task_id FROM conversation_execution_requests WHERE task_id=? OR coalesce(core_task_id,task_id)=?) AND edit_generation=? AND draft_hash=? AND requirements_hash=?",UUID.fromString(d.validationId()),run.get("production_id"),task,run.get("core_task_id")==null?task:run.get("core_task_id"),run.get("edit_generation"),d.draftHash(),d.requirementsHash());
             if(rows.isEmpty()||rows.get(0).get("normalized_content_json")==null||!runs.parse(rows.get(0).get("result_json")).path("valid").asBoolean())throw conflict("草稿必须绑定当前执行的有效持久校验");
             var latest=db.queryForMap("SELECT id FROM edit_draft_validations WHERE production_id=? ORDER BY created_at DESC,id DESC LIMIT 1",run.get("production_id"));
             if(!UUID.fromString(d.validationId()).equals(latest.get("id")))throw conflict("该校验已经过期");
@@ -77,7 +83,7 @@ public class AgentRunResults {
         runs.append(message,(UUID)run.get("conversation_id"),"ASSISTANT",result.content(),refs,task);
         if(result.draft()!=null) {
             var d=result.draft();
-            db.update("INSERT INTO conversation_edit_drafts(message_id,conversation_id,project_id,production_id,validation_id,source_task_id,draft_hash,requirements_hash,edit_generation) VALUES (?,?,?,?,?,?,?,?,?)",message,run.get("conversation_id"),run.get("project_id"),run.get("production_id"),UUID.fromString(d.validationId()),task,d.draftHash(),d.requirementsHash(),d.editGeneration());
+            db.update("INSERT INTO conversation_edit_drafts(message_id,conversation_id,project_id,production_id,validation_id,source_task_id,draft_hash,requirements_hash,edit_generation) VALUES (?,?,?,?,?,?,?,?,?)",message,run.get("conversation_id"),run.get("project_id"),run.get("production_id"),UUID.fromString(d.validationId()),db.queryForObject("SELECT source_task_id FROM edit_draft_validations WHERE id=?",UUID.class,UUID.fromString(d.validationId())),d.draftHash(),d.requirementsHash(),d.editGeneration());
             db.update("UPDATE edit_productions SET current_draft_message_id=? WHERE id=?",message,run.get("production_id"));
         }
         String state=switch(result.status()){case ANSWER,DRAFT_READY -> "SUCCEEDED";case WAITING_INPUT -> "WAITING_INPUT";case CANCELLED -> "CANCELLED";case INCOMPLETE,FAILED -> "FAILED";};
@@ -86,6 +92,14 @@ public class AgentRunResults {
         db.update("UPDATE conversation_execution_requests SET result_json=?::jsonb WHERE task_id=?",body.toString(),task);
         db.update("INSERT INTO execution_reports(task_id,attempt_id,report_kind,producer_key,payload_json,outcome_json) VALUES (?,?,'AGENT_RESULT','result',?::jsonb,?::jsonb)",task,attempt,body.toString(),json.valueToTree(outcome(run,result)).toString());
         return outcome(run,result);
+    }
+    @Transactional public Object receipts(UUID task,UUID attempt,String token) {
+        var run=runs.locked(task);runs.requireAttempt(run,attempt,token,true);runs.requireRunning(run);runs.requireCurrent(run);
+        return db.query("SELECT c.scope_id,c.call_id,r.result_json FROM agent_run_tool_calls c JOIN question_tool_receipts r ON r.scope_id=c.scope_id AND r.call_id=c.call_id WHERE c.task_id=? ORDER BY c.call_id",(row,n)->{
+            var ids=new ArrayList<String>();var tool=runs.parse(row.getString("result_json"));
+            for(var record:tool.path("records"))ids.add(record.path("id").asText());
+            return new ScopeReceipt(row.getString("scope_id"),row.getString("call_id"),ids);
+        },task);
     }
     private Object outcome(Map<String,Object> run,RunResult result){return Map.of("taskId",run.get("task_id"),"status",result.status());}
 }

@@ -1,6 +1,6 @@
 # 对话会话、制作需求生命周期与浏览器接入
 
-日期：2026-10-16（Asia/Shanghai）。状态：CL-Q1～Q13 及完整设计均已由用户确认，作为本阶段实施基线；第 1 步实施记录见[身份与契约验证](verification/conversation-lifecycle-step1.md)，第 2 步见[Python 生命周期验证与交接](verification/conversation-lifecycle-step2.md)，第 3 步见[Java 事务验证与交接](verification/conversation-lifecycle-step3.md)，后续步骤待实施。本文记录已确认的产品行为、最小技术方案、实施顺序和验收标准。原设计确认轮仅维护文档，未开始实现；用户已另行授权实施第 1～3 步。本文保留设计轮的事实与历史核验，新增实现验证以步骤记录为准。
+日期：2026-10-16（Asia/Shanghai）。状态：CL-Q1～Q13 及完整设计均已由用户确认，作为本阶段实施基线；第 1 步实施记录见[身份与契约验证](verification/conversation-lifecycle-step1.md)，第 2 步见[Python 生命周期验证与交接](verification/conversation-lifecycle-step2.md)，第 3 步见[Java 事务验证与交接](verification/conversation-lifecycle-step3.md)，第 4 步见[Worker／MQ 验证与交接](verification/conversation-lifecycle-step4.md)，后续步骤待实施。本文记录已确认的产品行为、最小技术方案、实施顺序和验收标准。原设计确认轮仅维护文档，未开始实现；用户已另行授权实施第 1～4 步。本文保留设计轮的事实与历史核验，新增实现验证以步骤记录为准。
 
 ## 已确认目标
 

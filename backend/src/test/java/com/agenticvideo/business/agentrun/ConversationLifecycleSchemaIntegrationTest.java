@@ -119,6 +119,8 @@ class ConversationLifecycleSchemaIntegrationTest {
         assertThrows(DataIntegrityViolationException.class, () -> db.update("UPDATE conversation_questions SET execution_id=? WHERE task_id=?",UUID.randomUUID(),r.task()));
         assertThrows(DataIntegrityViolationException.class, () -> db.update("UPDATE conversation_questions SET production_id=? WHERE task_id=?",other,r.task()));
         var unrelated=run(context(),null,null);
+        assertThrows(DataIntegrityViolationException.class, () -> db.update("UPDATE conversation_execution_requests SET core_task_id=? WHERE task_id=?",unrelated.task(),r.task()));
+        assertThrows(DataIntegrityViolationException.class, () -> db.update("UPDATE conversation_execution_requests SET core_task_id=task_id WHERE task_id=?",r.task()));
         assertThrows(DataIntegrityViolationException.class, () -> db.update("UPDATE conversation_questions SET successor_task_id=? WHERE task_id=?",unrelated.task(),r.task()));
         var answer=run(c,p,0L);
         db.update("UPDATE conversation_execution_requests SET thread_id=?,execution_id=? WHERE task_id=?",r.thread(),r.execution(),answer.task());

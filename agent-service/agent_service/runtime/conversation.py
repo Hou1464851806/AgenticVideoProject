@@ -99,7 +99,7 @@ async def execute_run(agent, value, *, identity, scope, production, question, ed
                     raise ValueError('不能修改非当前或已冻结制作')
                 if not production or production['requirement_id'] != current.production_id or not scope or scope['scope_id'] != current.scope_id:
                     raise ValueError('修改必须使用当前制作及固定 scope')
-                if not target.values or target.values['request']['edit_generation'] != current.edit_generation:
+                if target.values and target.values['request']['edit_generation'] > current.edit_generation:
                     raise ValueError('制作摘要代次与原 checkpoint 不匹配')
             if question and question.production_id:
                 if not production or production['requirement_id'] != question.production_id:
@@ -112,13 +112,13 @@ async def execute_run(agent, value, *, identity, scope, production, question, ed
                 raise ValueError('制作与执行范围不匹配')
             if (production is None) != (edit_generation is None):
                 raise ValueError('制作必须携带编辑代次')
-            if target.next and not question and identity.thread_id != value.identity.thread_id:
-                raise ValueError('目标制作仍有挂起执行')
+            # Java authorizes continuation only after the old task/wait relinquishes ownership.
+            # A fresh input starts the new execution on this thread without resuming its old wait.
             if isinstance(agent.executor, JavaToolExecutor) and scope is None:
                 raise ValueError('真实执行必须携带 Java 固定 scope')
             # Only continuation takes private production context. Public history is always Java's.
             old = target.values if relation in ('CONTINUE_PRODUCTION', 'ANSWER_QUESTION') else {}
-            if relation in ('CONTINUE_PRODUCTION', 'ANSWER_QUESTION'):
+            if question or old:
                 if not old or old.get('production') != production or old.get('question_scope') != scope:
                     raise ValueError('原执行的制作或固定 scope 不匹配')
                 if old.get('saved_result'):
@@ -129,9 +129,10 @@ async def execute_run(agent, value, *, identity, scope, production, question, ed
                 raise ValueError('问题代次与原 checkpoint 不匹配')
             state = {**prepared.values, 'identity': {**identity.model_dump(),
                 'session_id': identity.conversation_id, 'requirement_id': production['requirement_id'] if production else identity.thread_id},
-                'requirements': old.get('requirements', Requirements().model_dump()),
+                'requirements': prepared.values['requirements'] if relation == 'CONTINUE_PRODUCTION' else old.get('requirements', Requirements().model_dump()),
                 'observations': old.get('observations', {}), 'coverage': old.get('coverage', {}),
-                'draft': old.get('draft'), 'validation': old.get('validation'), 'draft_ready': old.get('draft_ready', False),
+                'draft': old.get('draft'), 'validation': old.get('validation') if not current or old.get('request', {}).get('edit_generation') == current.edit_generation else None,
+                'draft_ready': old.get('draft_ready', False) if not current or old.get('request', {}).get('edit_generation') == current.edit_generation else False,
                 'production': production, 'question_scope': scope,
                 'saved_result': None, 'save_request': None, 'previous_validation': old.get('previous_validation')}
             parsed_understanding = prepared.values['understanding']

@@ -29,6 +29,8 @@ class TaskDispatch {
             @Value("${analysis.execution-enabled:false}") boolean analysisEnabled) {
         this.database = database; this.broker = broker; this.analysisEnabled=analysisEnabled; this.pendingRenotifySeconds = Math.max(2, pendingRenotifySeconds);
     }
+    @Bean Queue agentQueue() { return new Queue("agent.v1",true,false,false,java.util.Map.of("x-dead-letter-exchange","","x-dead-letter-routing-key","agent.dead.v1")); }
+    @Bean Queue agentDeadQueue() { return new Queue("agent.dead.v1",true); }
     @Bean Queue mediaQueue() { return new Queue("media.v1", true, false, false, java.util.Map.of("x-dead-letter-exchange", "", "x-dead-letter-routing-key", "media.dead.v1")); }
 
     @Bean Queue mediaDeadQueue() { return new Queue("media.dead.v1", true); }
@@ -40,14 +42,14 @@ class TaskDispatch {
         // RabbitMQ is a wake-up channel; a successful publish does not prove a task was claimed.
         database.update("""
                 UPDATE outbox_events e SET status='PENDING',available_at=now(),published_at=NULL
-                FROM tasks t WHERE e.task_id=t.id AND t.status='PENDING' AND e.type IN ('MEDIA_PREPARE','CONTENT_ANALYZE','INDEX_BUILD','VISION_PREPARE','VISION_ANALYZE','PREVIEW_RENDER','EXPORT_RENDER')
+                FROM tasks t WHERE e.task_id=t.id AND t.status='PENDING' AND e.type IN ('AGENT_TURN','MEDIA_PREPARE','CONTENT_ANALYZE','INDEX_BUILD','VISION_PREPARE','VISION_ANALYZE','PREVIEW_RENDER','EXPORT_RENDER')
                 AND e.status='PUBLISHED' AND e.published_at < now()-make_interval(secs => ?)
                 """, pendingRenotifySeconds);
         UUID claim = UUID.randomUUID();
         var events = database.queryForList("""
                 WITH candidates AS (
                     SELECT e.id FROM outbox_events e JOIN tasks t ON t.id=e.task_id
-                    WHERE e.type IN ('MEDIA_PREPARE','CONTENT_ANALYZE','INDEX_BUILD','VISION_PREPARE','VISION_ANALYZE','PREVIEW_RENDER','EXPORT_RENDER') AND (? OR e.type IN ('MEDIA_PREPARE','VISION_PREPARE','PREVIEW_RENDER','EXPORT_RENDER')) AND e.available_at<=now() AND t.status='PENDING' AND t.next_execution_at<=now()
+                    WHERE e.type IN ('AGENT_TURN','MEDIA_PREPARE','CONTENT_ANALYZE','INDEX_BUILD','VISION_PREPARE','VISION_ANALYZE','PREVIEW_RENDER','EXPORT_RENDER') AND (e.type<>'AGENT_TURN' OR EXISTS(SELECT 1 FROM conversation_execution_requests r WHERE r.task_id=t.id AND r.schema_version='1.0')) AND (? OR e.type IN ('AGENT_TURN','MEDIA_PREPARE','VISION_PREPARE','PREVIEW_RENDER','EXPORT_RENDER')) AND e.available_at<=now() AND t.status='PENDING' AND t.next_execution_at<=now()
                     AND (e.status='PENDING' OR e.status='PUBLISHING' AND e.lease_expires_at<now())
                     ORDER BY e.available_at FOR UPDATE OF e SKIP LOCKED LIMIT 10
                 )
@@ -67,7 +69,7 @@ class TaskDispatch {
                     channel.addReturnListener(listener);
                     try {
                         channel.confirmSelect();
-                        String route=java.util.Set.of("CONTENT_ANALYZE","INDEX_BUILD","VISION_ANALYZE").contains(event.get("type"))?"analysis.v1":"media.v1";
+                        String route="AGENT_TURN".equals(event.get("type"))?"agent.v1":java.util.Set.of("CONTENT_ANALYZE","INDEX_BUILD","VISION_ANALYZE").contains(event.get("type"))?"analysis.v1":"media.v1";
                         var props=new com.rabbitmq.client.AMQP.BasicProperties.Builder().contentType("application/json").deliveryMode(2).messageId(event.get("id").toString()).build();
                         channel.basicPublish("",route,true,props,message.getBody());
                         channel.waitForConfirmsOrDie(5000);

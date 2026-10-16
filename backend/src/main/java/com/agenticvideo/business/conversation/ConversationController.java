@@ -116,8 +116,7 @@ public class ConversationController {
     public Object retry(@PathVariable UUID conversationId,@PathVariable UUID taskId,
             @RequestHeader("Idempotency-Key") String key,@RequestBody Retry request,Authentication account) {
         requireOwned(conversationId,account);
-        requireAgentEnabled();
-        return response(retries.retry(conversationId,taskId,key,request.acknowledgeUnknownCost()));
+        return response(legacyAgentEnabled?retries.retry(conversationId,taskId,key,request.acknowledgeUnknownCost()):agentRuns.retry(conversationId,taskId,key,request.acknowledgeUnknownCost()));
     }
     public record Retry(boolean acknowledgeUnknownCost) {}
 

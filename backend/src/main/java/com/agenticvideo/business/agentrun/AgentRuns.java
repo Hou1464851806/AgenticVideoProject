@@ -64,6 +64,52 @@ public class AgentRuns {
         db.update("INSERT INTO outbox_events(id,task_id,type,payload_json) VALUES (?,?,'AGENT_TURN',jsonb_build_object('schemaVersion','1.0','eventId',?::text,'taskId',?::text,'taskType','AGENT_TURN','projectId',?::text,'occurredAt',now()))",event,task,event,task,session.get("project_id"));
         return Map.of("turnId",turn,"messageId",message,"taskId",task);
     }
+    @Transactional public Object retry(UUID conversation,UUID source,String key,boolean acknowledgeUnknownCost) {
+        key(key);locks.conversation(conversation);
+        if(db.queryForObject("SELECT count(*) FROM conversation_execution_requests WHERE task_id=? AND conversation_id=? AND schema_version='1.0'",Integer.class,source,conversation)!=1)
+            throw new ResponseStatusException(NOT_FOUND,"运行不属于该会话");
+        var original=locked(source);
+        if(!conversation.equals(original.get("conversation_id")))throw new ResponseStatusException(NOT_FOUND,"运行不属于该会话");
+        var old=db.queryForList("SELECT * FROM conversation_turns WHERE conversation_id=? AND request_key=?",conversation,key);
+        if(!old.isEmpty()) {
+            if(!source.equals(old.get(0).get("retry_of_task_id")))throw conflict("重试键已用于另一操作");
+            return receipt(old.get(0));
+        }
+        var successor=db.queryForList("SELECT * FROM conversation_turns WHERE retry_of_task_id=?",source);
+        if(!successor.isEmpty())return receipt(successor.get(0));
+        if(acknowledgeUnknownCost||!"FAILED".equals(original.get("status"))||original.get("result_json")==null
+                ||!parse(original.get("result_json")).path("failure").path("recoverable").asBoolean()
+                ||!"EXECUTION_INTERRUPTED".equals(parse(original.get("result_json")).path("failure").path("code").asText()))
+            throw conflict("该失败没有可恢复执行点，不能重置预算或强制重付");
+        requireCurrent(original);
+        if(original.get("parsed_json")==null) {
+            var input=read(parse(original.get("input_json")),RunInput.class);
+            if(!Objects.equals(input.currentProduction(),currentProduction(conversation)))throw conflict("原消息所见的当前制作已变化，不能恢复旧理解");
+        }
+        if(busy(conversation))throw conflict("会话正在处理另一消息");
+        UUID task=UUID.randomUUID(),turn=UUID.randomUUID();
+        var fixed=(com.fasterxml.jackson.databind.node.ObjectNode)parse(original.get("input_json"));
+        var identity=(com.fasterxml.jackson.databind.node.ObjectNode)fixed.path("identity");
+        identity.put("taskId",task.toString()).put("turnId",turn.toString());
+        String hash=ToolJson.hash(fixed);
+        var binding=(com.fasterxml.jackson.databind.node.ObjectNode)parse(original.get("request_json"));
+        if(original.get("parsed_json")!=null) {
+            var boundIdentity=(com.fasterxml.jackson.databind.node.ObjectNode)binding.path("identity");
+            boundIdentity.put("taskId",task.toString()).put("turnId",turn.toString());binding.put("inputHash",hash);
+        }
+        db.update("INSERT INTO tasks(id,project_id,type,input_json) VALUES (?,?,'AGENT_TURN',?::jsonb)",task,original.get("project_id"),fixed.toString());
+        db.update("INSERT INTO conversation_turns(id,conversation_id,message_id,task_id,request_key,request_json,retry_of_task_id) VALUES (?,?,?,?,?,jsonb_build_object('retryOfTaskId',?::text),?)",turn,conversation,original.get("message_id"),task,key,source,source);
+        db.update("""
+                INSERT INTO conversation_execution_requests(task_id,request_json,input_json,schema_version,project_id,conversation_id,turn_id,message_id,
+                    input_hash,thread_id,execution_id,production_id,scope_id,edit_generation,parsed_json,core_task_id)
+                SELECT ?,?::jsonb,?::jsonb,'1.0',project_id,conversation_id,?,message_id,?,thread_id,execution_id,production_id,scope_id,edit_generation,parsed_json,coalesce(core_task_id,task_id)
+                FROM conversation_execution_requests WHERE task_id=?
+                """,task,binding.toString(),fixed.toString(),turn,hash,source);
+        db.update("INSERT INTO agent_run_tool_calls(task_id,scope_id,call_id) SELECT ?,scope_id,call_id FROM agent_run_tool_calls WHERE task_id=?",task,source);
+        UUID event=UUID.randomUUID();
+        db.update("INSERT INTO outbox_events(id,task_id,type,payload_json) VALUES (?,?,'AGENT_TURN',jsonb_build_object('schemaVersion','1.0','eventId',?::text,'taskId',?::text,'taskType','AGENT_TURN'))",event,task,event,task);
+        return receipt(db.queryForMap("SELECT * FROM conversation_turns WHERE task_id=?",task));
+    }
     private void validateReferences(Map<String,Object> session,List<Map<String,JsonNode>> refs) {
         var allowed=new HashSet<String>();parse(session.get("asset_ids_json")).forEach(a->allowed.add(a.asText()));
         for(var ref:refs) {

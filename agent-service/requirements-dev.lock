@@ -322,3 +322,17 @@ zstandard==0.25.0
     # via
     #   -c agent-service/requirements.lock
     #   langsmith
+aio-pika==9.6.2
+    # via -r agent-service/requirements.txt
+aiormq==6.9.4
+    # via aio-pika
+multidict==7.1.0
+    # via yarl
+pamqp==3.3.0
+    # via aiormq
+propcache==0.5.4
+    # via yarl
+yarl==1.25.1
+    # via
+    #   aio-pika
+    #   aiormq

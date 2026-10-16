@@ -59,6 +59,10 @@ class Store:
                 raise ValueError("同一接纳任务的执行绑定发生变化")
         return json.loads(row[1])
 
+    def has_uncertain_calls(self, execution_ids):
+        return any(self.db.execute("SELECT 1 FROM model_calls WHERE execution_id=? AND status IN ('SUBMITTING','UNKNOWN')",
+                                   (execution_id,)).fetchone() for execution_id in execution_ids)
+
     def transfer_usage(self, source_id, target_id):
         """Charge entry understanding once, retaining its original paid-call receipts."""
         if source_id == target_id:

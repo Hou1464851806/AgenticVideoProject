@@ -347,3 +347,70 @@ async def test_result_handoff_replays_after_checkpoint_before_local_result_recor
     assert result['status'] == ('WAITING' if waiting else 'ANSWER')
     assert result['usage']['model_calls'] == (1 if waiting else 2)
     assert (await restarted.execute_run(value, identity=value.identity))['usage']['model_calls'] == result['usage']['model_calls']
+
+
+@pytest.mark.asyncio
+async def test_authorized_continuation_replaces_cancelled_wait_without_consuming_question(tmp_path):
+    from test_real_production import ProductionBackend, DRAFT
+    from test_java_executor import READ
+    first = message('制作短片')
+    backend = ProductionBackend()
+    scope = fixed_scope(backend, first)
+    production = {'project_id': first.identity.project_id, 'requirement_id': str(uuid.uuid4()), 'scope_id': scope['scope_id']}
+    runner = real_runner(tmp_path, backend, first, {'relation': 'NEW', 'mode': 'DRAFT',
+        'conversation_relation': 'NEW_PRODUCTION', 'question': '要字幕吗？'}, [READ, DRAFT])
+    await runner.prepare_run(first)
+    waiting = await runner.execute_run(first, identity=first.identity, scope=scope, production=production, edit_generation=1)
+    assert waiting['status'] == 'WAITING'
+    # Java has cancelled the public question and authorized a fresh modification generation.
+    followup = message('继续修改，不要字幕', currentProduction=summary(waiting), pendingQuestions=[])
+    followup.identity.project_id = first.identity.project_id
+    followup.identity.conversation_id = first.identity.conversation_id
+    runner = real_runner(tmp_path, backend, followup, {'relation': 'CONTINUE', 'mode': 'DRAFT',
+        'conversation_relation': 'CONTINUE_PRODUCTION', 'subtitles_enabled': False}, [READ, DRAFT])
+    await runner.prepare_run(followup)
+    identity = followup.identity.model_copy(update={'thread_id': first.identity.thread_id})
+    result = await runner.execute_run(followup, identity=identity, scope=scope, production=production, edit_generation=2)
+    assert result['status'] == 'DRAFT_READY'
+    assert result['identity']['execution_id'] == followup.identity.execution_id
+    assert result['requirements']['subtitles_enabled'] is False
+    assert result['edit_generation'] == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('has_checkpoint', [True, False])
+async def test_continuation_preserves_java_conditions_when_previous_execution_never_applied_them(tmp_path, has_checkpoint):
+    from agent_service.runtime.state import Requirements
+    from test_real_production import ProductionBackend, DRAFT
+    from test_java_executor import READ
+    first = message('制作短片')
+    backend = ProductionBackend()
+    scope = fixed_scope(backend, first)
+    production = {'project_id': first.identity.project_id, 'requirement_id': str(uuid.uuid4()), 'scope_id': scope['scope_id']}
+    thread = str(uuid.uuid4())
+    if has_checkpoint:
+        runner = real_runner(tmp_path, backend, first, {'relation': 'NEW', 'mode': 'DRAFT',
+            'conversation_relation': 'NEW_PRODUCTION', 'question': '要字幕吗？'}, [READ, DRAFT])
+        await runner.prepare_run(first)
+        waiting = await runner.execute_run(first, identity=first.identity, scope=scope, production=production, edit_generation=1)
+        current = summary(waiting)
+        thread = waiting['thread_id']
+    else:
+        current = {'productionId': production['requirement_id'], 'scopeId': scope['scope_id'], 'threadId': thread,
+            'editGeneration': 1, 'requirements': Requirements().production(['a']),
+            'requirementsSources': Requirements().sources, 'currentDraft': None, 'frozen': False}
+    # Java committed the previous turn's conditions; cancellation happened before the core applied them.
+    current['editGeneration'] = 2
+    current['requirements']['subtitles_enabled'] = False
+    current['requirementsSources']['subtitles_enabled'] = {'kind': 'USER', 'message_id': first.identity.message_id, 'value': False}
+    followup = message('修改主题', currentProduction=current)
+    followup.identity.project_id = first.identity.project_id
+    followup.identity.conversation_id = first.identity.conversation_id
+    runner = real_runner(tmp_path, backend, followup, {'relation': 'CONTINUE', 'mode': 'DRAFT',
+        'conversation_relation': 'CONTINUE_PRODUCTION', 'topic': '新主题'}, [READ, DRAFT])
+    await runner.prepare_run(followup)
+    identity = followup.identity.model_copy(update={'thread_id': thread})
+    result = await runner.execute_run(followup, identity=identity, scope=scope, production=production, edit_generation=3)
+    assert result['status'] == 'DRAFT_READY'
+    assert result['requirements']['subtitles_enabled'] is False
+    assert result['requirements']['topic'] == '新主题'
