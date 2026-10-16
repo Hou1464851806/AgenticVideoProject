@@ -60,13 +60,24 @@ class Agent:
                  "question_scope": old.get("question_scope") if old.get("production") else None,
                  "production": old.get("production"), "previous_validation": None,
                  "save_request": old.get("save_request"), "saved_result": old.get("saved_result"),
-                 "draft": old.get("draft"), "validation": None, "scenario": self.config.scenario}
+                 "draft": old.get("draft"), "draft_ready": old.get("draft_ready", (old.get("outcome") or {}).get("status") == "DRAFT_READY"), "validation": old.get("validation"), "scenario": self.config.scenario}
         if old.get("question_scope") and not self.mock:
             self.executor.project_id = old["question_scope"]["project_id"]
             self.executor.asset_ids = [a["id"] for a in old["question_scope"]["assets"]]
         if not self.mock and not old.get("production"):
             state.update(observations={}, coverage={}, draft=None, validation=None)
         return await self._drive(thread_id, state, expected_checkpoint=checkpoint)
+
+    async def prepare_run(self, value):
+        """Understand a fixed RunInput once, before Java chooses its execution binding."""
+        from .conversation import prepare_run
+        return await prepare_run(self, value)
+
+    async def execute_run(self, value, *, identity, scope=None, production=None, question=None, edit_generation=None):
+        """Execute a persisted understanding with the binding authorized by Java."""
+        from .conversation import execute_run
+        return await execute_run(self, value, identity=identity, scope=scope, production=production,
+                                 question=question, edit_generation=edit_generation)
 
     async def inspect(self, thread_id):
         async with AsyncSqliteSaver.from_conn_string(str(self.path)) as saver:
@@ -89,11 +100,11 @@ class Agent:
         if snapshot.values.get("save_request") and not snapshot.values.get("saved_result"):
             return await self.save(thread_id)
         if not snapshot.next:
-            return self._view(thread_id, snapshot.values, False)
+            return await self.inspect(thread_id)
         waiting = snapshot.values.get("waiting")
         if snapshot.interrupts:
             if payload is None:
-                return self._view(thread_id, snapshot.values, True)
+                return await self.inspect(thread_id)
             payload = self._validate_resume(snapshot.values, payload)
             value = Command(resume=payload)
         else:
@@ -149,6 +160,8 @@ class Agent:
                 state = snapshot.values
                 if not state or not state.get("production"):
                     raise ValueError("没有可保存的真实制作需求")
+                if state["request"].get("public_context"):
+                    raise ValueError("浏览器制作须通过 Java 草稿确认入口保存")
                 production = state["production"]
                 if self.executor.project_id and self.executor.project_id != production["project_id"]:
                     raise ValueError("保存项目与原制作不匹配")
@@ -158,7 +171,7 @@ class Agent:
                     validation = state.get("validation") or {}
                     requirements = Requirements.model_validate(state["requirements"]).production(
                         sorted(a["id"] for a in state["question_scope"]["assets"]))
-                    if (state.get("outcome") or {}).get("status") != "DRAFT_READY" or not validation.get("valid"):
+                    if not state.get("draft_ready", (state.get("outcome") or {}).get("status") == "DRAFT_READY") or not validation.get("valid"):
                         raise ValueError("只有 DRAFT_READY 的当前草稿可以保存")
                     if validation["draft_hash"] != fingerprint(state["draft"]) or validation["requirements_hash"] != fingerprint(requirements):
                         raise ValueError("草稿或条件已改变，请重新校验到 DRAFT_READY")
@@ -205,7 +218,9 @@ class Agent:
                     latest = await build_graph(saver).aget_state({"configurable": {"thread_id": thread_id}})
                 if latest.config["configurable"].get("checkpoint_id") != expected_checkpoint:
                     raise ValueError("需求已被另一个本机操作更新，请重新查看后重试")
-            if isinstance(self.executor, JavaToolExecutor):
+            if (previous or value)["request"].get("parse_only"):
+                pass
+            elif isinstance(self.executor, JavaToolExecutor):
                 saved = (previous or value).get("question_scope")
                 if previous and not saved:
                     raise ValueError("不能用真实执行器恢复 Mock 需求")
@@ -221,7 +236,7 @@ class Agent:
             fcntl.flock(lock, fcntl.LOCK_UN)
             lock.close()
             raise
-        ctx = Context(self.model, self.executor, store, self.config.limits, tracer, stop, self.progress, self.assets, self.mock)
+        ctx = Context(self.model, self.executor, store, self.config.limits, tracer, stop, self.progress, self.assets or {}, self.mock)
         scope_id = ((previous or value).get("question_scope") or {}).get("scope_id")
         config = {"configurable": {"thread_id": thread_id}, "recursion_limit": 256,
                   "callbacks": tracer.callbacks, "metadata": {**identity, "langfuse_session_id": identity["session_id"], "mock_tools": self.mock, "question_scope_id": scope_id}}
@@ -277,5 +292,6 @@ class Agent:
             outcome = incomplete("保存结果尚未核对，请执行 save 或 resume 恢复。", state.get("draft"), mock=False)
         return {"thread_id": thread_id, "identity": state["identity"], "status": "WAITING" if waiting else (outcome or {}).get("status", "FAILED"),
                 "waiting": state.get("waiting") if waiting else None, "outcome": outcome,
-                "production": state.get("production"), "draft": state.get("draft"), "validation": state.get("validation"),
+                "parsed_input": state.get("parsed_input"), "understanding": state.get("understanding"),
+                "intent": state.get("intent"), "edit_generation": state["request"].get("edit_generation"), "production": state.get("production"), "draft": state.get("draft"), "validation": state.get("validation"),
                 "save_request": state.get("save_request"), "saved_result": state.get("saved_result"), "question_scope": state.get("question_scope"), "requirements": state["requirements"], "pending_tool": state.get("pending_tool"), "usage": state.get("usage", {})}

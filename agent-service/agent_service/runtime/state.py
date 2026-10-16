@@ -1,6 +1,6 @@
 """Serializable workflow values, separated from live clients and credentials."""
 from dataclasses import dataclass
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal, Required, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -37,6 +37,8 @@ class Requirements(Value):
 class Understanding(Value):
     relation: Literal["NEW", "CONTINUE", "AMBIGUOUS"]
     mode: Literal["QUERY", "DRAFT", "DISCUSS", "UNSUPPORTED"]
+    conversation_relation: Literal["INDEPENDENT", "CONTINUE_PRODUCTION", "NEW_PRODUCTION", "ANSWER_QUESTION", "CLARIFY"] | None = None
+    question_id: str | None = None
     topic: str | None = None
     duration_min_ms: int | None = None
     duration_max_ms: int | None = None
@@ -62,22 +64,25 @@ class Action(Value):
 
 
 class State(TypedDict, total=False):
-    identity: dict
-    request: dict
-    requirements: dict
-    messages: list
-    observations: dict
-    coverage: dict
+    identity: Required[dict]
+    parsed_input: dict | None
+    intent: str
+    draft_ready: bool
+    request: Required[dict]
+    requirements: Required[dict]
+    messages: Required[list]
+    observations: Required[dict]
+    coverage: Required[dict]
     draft: dict | None
     validation: dict | None
     action: dict | None
     pending_tool: dict | None
     feedback: dict | None
-    waiting: dict | None
-    resume_input: dict | None
-    usage: dict
+    waiting: Required[dict | None]
+    resume_input: Required[dict | None]
+    usage: Required[dict]
     outcome: dict | None
-    model_sequence: int
+    model_sequence: Required[int]
     understanding: dict | None
     next_node: str
     stop_reason: str | None
@@ -85,8 +90,8 @@ class State(TypedDict, total=False):
     production: dict | None
     previous_validation: dict | None
     save_request: dict | None
-    saved_result: dict | None
-    question_scope: dict | None
+    saved_result: Required[dict | None]
+    question_scope: Required[dict | None]
 
 
 @dataclass

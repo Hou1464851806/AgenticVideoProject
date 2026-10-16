@@ -79,7 +79,8 @@ async def test_new_requirement_isolated_even_when_detected_by_model(tmp_path):
     second = await runner.send("另做一个新主题", thread_id=first["thread_id"])
     assert second["thread_id"] != first["thread_id"]
     assert second["requirements"]["outputs"][0]["duration_min_ms"] is None
-    assert second["requirements"]["topic"] == "新的项目"
+    assert second["requirements"]["topic"] == ""
+    assert second["understanding"]["topic"] == "新的项目"
     assert second["outcome"]["status"] == "ANSWER"
 
 

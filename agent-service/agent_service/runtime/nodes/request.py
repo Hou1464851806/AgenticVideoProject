@@ -1,6 +1,7 @@
 from langgraph.runtime import Runtime
 from pydantic import ValidationError
 
+from ...conversation_contracts import ParsedInput
 from ..calls import invoke_model
 from ..policy import LimitReached, ModelFormatError, SubmissionUnknown, fingerprint
 from ..state import Context, State, Understanding, merge_requirements
@@ -9,7 +10,8 @@ from ..state import Context, State, Understanding, merge_requirements
 def prepare_turn(state: State):
     return {"action": None, "pending_tool": None, "feedback": None, "waiting": None, "understanding": None,
             "resume_input": None, "outcome": None, "stop_reason": None,
-            "usage": {"tools": 0, "repairs": 0, "no_progress": 0, "decisions": 0}, "model_sequence": 0}
+            "usage": state["request"].get("continuation_usage", {"tools": 0, "repairs": 0, "no_progress": 0, "decisions": 0}),
+            "model_sequence": state["request"].get("continuation_sequence", 0)}
 
 
 async def understand_request(state: State, runtime: Runtime[Context], config):
@@ -17,28 +19,47 @@ async def understand_request(state: State, runtime: Runtime[Context], config):
     ctx.progress("understand_request")
     try:
         parsed = Understanding.model_validate(state["request"].get("pre_understanding") or await invoke_model(state, runtime, "understand", config))
+        if state["request"].get("parse_only"):
+            if parsed.conversation_relation is None:
+                raise ValueError("浏览器理解必须明确 conversation_relation")
+            if parsed.mode == "UNSUPPORTED":
+                parsed = parsed.model_copy(update={"mode": "DISCUSS"})
+            mode, relation = parsed.mode, parsed.conversation_relation
+            patch = parsed.model_dump(exclude={"relation", "mode", "conversation_relation", "question_id", "question", "defaults"}, exclude_none=True) if mode == "DRAFT" else {}
+            if not patch.get("output_durations"):
+                patch.pop("output_durations", None)
+            wire = ParsedInput.model_validate({"mode": mode, "relation": relation,
+                "questionId": parsed.question_id, "conditionsPatch": patch})
+            if wire.question_id and wire.question_id not in [q["questionId"] for q in state["request"]["public_context"]["pendingQuestions"]]:
+                raise ValueError("补答没有关联输入中的待回答问题")
+            return {"understanding": parsed.model_dump(), "parsed_input": wire.model_dump(),
+                    "intent": mode, "model_sequence": state["model_sequence"] + 1,
+                    "outcome": {"status": "PARSED", "content": "请求理解已持久化。"}, "next_node": "finalize"}
         if (parsed.relation == "NEW" and not state["request"].get("pre_understanding")
+                and not state["request"].get("public_context")
                 and (not state["request"].get("new_requirement") or state["request"].get("clarification"))):
             return {"understanding": parsed.model_dump(), "outcome": {"status": "NEW_REQUIREMENT"}, "next_node": "finalize"}
-        if not ctx.mock and parsed.mode not in ("QUERY", "DRAFT"):
+        if not ctx.mock and parsed.mode not in ("QUERY", "DRAFT", "DISCUSS"):
             return {"requirements": {**state["requirements"], "mode": "UNSUPPORTED"},
                     "outcome": {"status": "ANSWER", "content": "真实模式支持问答和剪辑草稿；保存请用 CLI save，预览／导出尚未开放。", "evidence_ids": [], "sources": [], "mock": False}, "next_node": "finalize"}
-        if state.get("saved_result"):
+        if state.get("saved_result") and parsed.mode == "DRAFT":
             return {"outcome": {"status": "SAVED", "content": "已保存制作只读；请用 --new 开始新需求。",
                                 "saved_result": state["saved_result"], "mock": ctx.mock}, "next_node": "finalize"}
         previous = state.get("requirements", {})
         req = previous
-        if parsed.relation != "AMBIGUOUS":
+        if parsed.relation != "AMBIGUOUS" and parsed.mode == "DRAFT":
             try:
-                req = merge_requirements(previous, parsed, state["identity"]["turn_id"],
+                req = merge_requirements(previous, parsed, state["identity"].get("message_id", state["identity"]["turn_id"]),
                                          state["request"].get("clarification", state["request"]["content"]))
             except (ValidationError, ValueError):
                 if not parsed.question:
                     raise
                 # Preserve conflicting parsed fields for the next understanding call,
                 # but never apply an invalid or arbitrarily relaxed hard condition.
-        updates = {"requirements": req, "validation": state.get("validation") if req == previous else None,
+        updates = {"requirements": req, "intent": parsed.mode, "validation": state.get("validation") if req == previous else None,
                    "understanding": parsed.model_dump(), "model_sequence": state["model_sequence"]+1}
+        if parsed.mode == "DRAFT":
+            updates["draft_ready"] = False
         if parsed.question or parsed.relation == "AMBIGUOUS":
             question = parsed.question or "这是修改当前需求，还是开始一个新需求？"
             waiting = {"kind": "USER_INPUT", "wait_id": fingerprint([state["identity"]["execution_id"], state["model_sequence"], question]), "question": question}
@@ -57,6 +78,6 @@ async def understand_request(state: State, runtime: Runtime[Context], config):
         return {"stop_reason": str(error), "next_node": "check_result"}
 
     # Infrastructure/protocol failures cannot be repaired by changing model output.
-    if not ctx.mock and req["mode"] == "DRAFT" and not state.get("production"):
+    if not ctx.mock and parsed.mode == "DRAFT" and not state.get("production") and not state["request"].get("public_context"):
         updates["production"] = await ctx.executor.bind(state["identity"]["requirement_id"], state["question_scope"])
     return updates

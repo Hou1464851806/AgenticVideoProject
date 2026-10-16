@@ -238,3 +238,16 @@ agent-service/.venv/bin/python agent-service/scripts/verify_java_m4_faults.py \
 ```
 
 该示例的输出已参与本机验收，重跑须选另一条未预览的已保存输出；脚本会明确拒绝历史输出。故障期间保留数据卷和原始素材，备份后移走预览对象，退出时恢复服务、对象及容器内临时 FFmpeg 包装。raw stdout 中的临时播放 URL 只留在忽略的本地目录；分享记录前去除签名和凭据。实际证据与未完成项见 [M4 步骤 4](../docs/verification/java-tools-m4.md#步骤-4真实视频与故障联调)。
+
+## 会话生命周期核心（实施顺序第 2 步）
+
+新版适配层调用 `Agent.prepare_run(run_input)`，输入为步骤 1 的严格 `RunInput` 对象或 camelCase JSON。它只理解当前消息，返回核心视图中的 `parsed_input`（Python snake_case）和用量；`PARSED` 是本地交接结果，不是公开 `RunResult`。需要 wire 值时使用 `ParsedInput.model_validate({"mode": parsed["mode"], "relation": parsed["relation"], "questionId": parsed["question_id"], "conditionsPatch": parsed["conditions_patch"]}).model_dump(by_alias=True)`。模型必须明确关系，缺失或无效关系在原预算内有限修正；不能根据普通消息自动消费待回答问题。
+
+Java 核对关系后，调用 `Agent.execute_run(run_input, identity=identity, scope=scope, production=production, edit_generation=generation, question=question)`。`identity`／`question` 使用步骤 1 的对象或 camelCase JSON；scope 与 production 沿用现有 Python／M2 snake_case 结构，production 含 `project_id/requirement_id/scope_id`。真实执行必须提供 Java 固定的完整 scope；新制作还须由 Java 先确定 production。这里不调用旧 CLI bind 来创建浏览器制作。
+
+- 独立 QUERY／DISCUSS 使用本次接纳的 thread，不写当前制作 checkpoint；公开历史只来自固定输入，当前原文单独出现。普通讨论可无证据，视频事实问答继续校验已读来源。
+- 继续制作使用制作 thread、新 execution 和 Java 给定代次；关联补答使用明确的 question／wait 和原 thread／execution。补答先完成自己的入口理解，再幂等归集调用数与活动耗时，复用原图的工具、修正和调用序号；等待时间不计入活动耗时。
+- `conversation_runs` 在现有 SQLite 中保存固定输入、不可变绑定、执行起始值和本地理解／结果；`execution_transfers` 保证预算归集仅一次。重投不重新 send、不拼最新聊天、不重置预算。原模型回执保留原身份；SUBMITTING／UNKNOWN 仍停止自动重付。
+- QUERY／DISCUSS 不合并制作条件、不清空旧校验；发起制作修改后，即使失败再插入问答，也不会重新开放旧稿保存。CLI 已保存制作可继续问答／讨论，修改仍只读；显式新制作保留原 `--new` 用法。
+
+这些入口返回核心视图，不负责 Java 权限、attempt／lease、编辑代次写入授权、scope 回执发布或 `RunResult` 投影；后续步骤 3／4 接入这些事务与传输。浏览器制作不能调用 CLI `save`，仍须由 Java 的接受事务冻结与确认。当前未开放新版浏览器路由或 Worker，也没有新增付费调用。验证及下一步接缝见[步骤 2 记录](../docs/verification/conversation-lifecycle-step2.md)。

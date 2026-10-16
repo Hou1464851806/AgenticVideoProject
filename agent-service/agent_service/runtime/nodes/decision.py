@@ -53,7 +53,7 @@ def check_action(state: State, runtime: Runtime[Context]):
             return {"stop_reason": "真实模式所请求能力尚未开放", "next_node": "check_result"}
         changes = {}
         if action.kind == "DRAFT":
-            if state["requirements"].get("mode") != "DRAFT":
+            if state.get("intent", state["requirements"].get("mode")) != "DRAFT":
                 raise ValueError("当前请求没有授权生成草稿")
             if action.draft is None:
                 raise ValueError("DRAFT requires draft")
@@ -69,7 +69,8 @@ def check_action(state: State, runtime: Runtime[Context]):
                 raise ValueError("Tool is disabled or program-only")
         args = PARAMETERS[name].model_validate(args).model_dump()
         allowed = set(ctx.assets)
-        scope = state["requirements"].get("asset_ids")
+        scope = (state["requirements"].get("asset_ids") if state.get("intent") == "DRAFT"
+                 else (state.get("understanding") or {}).get("asset_ids"))
         if scope is not None:
             allowed &= set(scope)
         if args.get("asset_id") and args["asset_id"] not in allowed:

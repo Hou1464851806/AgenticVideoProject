@@ -29,7 +29,8 @@ def check_result(state: State, runtime: Runtime[Context]):
         return {"outcome": incomplete(state["stop_reason"], state.get("draft"), mock=ctx.mock), "next_node": "finalize"}
     action = state.get("action") or {}
     validation = state.get("validation") or {}
-    requested = state["requirements"].get("asset_ids")
+    requested = (state["requirements"].get("asset_ids") if state.get("intent") == "DRAFT"
+                 else (state.get("understanding") or {}).get("asset_ids"))
     targets = set(ctx.assets) if requested is None else set(requested)
     if action.get("kind") == "DRAFT":
         if validation.get("valid") and validation.get("draft_hash") == fingerprint(state["draft"]) and validation.get("requirements_hash") == fingerprint(Requirements.model_validate(state["requirements"]).production(sorted(ctx.assets))):
@@ -43,20 +44,20 @@ def check_result(state: State, runtime: Runtime[Context]):
                     error = source_error(state, ctx, targets, clip["evidence_ids"])
                     if error:
                         return repair(state, ctx, *error)
-            return {"outcome": {"status": "DRAFT_READY", "content": ("Mock 样本剪辑草稿已通过模拟校验；尚未保存或渲染。" if ctx.mock else "剪辑草稿已通过 Java 校验；可用 CLI save 保存方案，尚未渲染。"),
+            return {"draft_ready": True, "outcome": {"status": "DRAFT_READY", "content": ("Mock 样本剪辑草稿已通过模拟校验；尚未保存或渲染。" if ctx.mock else "剪辑草稿已通过 Java 校验；可用 CLI save 保存方案，尚未渲染。"),
                                 "draft": state["draft"], "validation": validation, "mock": ctx.mock}, "next_node": "finalize"}
         return repair(state, ctx, "VALIDATION_REQUIRED", "草稿尚未通过当前输入的校验")
     if action.get("kind") == "ANSWER":
-        if state["requirements"].get("mode") == "DRAFT":
+        if state.get("intent", state["requirements"].get("mode")) == "DRAFT":
             return {"outcome": incomplete(action["content"], state.get("draft"), mock=ctx.mock), "next_node": "finalize"}
         ids = action.get("evidence_ids", [])
         error = source_error(state, ctx, targets, ids)
         if error:
             return repair(state, ctx, *error)
         text = action.get("content", "")
-        if state["requirements"].get("mode") == "QUERY" and not ids and not any(word in text for word in ("无法", "未找到", "没有", "不确定", "不足", "未命中")):
+        if state.get("intent", state["requirements"].get("mode")) == "QUERY" and not ids and not any(word in text for word in ("无法", "未找到", "没有", "不确定", "不足", "未命中")):
             return repair(state, ctx, "SOURCE_REQUIRED", "视频事实答复需要已读来源；无依据应明确无法确定")
-        request_text = " ".join([state["request"]["content"], state["requirements"].get("topic", ""),
+        request_text = " ".join([state["request"]["content"], (state.get("understanding") or {}).get("topic") or "",
                                  *[item["content"] for item in state["request"].get("clarifications", [])]])
         if any(word in request_text for word in ("全片", "整段", "全部步骤")):
             missing = [asset_id for asset_id in sorted(targets)
@@ -75,7 +76,7 @@ def finalize(state: State, runtime: Runtime[Context]):
     runtime.context.progress("finalize")
     outcome = state.get("outcome") or incomplete("未获得可核对的结果", mock=runtime.context.mock)
     history = state.get("messages", [])
-    if outcome["status"] != "NEW_REQUIREMENT":
+    if outcome["status"] not in ("NEW_REQUIREMENT", "PARSED"):
         history = (history + [{"role": "user", "content": state["request"]["content"]},
                               {"role": "assistant", "content": outcome.get("content", "")}])[-12:]
     outcome = {**outcome, "mock": runtime.context.mock}

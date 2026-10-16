@@ -3,7 +3,10 @@ from .policy import ModelFormatError, await_operation, fingerprint
 
 
 def model_context(state):
-    return {key: state.get(key) for key in ("request", "requirements", "understanding", "messages", "observations", "coverage", "draft", "validation", "feedback", "usage")}
+    context = {key: state.get(key) for key in ("request", "requirements", "understanding", "messages", "observations", "coverage", "draft", "validation", "feedback", "usage")}
+    if "intent" in state:
+        context["intent"] = state["intent"]
+    return context
 
 
 async def invoke_model(state, runtime, phase, config):

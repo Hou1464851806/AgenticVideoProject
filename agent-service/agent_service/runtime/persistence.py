@@ -1,4 +1,5 @@
 """Local paid-call receipts. Checkpoints do not roll back remote submissions."""
+import json
 import sqlite3
 import time
 from pathlib import Path
@@ -18,7 +19,65 @@ class Store:
             id TEXT PRIMARY KEY, execution_id TEXT NOT NULL, input_hash TEXT NOT NULL,
             status TEXT NOT NULL, response TEXT);
         """)
+        self.db.executescript("""
+          CREATE TABLE IF NOT EXISTS conversation_runs (
+            task_id TEXT PRIMARY KEY, input_json TEXT NOT NULL,
+            binding_json TEXT, state_json TEXT, prepared_json TEXT, result_json TEXT);
+          CREATE TABLE IF NOT EXISTS execution_transfers (
+            source_id TEXT PRIMARY KEY, target_id TEXT NOT NULL);
+        """)
         self.segment = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+    def accept_run(self, value):
+        task_id = value["identity"]["taskId"]
+        fixed = encoded(value)
+        with self.db:
+            self.db.execute("INSERT OR IGNORE INTO conversation_runs(task_id,input_json) VALUES (?,?)", (task_id, fixed))
+            row = self.db.execute("SELECT input_json,binding_json,state_json,prepared_json,result_json FROM conversation_runs WHERE task_id=?", (task_id,)).fetchone()
+            if row[0] != fixed:
+                raise ValueError("同一接纳任务的固定输入发生变化")
+        return {key: json.loads(data) if data else None for key, data in
+                zip(("binding", "initial", "prepared", "result"), row[1:])}
+
+    def record_run(self, task_id, *, prepared=None, result=None):
+        with self.db:
+            self.db.execute("UPDATE conversation_runs SET prepared_json=COALESCE(prepared_json,?), result_json=COALESCE(result_json,?) WHERE task_id=?",
+                            (encoded(prepared) if prepared else None, encoded(result) if result else None, task_id))
+
+    def bind_run(self, task_id, binding, state):
+        with self.db:
+            self.db.execute("UPDATE conversation_runs SET binding_json=?,state_json=? WHERE task_id=? AND binding_json IS NULL",
+                            (encoded(binding), encoded(state), task_id))
+            row = self.db.execute("SELECT binding_json,state_json FROM conversation_runs WHERE task_id=?", (task_id,)).fetchone()
+            if row[0] != encoded(binding):
+                raise ValueError("同一接纳任务的执行绑定发生变化")
+        return json.loads(row[1])
+
+    def transfer_usage(self, source_id, target_id):
+        """Charge entry understanding once, retaining its original paid-call receipts."""
+        if source_id == target_id:
+            return
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            row = self.db.execute("SELECT target_id FROM execution_transfers WHERE source_id=?", (source_id,)).fetchone()
+            if row:
+                if row[0] != target_id:
+                    raise ValueError("理解预算已归入另一执行")
+            else:
+                source = self.db.execute("SELECT calls,seconds FROM executions WHERE id=?", (source_id,)).fetchone()
+                self.db.execute("INSERT OR IGNORE INTO executions(id) VALUES (?)", (target_id,))
+                self.db.execute("UPDATE executions SET calls=calls+?,seconds=seconds+? WHERE id=?", (*source, target_id))
+                self.db.execute("INSERT INTO execution_transfers VALUES (?,?)", (source_id, target_id))
+            self.db.commit()
+        except BaseException:
+            self.db.rollback()
+            raise
 
     def start(self, execution_id):
         self.db.execute("INSERT OR IGNORE INTO executions(id) VALUES (?)", (execution_id,))
