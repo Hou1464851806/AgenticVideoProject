@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Limits:
-    model_calls: int = 12
+    model_calls: int = 16
     tool_calls: int = 20
     repairs: int = 3
     attempts: int = 2

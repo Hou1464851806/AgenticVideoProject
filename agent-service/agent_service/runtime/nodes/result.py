@@ -10,7 +10,7 @@ def source_error(state, ctx, targets, ids):
     for evidence_id in ids:
         record = state["observations"].get(evidence_id)
         if not record:
-            return "UNREAD_REFERENCE", "结果引用了未读取的记录"
+            return "UNREAD_REFERENCE", f"结果引用了未读取的记录：{evidence_id}。只可引用 observations 中的 ID；需要补读时按 reading.next_pages 继续。"
         asset_id = record.get("asset_id")
         asset = ctx.assets.get(asset_id)
         if not asset or asset_id not in targets:

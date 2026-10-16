@@ -78,13 +78,15 @@ State 保存序列化值；Context 保存活客户端、凭据外的执行依赖
 
 | Limits 字段 | 当前默认值 | 语义 |
 | --- | --- | --- |
-| model_calls／tool_calls | 12／20 | 同一执行的模型／工具预算 |
+| model_calls／tool_calls | 16／20 | 同一执行的模型／工具预算 |
 | repairs／attempts／no_progress | 3／2／3 | 修正、安全工具尝试、连续无进展上限 |
 | active_seconds | 300 | 活动执行时间，等待不计入 |
 | output_tokens | 8192 | 模型输出上限 |
 | prompt_bytes／tool_bytes | 1048576／32768 | 输入／工具反馈序列化字节上限 |
 
 以 policy.py 的实际值为准；这些是 Python 值对象默认值，没有一组同名环境变量开关。模型参数与 HTTP 超时在上层 model／tools 中定义。
+
+模型输入由 calls.py 的 model_view 投影：QUERY 省略词级时间等原始 observation 明细，保留原文、证据身份、时间及情绪／语言；DRAFT 保留剪辑需要的完整明细。已读概览条目、反馈中的重复 records 不再重复发送，概览不暴露可误作引用的 navigation_ids。reading 汇总目标素材读取进度和下一页参数，budget 给出包含当前调用在内的剩余次数。完整证据、工具回执和原有输入哈希仍保留，用于校验与恢复。
 
 ## 6. 错误处理与观测
 

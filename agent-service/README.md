@@ -150,7 +150,7 @@ stdout 为协议 JSON，进度和提示在 stderr。FAILED／INCOMPLETE 退出 1
 | `JAVA_URL` | Worker 默认 http://business-api:8080 | CLI 使用显式 --java-url，不自动沿用该变量 |
 | `RABBITMQ_HOST`、`RABBITMQ_PORT`、`RABBITMQ_USER`、`RABBITMQ_PASSWORD` | Worker 默认 rabbitmq／5672／agentic-worker；密码必需 | agent.v1，prefetch=1，exclusive consumer |
 | `AGENT_DATA_DIRECTORY` | Config 从进程环境取，默认 .local；Compose /state | agent.sqlite 及锁文件，持久 agent_state 卷 |
-| `Limits` | [policy.py](agent_service/runtime/policy.py) | 模型 12 次、工具 20 次、修正 3 次、活动 300 秒；其它限制见 runtime |
+| `Limits` | [policy.py](agent_service/runtime/policy.py) | 模型 16 次、工具 20 次、修正 3 次、活动 300 秒；其它限制见 runtime |
 | `LANGFUSE_PUBLIC_KEY`、`LANGFUSE_SECRET_KEY`、`LANGFUSE_BASE_URL` | 可选本机观测；CLI localhost:3035，Worker host.docker.internal:3035 | 观测不是业务状态或付费回执权威 |
 
 CLI 按进程环境优先，随后依次补读根 `.env`、模块 `.env.langfuse`、模块 `.env`；dotenv 不覆盖已存在环境。CLI 默认目录在参数解析时创建 Config，建议用 `--data-dir` 明确指定，而非依赖后加载 dotenv 改变默认。Worker 由 Compose 注入环境，不加载 CLI dotenv。
