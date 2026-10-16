@@ -26,7 +26,9 @@ public class ProductionSaves {
         if(rows.isEmpty())throw new ResponseStatusException(NOT_FOUND,"制作需求尚无保存结果");
         return parse(rows.get(0).get("production_save_result_json"));
     }
-    public JsonNode save(UUID production,JsonNode body) {
+    public JsonNode save(UUID production,JsonNode body) {return save(production,body,false);}
+    public JsonNode accept(UUID production,JsonNode body) {return save(production,body,true);}
+    private JsonNode save(UUID production,JsonNode body,boolean browserAcceptance) {
         final EditDraftContracts.SaveRequest input;
         final UUID project,scope,validation;
         try {
@@ -35,9 +37,11 @@ public class ProductionSaves {
             if(!production.equals(UUID.fromString(input.requirement_id())))throw new IllegalArgumentException("制作需求与路由不匹配");
         } catch(IllegalArgumentException invalid){throw new ResponseStatusException(BAD_REQUEST,invalid.getMessage());}
         return transaction.execute(tx->{
-            var bindings=db.queryForList("SELECT project_id,scope_id FROM edit_productions WHERE id=? FOR UPDATE",production);
+            var bindings=db.queryForList("SELECT project_id,scope_id,conversation_id FROM edit_productions WHERE id=? FOR UPDATE",production);
             if(bindings.isEmpty())throw new ResponseStatusException(NOT_FOUND,"制作需求不存在");
             var binding=bindings.get(0);
+            if(binding.get("conversation_id")!=null && !browserAcceptance)
+                throw new ToolFailure("BROWSER_ACCEPTANCE_REQUIRED","IDENTITY_CONFLICT","浏览器制作须由用户接受当前草稿");
             if(!project.equals(binding.get("project_id")) || !scope.equals(binding.get("scope_id")))
                 throw new ToolFailure("SAVE_IDENTITY_CONFLICT","IDENTITY_CONFLICT","保存身份与固定制作需求不匹配");
             var receipts=db.queryForList("SELECT * FROM edit_draft_validations WHERE id=? AND production_id=? AND project_id=? AND scope_id=?",validation,production,project,scope);

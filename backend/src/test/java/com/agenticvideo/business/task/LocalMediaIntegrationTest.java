@@ -157,8 +157,9 @@ class LocalMediaIntegrationTest {
         var sessionReply=browser.post("/projects/"+project+"/conversations",new ObjectMapper().writeValueAsString(java.util.Map.of("title","旧入口检查","assetIds",java.util.List.of(asset))));
         assertEquals(201,sessionReply.statusCode(),sessionReply.body());
         var session=json(sessionReply).path("data").path("id").asText();
-        assertEquals(503,browser.post("/conversations/"+session+"/turns","{\"content\":\"视频讲了什么\"}").statusCode());
-        assertEquals(0,db.queryForObject("SELECT count(*) FROM tasks WHERE type='AGENT_TURN' AND status='PENDING'",Integer.class));
+        // New Agent admission is durable; its Worker dispatch is a separate implementation step.
+        assertEquals(202,browser.post("/conversations/"+session+"/turns","{\"content\":\"视频讲了什么\"}").statusCode());
+        assertEquals(1,db.queryForObject("SELECT count(*) FROM tasks WHERE type='AGENT_TURN' AND status='PENDING'",Integer.class));
 
         java.util.UUID revision=java.util.UUID.randomUUID(),plan=java.util.UUID.randomUUID(),output=java.util.UUID.randomUUID();
         db.update("INSERT INTO edit_plans(id,project_id,title,next_revision_number) VALUES (?,?,'媒体回归方案',2)",plan,java.util.UUID.fromString(project));

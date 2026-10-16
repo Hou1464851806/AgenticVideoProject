@@ -1,5 +1,7 @@
 # Java 后端
 
+对话生命周期第 3 步已增加新版消息接纳、`/internal/v1/agent-runs/**` 执行绑定／工具／结果事务与浏览器草稿接受；旧 Agent／Worker 开关保持关闭。新消息先持久为 PENDING，Worker／MQ 调度与草稿预览、前端接入仍按后续步骤实施。协议、验证与交接见[步骤 3 记录](../docs/verification/conversation-lifecycle-step3.md)。
+
 M4 步骤 1 提供 `POST /internal/v1/productions/{requirement_id}/previews`（JSON `{}` 或 `{"output_key":"out-1"}`）及同路径 GET 列表，使用现有 `INTERNAL_WORKER_TOKEN` Bearer 认证。仅接受已保存制作，由服务端解析版本与输出，新建 202、复用 200。步骤 2 已增加 `GET /internal/v1/previews/{request_id}`、`POST /internal/v1/previews/{request_id}/cancel` 和 `/retry`。详情实时核对产物并生成 300 秒播放链接；普通提交不会自动重做失败／取消／失效的预览，显式重试始终返回原请求的固定后继。存储异常返回 503，不改写为文件失效。步骤 3 已接通 [Python CLI 五个预览命令](../agent-service/README.md#显式预览已保存方案m4-步骤-3)，不使用模型；步骤 4 已通过真实视频／故障自动验收，用户已确认五条视频完整观看试听无问题；步骤 5 两轴审查、Java/Python 完整非付费回归及后端打包已通过，M4 已收尾。完整范围和验证见 [M4 实施记录](../docs/verification/java-tools-m4.md)。
 
 

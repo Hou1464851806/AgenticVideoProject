@@ -22,11 +22,14 @@ public class ReadTools {
     private final com.agenticvideo.business.plan.ProductionDrafts productions;
     public ReadTools(JdbcTemplate db,ObjectMapper json,QuestionScopes scopes,QuestionEvidence evidence,com.agenticvideo.business.plan.ProductionDrafts productions){this.db=db;this.json=json;this.scopes=scopes;this.evidence=evidence;this.productions=productions;}
     public JsonNode execute(UUID scopeId,JsonNode request) {return execute(scopeId,null,request);}
-    public JsonNode execute(UUID scopeId,UUID productionId,JsonNode request) {
+    public JsonNode execute(UUID scopeId,UUID productionId,JsonNode request) {return execute(scopeId,productionId,request,null);}
+    public JsonNode execute(UUID scopeId,UUID productionId,JsonNode request,com.agenticvideo.business.plan.ProductionDrafts.Execution execution) {
         for(String name:List.of("call_id","tool_name","request_hash"))
             if(!request.path(name).isTextual()||request.path(name).asText().isBlank()||request.path(name).asText().length()>200)
                 throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST,"调用身份字段无效");
         if(bytes(request)>65536)throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST,"工具请求超出字节上限");
+        if(productionId!=null && execution==null && db.queryForObject("SELECT conversation_id IS NOT NULL FROM edit_productions WHERE id=?",Boolean.class,productionId))
+            throw new ToolFailure("BROWSER_EXECUTION_REQUIRED","IDENTITY_CONFLICT","浏览器制作不能通过 CLI 写入口校验");
         Scope scope=scopes.get(scopeId);
         var result=base(request);
         boolean admitted=false;
@@ -43,7 +46,7 @@ public class ReadTools {
             if(!parse(receipt.get("request_json")).equals(admittedRequest))throw new ToolFailure("CALL_ID_CONFLICT","IDENTITY_CONFLICT","相同调用身份的工具或参数不同");
             if(receipt.get("result_json")!=null)return parse(receipt.get("result_json"));
             if(!admitted)throw new ToolFailure("CALL_UNCONFIRMED","EXECUTION_UNCONFIRMED","调用仍在执行或结果尚未核对，停止本次尝试");
-            if(productionId!=null){((ObjectNode)result.path("coverage")).put("scope_id",scopeId.toString());return productions.validate(scope,productionId,request,result);}
+            if(productionId!=null){((ObjectNode)result.path("coverage")).put("scope_id",scopeId.toString());return productions.validate(scope,productionId,request,result,execution);}
             var args=request.path("arguments");String name=request.path("tool_name").asText();
             validateArguments(name,args);
             int cursor=args.path("cursor").asInt(0);

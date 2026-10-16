@@ -23,6 +23,8 @@ public class ConversationController {
         if(!legacyAgentEnabled)throw new org.springframework.web.server.ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,"旧 Agent 对话执行已停用；M1 问答使用 Python CLI");
     }
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.agenticvideo.business.agentrun.AgentRuns agentRuns;
     private final ConversationQuestions questions;
     private final JdbcTemplate database;
     private final ProjectAccess access;
@@ -124,8 +126,7 @@ public class ConversationController {
     public Map<String, Object> accept(@PathVariable UUID conversationId,
             @RequestHeader("Idempotency-Key") String key, @Valid @RequestBody Turn request, Authentication account) {
         requireOwned(conversationId, account);
-        requireAgentEnabled();
-        return response(turns.accept(conversationId, key, request));
+        return response(legacyAgentEnabled?turns.accept(conversationId,key,request):agentRuns.accept(conversationId, key, request));
     }
 
     private static Map<String, Object> response(Object data) {

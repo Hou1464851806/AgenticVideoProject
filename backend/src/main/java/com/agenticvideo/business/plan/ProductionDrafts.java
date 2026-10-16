@@ -37,7 +37,14 @@ public class ProductionDrafts {
         var rows=db.queryForList("SELECT project_id,scope_id FROM edit_productions WHERE id=?",id);
         if(rows.isEmpty())throw new ResponseStatusException(NOT_FOUND,"制作需求不存在");return rows.get(0);
     }
+    public record Execution(UUID taskId,UUID attemptId,long editGeneration) {}
     public JsonNode validate(Scope scope,UUID production,JsonNode request,ObjectNode envelope) {
+        return validate(scope,production,request,envelope,null);
+    }
+    public JsonNode validate(Scope scope,UUID production,JsonNode request,ObjectNode envelope,Execution execution) {
+        var browser=db.queryForMap("SELECT conversation_id,requirements_json FROM edit_productions WHERE id=?",production);
+        if(browser.get("conversation_id")!=null && execution==null)
+            throw new ToolFailure("BROWSER_EXECUTION_REQUIRED","IDENTITY_CONFLICT","浏览器制作必须通过当前执行校验");
         requireMediaSnapshot(scope);
         final EditDraftContracts.Input input;
         try {input=EditDraftContracts.validation(request.path("arguments"));}
@@ -46,6 +53,8 @@ public class ProductionDrafts {
             throw new ToolFailure("CONTENT_HASH_MISMATCH","IDENTITY_CONFLICT","草稿或条件哈希核验失败");
         var assetIds=new HashSet<String>();scope.assets().forEach(a->assetIds.add(a.path("id").asText()));
         if(!assetIds.containsAll(input.requirements().asset_ids()))throw new ToolFailure("ASSET_OUTSIDE_SCOPE","PERMISSION_DENIED","制作条件包含固定范围以外的素材");
+        if(execution!=null && !parse(browser.get("requirements_json")).equals(json.valueToTree(input.requirements())))
+            throw new ToolFailure("REQUIREMENTS_MISMATCH","IDENTITY_CONFLICT","校验条件与本轮持久制作条件不符");
         UUID id=UUID.randomUUID();var checked=validation.validate(scope,input,id);envelope.set("data",checked.result());
         bound(envelope);
         return transaction.execute(tx->{
@@ -59,6 +68,7 @@ public class ProductionDrafts {
                     VALUES (?,?,?,?,?,?,?,?,?::jsonb,?::jsonb,?::jsonb,?::jsonb,?::jsonb,clock_timestamp())
                     """,id,production,scope.projectId(),scope.id(),request.path("call_id").asText(),input.draft_hash(),input.requirements_hash(),EditDraftValidation.RULE_VERSION,
                     json.valueToTree(input.draft()).toString(),json.valueToTree(input.requirements()).toString(),checked.sources().toString(),envelope.path("data").toString(),checked.content()==null?null:checked.content().toString());
+            if(execution!=null)db.update("UPDATE edit_draft_validations SET source_task_id=?,source_attempt_id=?,edit_generation=? WHERE id=?",execution.taskId(),execution.attemptId(),execution.editGeneration(),id);
             db.update("UPDATE question_tool_receipts SET result_json=?::jsonb WHERE scope_id=? AND call_id=?",envelope.toString(),scope.id(),request.path("call_id").asText());
             return envelope;
         });
@@ -78,5 +88,6 @@ public class ProductionDrafts {
         }
         while(bytes(envelope)>EditDraftContracts.RESULT_BYTES && !issues.isEmpty()){issues.remove(issues.size()-1);data.put("issues_truncated",true);}
     }
+    private JsonNode parse(Object value){try{return json.readTree(value.toString());}catch(java.io.IOException invalid){throw new IllegalStateException(invalid);}}
     private int bytes(JsonNode value){return value.toString().getBytes(StandardCharsets.UTF_8).length;}
 }

@@ -109,9 +109,7 @@ public class TaskExecution {
     public int attemptCount(UUID id) { return database.queryForObject("SELECT count(*) FROM task_attempts WHERE task_id=?",Integer.class,id); }
     public Object claim(UUID id, TaskController.Claim request) {
         return transactions.execute(tx -> {
-            var rows = database.queryForList("SELECT * FROM tasks WHERE id=? FOR UPDATE", id);
-            if (rows.isEmpty()) throw new ResponseStatusException(NOT_FOUND, "任务不存在");
-            var task = rows.get(0);
+            var task = locked(id);
             if (!java.util.List.of("MEDIA_PREPARE","VISION_PREPARE","VISION_ANALYZE","INSPECTION_PREPARE","INSPECTION_ANALYZE","CONTENT_ANALYZE","INDEX_BUILD","AGENT_TURN","PREVIEW_RENDER","EXPORT_RENDER").contains(task.get("type"))) throw new ResponseStatusException(CONFLICT, "执行器不能领取此任务类型");
             if ("RUNNING".equals(task.get("status"))) {
                 var attempt = database.queryForMap("SELECT *, lease_expires_at>now() AS valid FROM task_attempts WHERE id=?", task.get("current_attempt_id"));
@@ -143,7 +141,10 @@ public class TaskExecution {
                 || requireLive && !Boolean.TRUE.equals(attempt.get("live"))) throw new ResponseStatusException(CONFLICT, "任务执行凭证或租约已失效");
         return attempt;
     }
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.agenticvideo.business.agentrun.AgentRunLocks agentLocks;
     private Map<String, Object> locked(UUID id) {
+        agentLocks.beforeTask(id);
         var rows = database.queryForList("SELECT * FROM tasks WHERE id=? FOR UPDATE", id);
         if (rows.isEmpty()) throw new ResponseStatusException(NOT_FOUND, "任务不存在");
         return rows.get(0);
@@ -209,6 +210,8 @@ public class TaskExecution {
         return outcome;
     }
     public Object complete(UUID id, TaskController.Completed request) {
+        if(database.queryForObject("SELECT count(*) FROM conversation_execution_requests WHERE task_id=? AND schema_version='1.0'",Integer.class,id)>0)
+            throw new ResponseStatusException(CONFLICT,"新版 Agent 须通过独立结果发布入口");
         com.agenticvideo.business.search.SearchIndexes.Verified verified=null;
         if("INDEX_BUILT".equals(request.resultType())) {
             var snapshot=transactions.execute(tx->{
