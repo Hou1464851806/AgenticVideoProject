@@ -36,7 +36,18 @@ async def scenario(fixture):
                 assert ctx['validation']['valid'] is False
                 return {'kind': 'TOOL', 'tool_name': 'read_video_range', 'arguments': {
                     'asset_id': asset['id'], 'start_ms': start, 'end_ms': end}}
-            return invalid if step in (0, 3) else valid
+            if step in (0, 3):
+                return invalid
+            corrected = copy.deepcopy(valid)
+            candidate = ctx['draft_repair']['outputs']['out-1']['clips'][0]['candidates'][0]
+            corrected['draft']['outputs'][0]['clips'][0].update({key: candidate[key]
+                for key in ('source_in_ms', 'source_out_ms', 'evidence_ids')})
+            trace[-1]['repair_candidate'] = candidate
+            # Repair output 1 while the model accidentally regresses/reorders output 2.
+            corrected['draft']['outputs'][1]['clips'][0]['source_out_ms'] = 4000
+            corrected['draft']['outputs'].reverse()
+            assert ctx['draft_repair']['preserve_output_keys'] == ['out-2']
+            return corrected
         lost_validation = []
         class FaultAfterResponse(JavaToolExecutor):
             async def execute(self, request):
@@ -54,6 +65,7 @@ async def scenario(fixture):
         assert first['status'] == 'DRAFT_READY', first
         assert first['validation']['durations_ms'] == [6000, 4000]
         assert first['validation']['valid'] is True
+        assert first['draft']['outputs'][1] == valid['draft']['outputs'][1]
         issues = [i['code'] for t in trace if t['validation'] for i in t['validation']['issues']]
         assert 'CONTEXT_NOT_READ' in issues and 'CUT_INSIDE_WORD' in issues, issues
         assert first['usage']['repairs'] == 2

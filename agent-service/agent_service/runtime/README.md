@@ -17,6 +17,7 @@
 | [graph.py](graph.py) | `build_graph` 连接节点，统一按 next_node 路由 |
 | [state.py](state.py) | Requirements、Understanding、Action、State、Context 与条件来源合并 |
 | [calls.py](calls.py) | 稳定模型 call_id、输入哈希、调用前登记与响应复用 |
+| [draft_repair.py](draft_repair.py) | 按 output_key 保护已合格输出、同步引用及生成联合约束候选 |
 | [persistence.py](persistence.py) | Store：executions、model_calls、conversation_runs、execution_transfers |
 | [policy.py](policy.py) | Limits、错误类别、fingerprint、活动时间及取消检查 |
 | [nodes/request.py](nodes/request.py) | 准备当前轮次、理解消息及关系 |
@@ -53,6 +54,8 @@ flowchart LR
 3. 决策读取工具，累积真实证据与分页范围。DRAFT 动作由程序强制转为 validate_edit_draft，模型不能略过。
 4. 校验未通过时保存完整结构化问题，有限修正；相同问题无进展或预算耗尽返回 INCOMPLETE。成功核对当前哈希与引用后返回 DRAFT_READY。
 5. CLI 由用户另行 save；浏览器由 Java 接受事务保存和确认，不调用 CLI save。
+
+同一轮修正按 output_key 保留上次完整校验未报错的输出；问题被截断、含全局错误或校验哈希不匹配时不作保护判断，新一轮用户请求清除修正基线。提交时只移除已读、同素材同版本且确定与区间不相交的引用，不延长片段、不添加证据；无法保留任何引用时明确要求重新选取。模型可见 draft_repair 提供失败输出的时长差额、待删除引用，以及同时筛选时长、词边界、已读范围与相交依据的候选。候选不证明语义完整性，也不替代禁用内容等 Java 规则；所有输出仍整体校验，修正与执行额度不重置。
 
 ### 中断与补答
 

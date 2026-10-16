@@ -4,6 +4,7 @@ from pydantic import ValidationError
 from ...tools.catalog import READ_TOOLS
 from ...tools.contracts import PARAMETERS, ToolRequest
 from ..calls import invoke_model
+from ..draft_repair import prepare_draft
 from ..policy import LimitReached, ModelFormatError, SubmissionUnknown, fingerprint
 from ..state import Action, Context, State, Requirements
 
@@ -57,7 +58,7 @@ def check_action(state: State, runtime: Runtime[Context]):
                 raise ValueError("当前请求没有授权生成草稿")
             if action.draft is None:
                 raise ValueError("DRAFT requires draft")
-            draft = action.draft.model_dump()
+            draft = prepare_draft(action.draft.model_dump(), state, ctx.assets)
             name = "validate_edit_draft"
             requirements = Requirements.model_validate(state["requirements"]).production(sorted(ctx.assets))
             args = {"draft": draft, "requirements": requirements,

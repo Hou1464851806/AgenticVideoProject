@@ -63,6 +63,37 @@ def runner(path, backend, model, limits=None):
 
 
 @pytest.mark.asyncio
+async def test_repair_preserves_good_output_by_key_and_revalidates_all(tmp_path):
+    backend = ProductionBackend()
+    initial = copy.deepcopy(DRAFT)
+    initial['draft']['outputs'].append({**copy.deepcopy(initial['draft']['outputs'][0]), 'output_key': 'out-2'})
+    backend.issues = [{'code': 'OUTPUT_DURATION', 'field': 'outputs[0]', 'output_key': 'out-1',
+                       'message': '超时', 'actual': 10000, 'expected': {'max_ms': 9000}}]
+    def actions(ctx):
+        step = ctx['usage']['decisions']
+        if step == 0:
+            return READ
+        if step == 1:
+            return initial
+        assert ctx['draft_repair']['preserve_output_keys'] == ['out-2']
+        corrected = copy.deepcopy(initial)
+        corrected['draft']['outputs'][0]['clips'][0]['source_out_ms'] = 9000
+        corrected['draft']['outputs'][1]['clips'][0]['source_out_ms'] = 1
+        corrected['draft']['outputs'][1]['title'] = '不应改坏的输出'
+        corrected['draft']['outputs'].reverse()
+        backend.issues = []
+        return corrected
+    result = await runner(tmp_path, backend, ScriptedModel({**UNDERSTAND, 'output_count': 2,
+        'output_durations': [{'output_key': 'out-1', 'duration_max_ms': 9000}]}, actions)).send('制作两条')
+    assert result['status'] == 'DRAFT_READY'
+    sent = backend.validations[-1]['arguments']['draft']['outputs']
+    assert [o['output_key'] for o in sent] == ['out-1', 'out-2']
+    assert sent[1] == initial['draft']['outputs'][1]
+    assert sent[0]['clips'][0]['source_out_ms'] == 9000
+    assert len(backend.validations) == 2
+
+
+@pytest.mark.asyncio
 async def test_real_draft_forces_validation_and_preserves_full_feedback(tmp_path):
     backend = ProductionBackend()
     issue = {'code': 'RANGE_NOT_READ', 'field': 'outputs[0].clips[0]', 'message': '需补读' * 600,

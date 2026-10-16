@@ -1,5 +1,6 @@
 """Budgeted model calls with stable identities and cancellable I/O."""
 from .policy import ModelFormatError, await_operation, fingerprint
+from .draft_repair import repair_plan
 
 
 def model_context(state):
@@ -68,6 +69,7 @@ async def invoke_model(state, runtime, phase, config):
     # Hash the unchanged core context so pre-deployment receipts remain reusable.
     input_hash = fingerprint({"phase": phase, "context": context})
     context = model_view(context)
+    context["draft_repair"] = repair_plan(state, ctx.assets)
     context["budget"] = {"model_calls_remaining": ctx.limits.model_calls - ctx.store.usage(execution_id)["model_calls"]}
     if hasattr(ctx.model, "prepare"):
         ctx.model.prepare(phase, context)
@@ -77,7 +79,7 @@ async def invoke_model(state, runtime, phase, config):
         ctx.tracer.reused(call_id)
         reply = saved
     else:
-        model_config = {**config, "metadata": {**config.get("metadata", {}), "call_id": call_id, "prompt_version": "mvp-2"}}
+        model_config = {**config, "metadata": {**config.get("metadata", {}), "call_id": call_id, "prompt_version": "mvp-3"}}
         try:
             reply = await await_operation(ctx.model.invoke(phase, context, model_config), ctx, execution_id)
             ctx.store.received(call_id, reply)

@@ -9,7 +9,7 @@ from ..state import Context, State, Understanding, merge_requirements
 
 def prepare_turn(state: State):
     return {"action": None, "pending_tool": None, "feedback": None, "waiting": None, "understanding": None,
-            "resume_input": None, "outcome": None, "stop_reason": None,
+            "resume_input": None, "outcome": None, "stop_reason": None, "previous_validation": None,
             "usage": state["request"].get("continuation_usage", {"tools": 0, "repairs": 0, "no_progress": 0, "decisions": 0}),
             "model_sequence": state["request"].get("continuation_sequence", 0)}
 
