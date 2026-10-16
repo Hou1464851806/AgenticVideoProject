@@ -9,7 +9,7 @@ Agent 核心负责 LangGraph 决策、条件、证据、草稿、等待、预算
 
 新版任务使用独立 `agent.v1` 队列，经 `/internal/v1/agent-runs/**` 领取固定输入，调用 `Agent.prepare_run/execute_run`，通过当前 attempt／lease／编辑代次执行工具并发布结果。Java 是业务状态权威；Python SQLite 保留原 checkpoint、execution 与付费回执。legacy Agent／Worker 开关继续关闭。草稿预览和前端卡片仍待第 5～6 步，完整记录见[第 4 步验证与交接](../docs/verification/conversation-lifecycle-step4.md)。
 
-在根 `.env` 配置 `DEEPSEEK_API_KEY` 后，从仓库根目录执行 `docker compose up -d --build agent-worker`。Compose 注入 Java 地址、内部 Worker token 和 RabbitMQ 凭据；`agent_state:/state` 持久保存 SQLite。不要删除该卷、手工清理调用回执或扩容此服务；本地文件锁与 MQ exclusive consumer 保证单实例、prefetch=1。CLI 继续使用原入口及自己的数据目录。
+在根 `.env` 配置 `DEEPSEEK_API_KEY` 后，从仓库根目录执行 `scripts/start.sh`。Compose 注入 Java 地址、内部 Worker token 和 RabbitMQ 凭据；`agent_state:/state` 持久保存 SQLite。不要删除该卷、手工清理调用回执或扩容此服务；本地文件锁与 MQ exclusive consumer 保证单实例、prefetch=1。CLI 继续使用原入口及自己的数据目录。
 
 Worker 只在 Java 持久收束结果／等待／失败／取消后 ACK。网络中断关闭未 ACK 的通道；Java 租约过期收回旧 attempt 并重新通知，原执行恢复且不重置预算。确定模型回执复用，SUBMITTING／UNKNOWN 明确停止，不自动重付。仅确有未完成恢复点且无不确定付费回执的中断标为 `EXECUTION_INTERRUPTED` 并允许浏览器显式 retry；已经结束的 INCOMPLETE、预算耗尽和未知付费提交不提供重置入口。详细命令与受控验证见交接记录。
 
@@ -68,6 +68,20 @@ curl -f http://localhost:3035/api/public/health
 ```
 
 打开 <http://localhost:3035>。账号和密码见私有 `.env.langfuse` 的 `LANGFUSE_INIT_USER_EMAIL` / `LANGFUSE_INIT_USER_PASSWORD`；初始化脚本不打印凭据，已有文件不会覆盖。CLI 自动加载这个文件。独立数据卷与项目业务设施隔离，Web 仅绑定本机 3035，样本对象存储仅绑定本机 9095。镜像已按本次验证的 digest 固定，Langfuse 服务版本 4.59.0。
+
+浏览器 Worker 使用 Docker Desktop 的 `http://host.docker.internal:3035` 访问本机观测栈。根目录 `scripts/start.sh` 在私有 `agent-service/.env.langfuse` 存在时自动读取它，再读取根 `.env`（同名配置以后者为准）；仅向 Worker 注入 Langfuse 公钥、密钥和容器地址，不传入观测栈的数据库或管理账号凭据。未配置密钥时观测仍为可选，并在 Worker 日志明确提示。已有观测栈启动后，只重建 Worker 可在仓库根目录执行：
+
+```sh
+docker compose --env-file agent-service/.env.langfuse --env-file .env up -d --build --no-deps agent-worker
+```
+
+浏览器请求的理解与执行片段使用业务 `conversationId` 作为 Langfuse session ID，多个 trace 归入同一会话。配置生效前未采集的请求不会自动补回。
+
+重启后可从仓库根目录运行非付费验证。该脚本在 Worker 容器内运行实际 `execute_delivery`，模拟 Java 接口和模型，使用临时 SQLite，并通过真实 Langfuse Observations API 核对理解／执行两条 trace、LangGraph callback 及同一 session 关联；不会修改业务会话或调用付费模型：
+
+```sh
+docker exec -i agenticvideo-agent-worker-1 python < agent-service/scripts/verify_worker_langfuse.py
+```
 
 每次运行或恢复生成一个 trace，使用相同 execution_id 关联恢复片段；LangGraph callback 记录节点，真实 DeepSeek 调用记录 generation 和 token，执行器边界记录带当前 `mock` 标记和调用身份的工具 observation。脚本模型不会伪造 generation。Langfuse 不可用会有终端警告，Agent 仍使用 SQLite 正常运行。
 

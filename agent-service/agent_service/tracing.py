@@ -28,7 +28,7 @@ class Tracer:
         if not public or not secret:
             print("观测未启用：缺少本机 Langfuse 配置。", file=sys.stderr)
             return
-        if urlparse(base).hostname not in ("localhost", "127.0.0.1", "::1"):
+        if urlparse(base).hostname not in ("localhost", "127.0.0.1", "::1", "host.docker.internal"):
             raise ValueError("This MVP requires local self-hosted Langfuse")
         try:
             import httpx

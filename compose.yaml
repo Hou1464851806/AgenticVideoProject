@@ -123,6 +123,9 @@ services:
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_BASE_URL: http://host.docker.internal:3035
       AGENT_DATA_DIRECTORY: /state
     volumes:
       - agent_state:/state

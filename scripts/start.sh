@@ -15,4 +15,8 @@ for task_config_key in RABBITMQ_PASSWORD INTERNAL_WORKER_TOKEN; do
     printf '%s=%s\n' "$task_config_key" "$(openssl rand -hex 32)" >> .env
   fi
 done
-docker compose up --build -d
+compose_command=(docker compose)
+if [[ -f agent-service/.env.langfuse ]]; then
+  compose_command+=(--env-file agent-service/.env.langfuse --env-file .env)
+fi
+"${compose_command[@]}" up --build -d
