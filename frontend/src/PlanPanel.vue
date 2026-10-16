@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { request } from './api';
 import type { Playback } from './AssetLibrary.vue';
 export type PlanSelection = { planId: string; revisionId: string; sessionId: string };
@@ -17,10 +17,15 @@ const selectedPlan = ref(''), selectedRevision = ref('');
 const current = ref<Revision | null>(null), names = ref<Record<string,string>>({});
 const error = ref(''), stopping = ref(false), loading = ref(false);
 type RenderRequest = {requestId:string;taskId:string;revisionId:string;status:string;artifactId?:string;createdAt?:string;configuration?:{profile:string};outputId?:string;error?:{message:string}};
-const preview=ref<RenderRequest|null>(null),previewVersion=ref(0),previewUrl=ref(''),previewBusy=ref(false);
+const preview=ref<RenderRequest|null>(null),previewVersion=ref(0),previewUrl=ref(''),previewBusy=ref(false),previewTitle=ref('');
 const exportHistory=ref<RenderRequest[]>([]);
 const exportDeletePending=ref(false), exportUnavailable=ref(false);
 const deleteCandidate=ref<{artifactId:string;title:string}|null>(null), deleting=ref(false);
+const deleteButton=ref<HTMLButtonElement|null>(null), keepButton=ref<HTMLButtonElement|null>(null), exportSection=ref<HTMLElement|null>(null);
+watch(deleteCandidate, async candidate => {
+  await nextTick();
+  (candidate ? keepButton.value : deleteButton.value ?? exportSection.value)?.focus();
+});
 const exportTitle=ref(''), exportVideo=ref<HTMLVideoElement|null>(null);
 let exportRenewed=false, exportRestore:{seconds:number;playing:boolean}|undefined;
 const confirmationId=ref(''),exportProfile=ref('HD_720'),exportBusy=ref(false);
@@ -102,7 +107,7 @@ async function generatePreview(output:Output) {
   previewBusy.value=true;error.value='';
   try {
     const result=await request<RenderRequest>(`/revisions/${revision}/previews`,'POST',{outputId:output.outputId,previewProfile:'LOW_360'},{'Idempotency-Key':crypto.randomUUID()});
-    if(alive){preview.value=result;previewVersion.value=version;previewUrl.value='';}
+    if(alive){preview.value=result;previewVersion.value=version;previewTitle.value=output.title;previewUrl.value='';}
   }catch(failure){if(alive)error.value=failure instanceof Error?failure.message:'无法生成预览';}
   finally{if(alive)previewBusy.value=false;}
 }
@@ -114,7 +119,7 @@ async function refreshPreview(){
   finally{previewRefreshing=false;}
 }
 async function openStoredPreview(id:string){
-  try{const result=await request<RenderRequest>(`/render-requests/${id}`);const version=await request<Revision>(`/revisions/${result.revisionId}`);if(alive&&props.previewRequestId===id){preview.value=result;previewVersion.value=version.revisionNumber;previewUrl.value='';}}
+  try{const result=await request<RenderRequest>(`/render-requests/${id}`);const version=await request<Revision>(`/revisions/${result.revisionId}`);if(alive&&props.previewRequestId===id){preview.value=result;previewVersion.value=version.revisionNumber;previewTitle.value=version.content.outputs.find(output=>output.outputId===result.outputId)?.title??'输出名称暂不可用';previewUrl.value='';}}
   catch(failure){if(alive)error.value=failure instanceof Error?failure.message:'无法读取聊天预览';}
 }
 async function previewAccess(action:'playback-access'|'download-access'){
@@ -290,7 +295,7 @@ onUnmounted(() => { alive = false; ++epoch; clearInterval(timer); });
         <p v-if="singleExporting || (exportOutputId && outputExporting(exportOutputId))" role="status">此版本、输出与清晰度正在导出，请等待完成或停止当前导出。</p><p>确认的方案不会自动预览或导出。</p>
       </div>
     </template>
-    <section v-if="exported" aria-label="正式成片导出">
+    <section v-if="exported" ref="exportSection" aria-label="正式成片导出" tabindex="-1">
       <h4>正式成片 · 固定 V{{ exportVersion }}</h4><p>{{exportTitle}} · {{exported.configuration?.profile === 'FULL_HD_1080' ? '1080p' : '720p'}}；切换查看版本不会改变此任务的来源。</p>
       <p role="status">{{ ({PENDING:'等待导出',RUNNING:'正在导出',CANCEL_REQUESTED:'正在停止',CANCELLED:'已停止',SUCCEEDED:'导出完成',FAILED:'导出失败'} as Record<string,string>)[exported.status] }}</p>
       <p v-if="exported.error" role="alert">{{ exported.error.message }}</p>
@@ -301,16 +306,16 @@ onUnmounted(() => { alive = false; ++epoch; clearInterval(timer); });
       <template v-if="exported.status==='SUCCEEDED' && !exportRemoved && !exportDeletePending">
         <button v-if="!exportUnavailable" @click="artifactAction('playback-access')">{{exportUrl ? '重新获取播放地址' : '播放正式成片'}}</button>
         <button v-if="!exportUnavailable" @click="artifactAction('download-access')">下载正式成片</button>
-        <button class="text-button danger" @click="deleteCandidate={artifactId:exported.artifactId!,title:exportTitle}">删除成片文件</button>
+        <button ref="deleteButton" class="text-button danger" @click="deleteCandidate={artifactId:exported.artifactId!,title:exportTitle}">删除成片文件</button>
       </template>
-      <div v-if="deleteCandidate" role="alertdialog" aria-label="确认删除成片文件" class="delete-confirmation">
+      <div v-if="deleteCandidate" role="alertdialog" aria-label="确认删除成片文件" class="delete-confirmation" @keydown.esc.stop="!deleting && (deleteCandidate=null)">
         <p>删除“{{deleteCandidate.title}}”的此份成片文件？下载链接将失效，原始素材与方案保留。</p>
-        <button class="secondary" :disabled="deleting" @click="deleteCandidate=null">保留文件</button><button class="danger" :disabled="deleting" @click="deleteExport">确认删除此成片</button>
+        <button ref="keepButton" class="secondary" :disabled="deleting" @click="deleteCandidate=null">保留文件</button><button class="danger" :disabled="deleting" @click="deleteExport">确认删除此成片</button>
       </div>
       <video v-if="exportUrl" ref="exportVideo" :src="exportUrl" @error="artifactAction('playback-access', true)" @loadedmetadata="exportLoaded" controls aria-label="正式成片播放器" style="width:100%;max-height:420px" />
     </section>
     <section v-if="preview" aria-label="低清效果预览">
-      <h4>低清效果预览 · 固定 V{{ previewVersion }}</h4>
+      <h4>低清效果预览 · 固定 V{{ previewVersion }}</h4><p>{{previewTitle}}；切换查看方案或版本不会改变此预览的来源。</p>
       <p role="status">{{ ({PENDING:'等待合成',RUNNING:'正在合成',CANCEL_REQUESTED:'正在停止',CANCELLED:'已停止',SUCCEEDED:'合成完成',FAILED:'合成失败'} as Record<string,string>)[preview.status] }}</p>
       <p v-if="preview.error" role="alert">{{ preview.error.message }}</p>
       <button v-if="['PENDING','RUNNING'].includes(preview.status)" class="secondary" @click="cancelPreview">停止预览</button>

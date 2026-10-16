@@ -169,7 +169,10 @@ async function choose(id: string) {
   references.value[id] ??= [];
   localStorage.setItem(`conversation:${props.projectId}`, id);
   emit('session', id);
-  await loadHistory();
+  try {
+    const [available] = await Promise.all([request<{ items: Asset[] }>(`/projects/${props.projectId}/assets`), loadHistory(true)]);
+    if (alive && selected.value === id) assets.value = available.items;
+  } catch (failure) { if (alive && selected.value === id) error.value = failure instanceof Error ? failure.message : '无法打开对话'; }
 }
 async function createChat() {
   if (creating.value || loading.value) return;
@@ -230,9 +233,9 @@ useProjectEvents(async event => {
 });
 onMounted(async () => {
   try {
-    const [available, existing] = await Promise.all([request<{ items: Asset[] }>(`/projects/${props.projectId}/assets`), request<{ items: Session[] }>(`/projects/${props.projectId}/conversations`)]);
+    const existing = await request<{ items: Session[] }>(`/projects/${props.projectId}/conversations`);
     if (!alive) return;
-    assets.value = available.items; sessions.value = existing.items;
+    sessions.value = existing.items;
     const saved = localStorage.getItem(`conversation:${props.projectId}`);
     if (existing.items.length) await choose(existing.items.find(item => item.id === saved)?.id ?? existing.items.at(-1)!.id);
   } catch (failure) { if (alive) error.value = failure instanceof Error ? failure.message : '无法打开对话'; }
@@ -265,7 +268,7 @@ onUnmounted(() => { alive = false; });
           </div>
           <button v-if="hasNewMessages" class="text-button new-messages" @click="latestMessages">有新消息，回到底部</button>
           <section v-if="history.agent.pendingQuestions.length" class="questions" aria-label="待回答问题"><div v-for="question in history.agent.pendingQuestions" :key="question.questionId"><p>{{question.prompt}}</p><p>在下方回答，也可继续独立问答或开始新制作。</p><button class="text-button" @click="toggleReference({ type: 'QUESTION', id: question.questionId })">引用此问题</button><button class="text-button" :disabled="controlling" @click="control(question.taskId)">停止此等待</button></div></section>
-          <div v-if="history.latestTask" class="task-status"><p role="status">{{ phaseLabels[history.latestTask.phase ?? ''] ?? statusLabels[history.latestTask.status] }}</p><p v-if="history.latestTask.failure" role="alert">{{history.latestTask.failure.message}}</p><p v-if="history.latestTask.status === 'CANCELLED'">本次执行已停止，制作条件和历史保留。</p><button v-if="running" class="text-button" :disabled="controlling || history.latestTask.status === 'CANCEL_REQUESTED'" @click="control(history.latestTask.taskId)">停止回复</button><button v-if="history.latestTask.status === 'FAILED' && history.latestTask.failure?.recoverable && history.latestTask.failure.code === 'EXECUTION_INTERRUPTED'" class="text-button" :disabled="controlling || sending" @click="control(history.latestTask.taskId, true)">重试原需求</button></div>
+          <div v-if="history.latestTask" class="task-status"><p role="status">{{ history.latestTask.status === 'RUNNING' ? phaseLabels[history.latestTask.phase ?? ''] ?? statusLabels.RUNNING : statusLabels[history.latestTask.status] }}</p><p v-if="history.latestTask.failure" role="alert">{{history.latestTask.failure.message}}</p><p v-if="history.latestTask.status === 'CANCELLED'">本次执行已停止，制作条件和历史保留。</p><button v-if="running" class="text-button" :disabled="controlling || history.latestTask.status === 'CANCEL_REQUESTED'" @click="control(history.latestTask.taskId)">停止回复</button><button v-if="history.latestTask.status === 'FAILED' && history.latestTask.failure?.recoverable && history.latestTask.failure.code === 'EXECUTION_INTERRUPTED'" class="text-button" :disabled="controlling || sending" @click="control(history.latestTask.taskId, true)">重试原需求</button></div>
           <form class="composer" @submit.prevent="send">
             <div v-if="references[selected]?.length" class="reference-chips" aria-label="本轮引用"><span v-for="reference in references[selected]" :key="`${reference.type}:${reference.id}`">{{referenceLabel(reference)}}<button type="button" class="text-button" :aria-label="`移除引用 ${referenceLabel(reference)}`" @click="toggleReference(reference)">×</button></span></div>
             <details v-if="session.assetIds.length" class="asset-choices"><summary>引用素材</summary><fieldset><legend>本次明确引用素材</legend><label v-for="asset in assets.filter(item => session!.assetIds.includes(item.id))" :key="asset.id" class="choice"><input type="checkbox" :checked="references[selected]?.some(item => item.type === 'ASSET' && item.id === asset.id)" @change="toggleReference({ type: 'ASSET', id: asset.id })">{{ asset.filename }}</label></fieldset></details>

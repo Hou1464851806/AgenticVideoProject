@@ -55,11 +55,16 @@ let selectionRequest = 0;
 let mounted = true;
 
 function preferenceKey() { return `workspace-view:${props.userId}:${selected.value!.id}`; }
-function setPane(pane: Pane) {
+async function setPane(pane: Pane) {
+  const moveFocus = pane !== activePane.value && document.getElementById(`panel-${activePane.value}`)?.contains(document.activeElement);
   activePane.value = pane;
   restorePane = false;
   try { localStorage.setItem(preferenceKey(), pane); }
   catch { preferenceNotice.value = '浏览器无法保存视图偏好，本次仍可正常切换。'; }
+  if (moveFocus) {
+    await nextTick();
+    document.getElementById(`panel-${pane}`)?.focus();
+  }
 }
 function assetsLoaded(count: number) {
   if (!restorePane) return;
@@ -222,7 +227,7 @@ onUnmounted(() => { mounted = false; ++selectionRequest; window.removeEventListe
 
 <style scoped>
 .diagnostics-notice { padding: 12px 20px; border: 1px solid var(--line); background: #edf3ee; font-size: 13px; }
-.workspace-header { display: flex; align-items: center; gap: 8px; min-height: 88px; border-bottom: 1px solid var(--line); }
+.workspace-header { position: relative; display: flex; align-items: center; gap: 8px; min-height: 88px; border-bottom: 1px solid var(--line); }
 .workspace-brand { display: flex; gap: 12px; align-items: center; text-decoration: none; font-weight: 600; flex-shrink: 0; }
 .workspace-header h1 { flex: 1; min-width: 0; font-size: 20px; margin: 0 16px; }
 .workspace-header button { margin: 0; flex-shrink: 0; }

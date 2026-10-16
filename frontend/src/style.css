@@ -58,6 +58,7 @@ a { color: var(--accent); }
 .skip-link { position: fixed; top: 8px; left: 8px; padding: 12px; background: white; z-index: 5; transform: translateY(-180%); }
 .skip-link:focus { transform: none; }
 @media (max-width: 720px) {
+  .account-menu { position: static; }
   .sign-in { grid-template-columns: 1fr; gap: 24px; padding: 24px 16px; }
   .account { padding: 24px; }
   .authenticated { padding: 0 16px 24px; }

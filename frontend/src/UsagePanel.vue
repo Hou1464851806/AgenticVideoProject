@@ -72,4 +72,7 @@ onUnmounted(()=>clearInterval(timer));
 </template>
 <style scoped>
 .usage{margin:20px 0;padding:20px;border:1px solid #dce5de;border-radius:8px;background:white}.usage h3{font-size:18px}.usage-summary{display:grid;grid-template-columns:1fr 1fr;gap:20px 16px}.usage-summary dt{font-size:13px;color:var(--muted)}.usage-summary dd{margin:4px 0 0;font-size:22px;font-variant-numeric:tabular-nums}summary{min-height:44px;padding:10px 0}.usage button{width:auto;margin:8px 0}table{border-collapse:collapse;width:100%;text-align:left}th,td{padding:10px;border-bottom:1px solid #dce5de;white-space:nowrap}.table-scroll{overflow-x:auto}p{line-height:1.6;font-size:14px}form{max-width:560px}.warning{padding:12px;background:#fff2d6;color:#704500}details{margin:12px 0}summary{cursor:pointer;line-height:1.7}pre{white-space:pre-wrap;overflow-wrap:anywhere}a{color:#245c45}
+@media (max-width: 480px) {
+  .usage-summary > div:last-child { grid-column: 1 / -1; }
+}
 </style>

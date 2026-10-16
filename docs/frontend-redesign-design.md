@@ -1,6 +1,6 @@
 # 前端工作区重构设计
 
-日期：2026-10-16（Asia/Shanghai）。状态：用户已认可重构方向；步骤 1～5 已完成，步骤 6 尚未实施。实施顺序、逐步验收和回归要求见[分步实施计划](frontend-redesign-implementation-plan.md)。
+日期：2026-10-16（Asia/Shanghai）。状态：步骤 1～6 已完成，非付费自动验收与本机更新完成；人工音画待用户试用，见[阶段记录](verification/frontend-redesign-stage.md)。实施顺序、逐步验收和回归要求见[分步实施计划](frontend-redesign-implementation-plan.md)。
 
 ## 目标与设计原则
 
@@ -10,9 +10,9 @@
 
 遵循根 [AGENTS.md](../AGENTS.md)：从用户任务出发，复用现有能力，只增加本次重构所需的最小展示与交互，不扩大业务范围。继续使用 Vue 3、TypeScript、Vite 和原生 CSS，不迁移框架或样式库。
 
-## 当前问题与依据
+## 重构前问题与依据
 
-| 当前事实 | 用户影响 | 设计处理 |
+| 重构前事实 | 用户影响 | 设计处理 |
 | --- | --- | --- |
 | [ProjectWorkspace](../frontend/src/ProjectWorkspace.vue) 在桌面同时展示素材、对话、播放器与方案三列 | 阅读和预览宽度不足，多个任务竞争注意力 | 素材、制作、作品三个主视图；制作使用对话与预览双栏 |
 | [App](../frontend/src/App.vue) 的全局按钮默认全宽、深绿色 | 播放、引用、重试和危险操作缺少主次 | 明确主操作、次操作、文字操作与危险操作 |

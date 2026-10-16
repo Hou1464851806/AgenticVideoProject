@@ -173,13 +173,14 @@ test('confirmation works without a preview and never requests an export', async 
 
 for (const status of ['FAILED', 'CANCELLED']) {
   test(`a new edit generation keeps the old draft readonly after ${status}`, async ({ page }) => {
-    await page.route('**/api/v1/conversations/chat/snapshot', route => route.fulfill({ json: { data: { ...baseSnapshot, latestTask: { taskId: 'new-task', status, failure: status === 'FAILED' ? { code: 'BUDGET_EXHAUSTED', message: '预算已耗尽', recoverable: false } : undefined }, agent: { ...baseSnapshot.agent, currentProduction: { ...baseSnapshot.agent.currentProduction, editGeneration: 3 }, canAcceptDraft: false, canPreviewDraft: false } } } }));
+    await page.route('**/api/v1/conversations/chat/snapshot', route => route.fulfill({ json: { data: { ...baseSnapshot, latestTask: { taskId: 'new-task', status, phase: 'VALIDATING', failure: status === 'FAILED' ? { code: 'BUDGET_EXHAUSTED', message: '预算已耗尽', recoverable: false } : undefined }, agent: { ...baseSnapshot.agent, currentProduction: { ...baseSnapshot.agent.currentProduction, editGeneration: 3 }, canAcceptDraft: false, canPreviewDraft: false } } } }));
     await page.goto('/?project=project');
     await page.getByRole('tab', { name: '制作', exact: true }).click();
     await expect(page.getByRole('button', { name: '确认全部输出', exact: true })).toBeDisabled();
     await expect(page.getByRole('button', { name: '预览草稿', exact: true })).toBeDisabled();
     await expect(page.getByRole('region', { name: '剪辑草稿', exact: true })).toContainText('失败或停止不会恢复旧稿资格');
     await expect(page.getByRole('button', { name: '重试原需求', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('status').filter({ hasText: status === 'FAILED' ? /^失败$/ : /^已停止$/ })).toBeVisible();
   });
 }
 
@@ -216,7 +217,9 @@ test('named plan references send only the existing revision and output identity'
   await page.getByRole('tab', { name: '作品', exact: true }).click();
   await page.getByLabel('查看方案', { exact: true }).selectOption('plan');
   await expect(page.getByRole('heading', { name: 'V1 · 正式短片', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '引用成片 1', exact: true }).click();
+  await page.getByRole('button', { name: '引用成片 1', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#panel-conversation')).toBeFocused();
   await expect(page.getByLabel('本轮引用', { exact: true })).toContainText('V1 · 正式短片');
   await page.getByLabel('对话输入', { exact: true }).fill('讨论这条输出');
   await page.getByRole('button', { name: '发送需求', exact: true }).click();
@@ -244,4 +247,27 @@ test('latest source choice wins when playback access responses arrive out of ord
   await expect(page.getByRole('region', { name: '原片回看', exact: true })).toContainText('选择 2');
   releaseFirst();
   await expect(page.getByLabel('视频播放器', { exact: true })).toHaveAttribute('src', '/source-2.mp4');
+});
+
+test('a chat created after importing assets uses current filenames without a page reload', async ({ page }) => {
+  let imported = false;
+  await page.route('**/api/v1/projects/project/assets', route => route.fulfill({ json: { data: { items: imported ? [{ id: 'asset', filename: '刚导入的素材.mp4', validationStatus: 'VALID' }] : [] } } }));
+  await page.route('**/api/v1/projects/project/conversations', route => route.fulfill({ json: { data: route.request().method() === 'POST' ? { id: 'chat', title: '新制作', assetIds: ['asset'] } : { items: [] } } }));
+  await page.goto('/?project=project');
+  // The import has completed at the HTTP boundary while the chat panel stays mounted.
+  await expect(page.getByRole('button', { name: '新聊天', exact: true, includeHidden: true })).toBeEnabled();
+  imported = true;
+  await page.getByRole('tab', { name: '制作', exact: true }).click();
+  await page.getByRole('button', { name: '新聊天', exact: true }).click();
+  await page.getByText('引用素材', { exact: true }).click();
+  await expect(page.getByLabel('刚导入的素材.mp4', { exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: '剪辑草稿', exact: true })).toContainText('刚导入的素材.mp4');
+});
+
+test('a completed reply shows its terminal status instead of the retained model phase', async ({ page }) => {
+  await page.route('**/api/v1/conversations/chat/snapshot', route => route.fulfill({ json: { data: { ...baseSnapshot, latestTask: { taskId: 'finished', status: 'SUCCEEDED', phase: 'VALIDATING' } } } }));
+  await page.goto('/?project=project');
+  await page.getByRole('tab', { name: '制作', exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: /^已完成$/ })).toBeVisible();
+  await expect(page.getByText('正在验证草稿', { exact: true })).toHaveCount(0);
 });

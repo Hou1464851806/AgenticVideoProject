@@ -102,6 +102,8 @@
 
 ## 测试清单与准入决定
 
+步骤 6 费用复核更正：当前部署 `ANALYSIS_EXECUTION_ENABLED=true`，`MediaProcessing` 会抽取代表帧，`VisualAnalysis.initialize` 会自动入队视觉分析；无音轨只免除 ASR，不等于无模型费用。下表已修正成功静音上传的分类；完整阶段采用隔离 LocalMedia 验证成功媒体，不重跑这些共享部署付费用例。
+
 核对范围：`frontend/e2e/*.spec.ts` 全部现有文件和新增基线文件，以及其直接导入的 `fixtures/render-seed.ts`。当前 Compose 没有历史 `agent-service`、`media-worker`；M4 原文／引用 + Python Worker 为当前对话协议。表中“历史”不等于所有断言无用，只表示不可原封不动当阶段门槛。
 
 门槛“定向”表示后续按业务选用，涉及 UI 改动再适配选择器；“迁移”表示保留业务断言，改为当前 HTTP 夹具或 LocalMedia；“单列”表示真实模型费用或服务故障实验单独安排。本步仅运行下文明确记录的两个文件。
@@ -114,15 +116,16 @@
 | conversation-lifecycle-model | 新版；同隔离环境 + 真实 Python／模型 | 显式付费 | harness 启动隔离容器／Worker | 单列模型验收，禁止默认运行 |
 | projects | 当前认证／项目／窄屏；真实 Java | 无，不上传、不发送 turn | 无 | 步骤 2 定向，保留隔离和导航断言 |
 | auth | 当前认证；真实 DB／API | 无 | 重建 postgres、business-api | 单列故障恢复；普通样式仅验证登录／退出呈现 |
-| uploads | 当前上传；真实服务，第二条丢失响应拦截后透传 | 静音 short-video／VFR 无 ASR；不主动视觉分析 | 无 | 步骤 3 定向，核对实际上传文件后执行 |
+| uploads | 当前上传；真实服务，第二条丢失响应拦截后透传 | 无 ASR，但自动 VLM 可能付费 | 无 | 步骤 6 更正：共享部署单列；成功媒体交隔离 LocalMedia |
 | upload-resume（除 expired part URL） | 当前上传；真实服务／S3 请求拦截，Buffer.alloc 构造不可解码文件 | 无（不可解码输入不进入模型分析） | 无 | 步骤 3 暂停、继续、重选、重复分片定向 |
 | upload-resume：actually expired part URL | 当前上传；真实服务故障注入 | 无 ASR | 重建 business-api，改 URL TTL | 隔离适配后再作门槛，禁止整文件默认跑 |
 | upload-cancel | 当前上传取消／过期；真实服务及授权门控 | 无 ASR（取消前不完成上传／仅创建过期会话） | 重建 business-api，改 TTL／清理参数 | 步骤 3 迁移／隔离执行 |
-| upload-limits（前两条） | 上传／空间；真实 API／媒体 | 无 ASR（无效输入／静音文件） | 重建 business-api；第二条启停旧 media-worker | 定向迁移当前 Java 媒体入口 |
+| upload-limits（前两条） | 上传／空间；真实 API／媒体 | 无效输入无模型；静音成功文件仍可能自动 VLM | 重建 business-api；第二条启停旧 media-worker | 定向迁移当前 Java 媒体入口 |
 | upload-limits：queued preview and export | 历史媒体准备；renderSeed + SQL | 冷缓存 ASR；已有缓存也不能视为隔离 | 重建 business-api、启停旧 media-worker、写 DB | 迁移 LocalMedia／受控空间场景 |
-| media：local MQ、undecodable、hash、over-duration | 当前原片链路；真实 Java／存储，hash 条拦截输入 | 无（静音或无效视频） | 无 | 步骤 3 定向播放／验证失败／清理 |
+| media：local MQ | 当前原片链路；真实 Java／存储，静音可解码文件 | 自动 VLM 可能付费 | 无 | 步骤 6 更正：共享部署单列，真实成功播放交隔离 LocalMedia |
+| media：undecodable、hash、over-duration | 当前验证失败与清理；hash 条拦截输入 | 无，媒体不被接纳 | 无 | 阶段当前非付费定向 |
 | media：variable frame rate and audio offset | 当前媒体时间映射；真实上传 | audio-offset 有音轨，自动分析可能付费 | 无 | 迁移无模型媒体隔离入口或单列 |
-| analysis：verified silent video | 当前静音能力状态；真实服务 | 无 ASR，NOT_APPLICABLE | 无 | 步骤 3 定向，不运行整 analysis 文件 |
+| analysis：verified silent video | 当前静音能力状态；真实服务 | ASR 不适用，但自动 VLM 可能付费 | 无 | 步骤 6 更正：能力状态用受控边界与隔离媒体验证 |
 | analysis：human-transcribed / lost real provider query / uploaded Chinese speech | 真实 ASR；lost query 条代理到真实供应商 | 付费 | lost query 条重建旧 agent-service；发布 MQ 也依赖旧消费者 | 单列模型／故障实验 |
 | analysis-credentials | 历史分析执行环境；真实媒体，清空凭据 | 注入期间无模型；恢复共享服务配置 | 重建旧 agent-service | 迁移当前受控 UNVERIFIED 场景 |
 | analysis-provider-failure | 真实 ASR 代理，损坏供应商输入 | 付费／已提交调用不能作零 | 重建旧 agent-service | 单列 |

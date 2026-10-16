@@ -143,6 +143,11 @@ for (const viewport of [{ width: 1366, height: 768 }, { width: 768, height: 1024
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await expect(page.getByRole('tabpanel', { name: /^(素材|制作|作品)$/ })).toHaveCount(1);
     }
+    await page.getByText('账户', { exact: true }).click();
+    await expect(page.getByRole('button', { name: '退出登录', exact: true })).toBeInViewport({ ratio: 1 });
+    mkdirSync(screenshots, { recursive: true });
+    await page.screenshot({ path: `${screenshots}/controlled-account-${viewport.width}x${viewport.height}.png` });
+    await page.getByText('账户', { exact: true }).click();
     await page.getByRole('button', { name: '用量', exact: true }).click();
     const usage = page.getByRole('complementary', { name: '项目用量', exact: true });
     await expect(usage).toContainText('缺价格的调用 1 次');
@@ -169,10 +174,12 @@ test('unavailable browser storage leaves navigation usable with an explicit noti
 });
 
 test('account logout and session expiry return to sign in without old project controls', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/?project=a');
   await page.getByRole('tab', { name: '制作', exact: true }).click();
   await page.getByLabel('对话输入', { exact: true }).fill('退出前的输入');
   await page.getByText('账户', { exact: true }).click();
+  await expect(page.getByRole('button', { name: '退出登录', exact: true })).toBeInViewport({ ratio: 1 });
   await page.getByRole('button', { name: '退出登录', exact: true }).click();
   await expect(page.getByRole('heading', { name: '登录工作区', exact: true })).toBeVisible();
   await expect(page.getByRole('tab')).toHaveCount(0);
