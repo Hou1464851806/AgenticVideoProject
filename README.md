@@ -1,6 +1,8 @@
 # Agent 视频工作区
 
-M4 步骤 1～5 已完成：内部预览与 CLI、真实视频／故障验收、用户完整观看试听、阶段两轴审查、Java/Python 完整非付费回归及后端打包均已通过。范围、证据与验证限制见 [M4 实施记录](docs/verification/java-tools-m4.md)。
+对话生命周期已接通浏览器 → Java → RabbitMQ → Python Worker：自然语言问答／讨论、生成及修改草稿、确认前低清预览、整体确认、方案列表正式导出与播放下载。阶段验收见[第 7 步记录](docs/verification/conversation-lifecycle-step7.md)，体验顺序见[功能说明](docs/current-features.md)。
+
+此前 M4 步骤 1～5 已完成：内部预览与 CLI、真实视频／故障验收、用户完整观看试听、阶段两轴审查、Java/Python 完整非付费回归及后端打包均已通过。范围、证据与验证限制见 [M4 实施记录](docs/verification/java-tools-m4.md)。
 
 
 使用 Vue 3 和 Spring Boot 提供同源浏览器入口。Java 后端已收敛为 `backend/` 下的单个 Maven 应用，通过 RabbitMQ 在同一进程中执行媒体探测、音频准备、稀疏抽帧和既有预览/导出。PostgreSQL 保存权威业务状态，Silo 保存对象，Qdrant 和 RabbitMQ 保留。M1 已贯通真实上传、Java 百炼分析与索引、Python CLI 四工具问答；综合验收、故障与媒体回归及未验证边界见 [第五阶段记录](docs/verification/java-tools-m1-stage5.md)，运行方式见 [后端说明](backend/README.md)。
@@ -12,6 +14,8 @@ M4 步骤 1～5 已完成：内部预览与 CLI、真实视频／故障验收、
 ```bash
 ./scripts/start.sh
 ```
+
+脚本同时构建业务服务及单实例 Python Worker。首次生成配置后，在根 `.env` 补齐 `DASHSCOPE_API_KEY`（素材分析）和 `DEEPSEEK_API_KEY`（Agent），再次运行脚本应用。Worker 的 `agent_state` 卷保存执行 checkpoint 和付费回执，请保留该卷。
 
 脚本首次生成权限为 600 的 `.env`，其中数据库、存储、消息队列密码和内部执行凭证随机生成。打开 `http://localhost:8080` 创建账号、登录和退出。登录后可创建私有项目并打开素材、对话、播放器与结果工作区；刷新保留当前项目。在素材库选择多个视频，浏览器直接分片上传到 Silo；传输完成后显示待媒体验证状态。验证通过后可查看媒体信息并定位播放；验证失败显示原因和对象清理状态。修改端口时，同时修改 `.env` 中 `APP_PORT` 和 `APP_ALLOWED_ORIGIN`，后者须与浏览器使用的完整 Origin 一致。
 
@@ -27,13 +31,13 @@ Silo WebUI 固定为 [http://localhost:9001](http://localhost:9001)，同样仅�
 
 M1 已实现并运行综合验收。当前上传执行真实媒体准备，Compose 默认开启 Java 基础分析：有音轨进行全音轨 ASR，按稀疏帧执行 VLM，并生成文档 Embedding / Qdrant 索引。需配置 `DASHSCOPE_API_KEY`；缺凭据时对应阶段明确失败，已完成的其他来源仍可用。无音轨 ASR 标为不适用；稀疏视觉不代表逐帧覆盖。权威证据和付费回执由 PostgreSQL 保存。
 
-旧浏览器 Agent 协议继续停用；新版 Agent 已接通 Java → MQ → Python Worker 的问答／草稿／恢复链路，草稿预览与前端卡片仍按后续步骤实施，见[第 4 步交接](docs/verification/conversation-lifecycle-step4.md)。独立 Python CLI 的离线 Mock 模式继续可用，见 [Python 说明](agent-service/README.md)；Java 问答快照与四个读取工具已实现，Python 真实模式已接入，问答／补答／恢复使用固定快照，见 [工具阶段记录](docs/verification/java-tools-m1-stage3.md)与 [Python 接入记录](docs/verification/java-tools-m1-stage4.md)。M2 已接通真实草稿、Java 校验及显式 CLI 保存，受控闭环见 [M2 阶段 4 记录](docs/verification/java-tools-m2-stage4.md)，真实模型制作、多轮修改、保存及失败样本见 [M2 阶段 5 记录](docs/verification/java-tools-m2-stage5.md)。
+旧浏览器 Agent 协议继续停用；新版 `/turns` 接通问答／讨论、草稿／恢复、聊天内预览和整体确认，见[完整设计](docs/conversation-lifecycle-browser-design.md)及[第 7 步验收](docs/verification/conversation-lifecycle-step7.md)。独立 Python CLI 的离线 Mock 模式继续可用，见 [Python 说明](agent-service/README.md)；Java 问答快照与四个读取工具已实现，Python 真实模式已接入，问答／补答／恢复使用固定快照，见 [工具阶段记录](docs/verification/java-tools-m1-stage3.md)与 [Python 接入记录](docs/verification/java-tools-m1-stage4.md)。M2 已接通真实草稿、Java 校验及显式 CLI 保存，受控闭环见 [M2 阶段 4 记录](docs/verification/java-tools-m2-stage4.md)，真实模型制作、多轮修改、保存及失败样本见 [M2 阶段 5 记录](docs/verification/java-tools-m2-stage5.md)。
 
 ## 既有方案与媒体渲染
 
 已有方案版本仍可从工作区查看、播放源片段、生成低清预览、确认并导出。低清预览无需正式确认；正式导出必须先确认具体版本，再选择 720p／1080p。预览和导出固定请求时的方案版本、素材及输出规格，产物可播放和下载。正式成片也可显式删除，下载本身不删除文件。
 
-Python 真实模式支持问答和待保存草稿制作，显式 CLI save 保存方案版本。旧浏览器 Agent 方案生成、方案修改和自然语言制作入口不可用；本次保留的是既有版本的按钮操作和媒体执行，不新增 Agent 到成片链路。
+浏览器直接输入制作或修改要求；当前已校验草稿下可预览或确认全部输出，确认后形成不可变 V1 并出现在方案列表。正式导出仍需点击按钮，多输出每次选择一条。确认后可继续聊天或另起制作；已冻结版本派生编辑尚未开放。自然语言预览／确认／导出会说明页面按钮，不直接执行媒体操作。Python CLI 保留独立开发与验收用途。
 
 ## 开发验证
 

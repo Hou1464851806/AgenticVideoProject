@@ -1,0 +1,75 @@
+import { test, expect } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
+import { writeFile } from 'node:fs/promises';
+
+// Explicit paid acceptance against the isolated Java/MQ/storage harness and actual Python Worker.
+test.skip(process.env.E2E_LIFECYCLE_MODEL !== '1', 'Requires -Dlifecycle.browser=true -Dlifecycle.model=true');
+test('real model understands discussion, evidence question, production and modification through the browser', async ({ page }) => {
+  test.setTimeout(540000);
+  const seed = JSON.parse(process.env.E2E_LIFECYCLE_SEED!);
+  const base = process.env.E2E_BASE_URL!;
+  const csrf = (await (await page.request.get(`${base}/api/v1/auth/csrf`)).json()).data.csrfToken;
+  const login = await page.request.post(`${base}/api/v1/auth/login`, { headers: { 'X-XSRF-TOKEN': csrf }, data: { username: 'm4-silent-owner', password: 'project-strong-password' } });
+  expect(login.status()).toBe(200);
+  await page.goto(`/?project=${seed.projectId}`);
+  const created = page.waitForResponse(response => response.url().endsWith('/conversations') && response.request().method() === 'POST');
+  await page.getByRole('button', { name: '新聊天', exact: true }).click();
+  const conversation = (await (await created).json()).data.id;
+  await expect(page.getByLabel('制作会话', { exact: true })).toHaveValue(conversation);
+  const snapshot = async () => {
+    const response = await page.request.get(`${base}/api/v1/conversations/${conversation}/snapshot`);
+    expect(response.status()).toBe(200); return (await response.json()).data;
+  };
+  const runs: unknown[] = [];
+  const send = async (content: string) => {
+    await page.getByLabel('对话输入', { exact: true }).fill(content);
+    const response = page.waitForResponse(response => response.url().endsWith('/turns') && response.request().method() === 'POST');
+    await page.getByRole('button', { name: '发送需求', exact: true }).click();
+    const accepted = await response; expect(accepted.status()).toBe(202);
+    const task = (await accepted.json()).data.taskId;
+    let completed: any;
+    await expect.poll(async () => {
+      const response = await page.request.get(`${base}/api/v1/tasks/${task}`);
+      expect(response.status()).toBe(200); completed = (await response.json()).data;
+      return completed.status;
+    }, { timeout: 180000, intervals: [1000] }).toMatch(/^(SUCCEEDED|FAILED|WAITING_INPUT|CANCELLED)$/);
+    runs.push({ content, task: completed, snapshot: await snapshot() });
+    await writeFile('../backend/target/conversation-lifecycle-model-evidence.json', JSON.stringify(runs, null, 2));
+    expect(completed.status, JSON.stringify(completed)).toBe('SUCCEEDED');
+    return snapshot();
+  };
+  let state = await send('先讨论一般的剪辑节奏，怎样让开场简洁？现在不要制作。');
+  expect(state.agent.currentProduction).toBeNull();
+  state = await send('这段视频画面中能看到什么？请依据已有画面证据回答。');
+  expect(state.agent.currentProduction).toBeNull();
+  await expect(page.getByRole('button', { name: '核查原视频证据', exact: true }).first()).toBeVisible();
+  state = await send('现在制作一条静音竖屏短片，使用视频开头0到2秒的红色矩形画面，不要字幕，严格2秒。');
+  await expect(page.getByRole('button', { name: '确认全部输出', exact: true })).toBeEnabled();
+  expect(state.agent.currentDraft.normalizedContent.outputs[0].durationMs).toBe(2000);
+  expect(state.agent.currentProduction.requirements.profile).toBe('PORTRAIT_720');
+  expect(state.agent.currentProduction.requirements.subtitles_enabled).toBe(false);
+  const first = state.agent.currentProduction;
+  state = await send('将当前草稿缩短为严格1.5秒，仍使用开头红色矩形画面，其他条件保留。');
+  await expect(page.getByRole('button', { name: '确认全部输出', exact: true }).last()).toBeEnabled();
+  expect(state.agent.currentProduction.productionId).toBe(first.productionId);
+  expect(state.agent.currentProduction.editGeneration).toBeGreaterThan(first.editGeneration);
+  expect(state.agent.currentDraft.normalizedContent.outputs[0].durationMs).toBe(1500);
+  expect(state.agent.currentProduction.requirements.outputs[0].duration_min_ms).toBe(1500);
+  expect(state.agent.currentProduction.requirements.outputs[0].duration_max_ms).toBe(1500);
+  expect(state.agent.currentProduction.requirements.profile).toBe('PORTRAIT_720');
+  expect(state.agent.currentProduction.requirements.subtitles_enabled).toBe(false);
+  await expect(page.getByText(/历史草稿.*只读/)).toBeVisible();
+  await page.getByRole('button', { name: '预览草稿', exact: true }).last().click();
+  await page.getByRole('button', { name: '播放草稿预览', exact: true }).click({ timeout: 60000 });
+  const video = page.getByLabel('聊天草稿预览播放器', { exact: true });
+  await expect.poll(() => video.evaluate((node: HTMLVideoElement) => node.readyState)).toBeGreaterThanOrEqual(1);
+  await video.evaluate(async (node: HTMLVideoElement) => { await node.play(); });
+  await expect.poll(() => video.evaluate((node: HTMLVideoElement) => node.currentTime)).toBeGreaterThan(0.1);
+  expect(await video.evaluate((node: HTMLVideoElement) => [node.videoWidth, node.videoHeight])).toEqual([360, 640]);
+  const response = await page.request.post(`${base}/api/v1/artifacts/${(await snapshot()).previews.items.at(-1).artifactId}/download-access`, { headers: { 'X-XSRF-TOKEN': (await (await page.request.get(`${base}/api/v1/auth/csrf`)).json()).data.csrfToken, 'Idempotency-Key': randomUUID() }, data: {} });
+  expect(response.status()).toBe(200);
+  const media = await page.request.get((await response.json()).data.url);
+  expect(media.status()).toBe(200);
+  await writeFile('../backend/target/conversation-lifecycle-model-preview.mp4', await media.body());
+  await page.screenshot({ path: '../backend/target/conversation-lifecycle-model.png', fullPage: true });
+});

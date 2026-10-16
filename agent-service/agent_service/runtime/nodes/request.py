@@ -25,6 +25,9 @@ async def understand_request(state: State, runtime: Runtime[Context], config):
             if parsed.mode == "UNSUPPORTED":
                 parsed = parsed.model_copy(update={"mode": "DISCUSS"})
             mode, relation = parsed.mode, parsed.conversation_relation
+            current = state["request"]["public_context"]["currentProduction"]
+            if relation == "CONTINUE_PRODUCTION" and (current is None or current["frozen"]):
+                raise ValueError("CONTINUE_PRODUCTION 必须有尚未冻结的 currentProduction；首次制作使用 NEW_PRODUCTION，关系不明使用 CLARIFY")
             patch = parsed.model_dump(exclude={"relation", "mode", "conversation_relation", "question_id", "question", "defaults"}, exclude_none=True) if mode == "DRAFT" else {}
             if not patch.get("output_durations"):
                 patch.pop("output_durations", None)

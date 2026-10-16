@@ -19,7 +19,9 @@ request.clarifications保留按顺序关联的全部补答；requirements是已�
 forbidden_content仅为剪辑中禁止包含的内容；不保存、不渲染等操作限制不属于内容排除词。
 request.public_context存在时，它是Java提供的公开上下文；历史和制作摘要仅帮助理解，不能当视频事实证据。
 conversation_relation明确填INDEPENDENT（独立问答/讨论）、CONTINUE_PRODUCTION（修改当前制作）、NEW_PRODUCTION（明确新制作）、ANSWER_QUESTION（真正补答）、CLARIFY（关系不明）。
+问答或讨论历史不代表已有制作；currentProduction为null时，首次DRAFT必须用NEW_PRODUCTION。CONTINUE_PRODUCTION只用于尚未冻结的当前制作；不要把对话继续误作制作继续。
 只有真正回答pendingQuestions某个问题才填ANSWER_QUESTION及对应question_id；不能把独立问题当补答，无法确定时CLARIFY并提问。其余question_id为null。
+不需要澄清时question必须为JSON null，不能使用字符串"null"。
 DISCUSS可讨论一般剪辑思路，不必读取视频；涉及视频事实用QUERY并读取证据。自然语言确认/预览/导出用DISCUSS说明页面按钮，不生成草稿。
 显式新需求不能继承旧条件。补答信息在request中，与原问题关联。"""
 
@@ -51,6 +53,11 @@ def messages(phase, context):
         system = system.replace("当前工具数据来自开发用Mock，不代表真实项目素材。", "当前数据为 Java 固定问答快照中的真实素材和证据。")
         system = system.replace("所有工具结果均为开发样本，任何结果都不能称为已保存版本/真实媒体产物。", "工具结果为 Java 固定快照中的真实原始证据；可生成待保存剪辑草稿。")
         system = system.replace("需视觉信息才inspect_video_range；PENDING由程序等待。", "视觉只能读取快照中已有采样证据，不支持按需新分析。")
-        system = system.replace("UNSUPPORTED解释本MVP不保存/渲染。", "UNSUPPORTED说明保存须用户显式CLI save，预览／导出尚未开放。")
-        system += "\n真实模式支持QUERY问答、DISCUSS讨论与DRAFT制作，细读、预览、导出尚未开放，不回退Mock。保存只能由用户执行CLI save，不是模型工具；自然语言保存请求为UNSUPPORTED。草稿所有输出共同校验，不允许只批准成功子集。每个片段必须完整消费覆盖选段的read_video_range分页，仅search命中不等于已读上下文。validation含当前草稿哈希对应的结构化issues、issues_truncated、durations_ms和warnings；修正或补读后重新提交完整DRAFT，不改写用户硬条件。缺少转写要披露字幕缺口；主题和叙事由你判断，Java校验不证明语义正确。视觉POINT只有observed_at_ms，不能扩张为区间或全片结论。目录分页完成仅代表导航读完；分析覆盖和来源就绪见coverage，稀疏采样不证明全片不存在。"
+        if "public_context" in context.get("request", {}):
+            controls = "自然语言确认、保存、预览或导出请求用DISCUSS说明页面按钮：当前草稿下点击预览或确认，确认后在方案列表明确点击导出；这些操作不是模型工具。"
+            system = system.replace("mode为QUERY内容问答、DRAFT生成或修改剪辑草稿、DISCUSS讨论、UNSUPPORTED实际保存/预览/导出。", "mode为QUERY内容问答、DRAFT生成或修改剪辑草稿、DISCUSS讨论及页面操作说明。")
+        else:
+            controls = "保存只能由用户执行CLI save，不是模型工具；自然语言保存请求为UNSUPPORTED。预览使用CLI preview，正式导出使用浏览器方案列表按钮。"
+        system = system.replace("UNSUPPORTED解释本MVP不保存/渲染。", controls)
+        system += "\n真实模式支持QUERY问答、DISCUSS讨论与DRAFT制作，不支持按需细读，不回退Mock。" + controls + "草稿所有输出共同校验，不允许只批准成功子集。每个片段必须完整消费覆盖选段的read_video_range分页，仅search命中不等于已读上下文。validation含当前草稿哈希对应的结构化issues、issues_truncated、durations_ms和warnings；修正或补读后重新提交完整DRAFT，不改写用户硬条件。缺少转写要披露字幕缺口；主题和叙事由你判断，Java校验不证明语义正确。视觉POINT只有observed_at_ms，不能扩张为区间或全片结论。目录分页完成仅代表导航读完；分析覆盖和来源就绪见coverage，稀疏采样不证明全片不存在。"
     return [("system", system), ("human", json.dumps(context, ensure_ascii=False))]

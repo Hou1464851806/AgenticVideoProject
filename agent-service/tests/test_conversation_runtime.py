@@ -17,6 +17,39 @@ def message(content='讨论剪辑节奏', **values):
 
 
 @pytest.mark.asyncio
+async def test_first_production_cannot_be_parsed_as_continuing_a_nonexistent_production(tmp_path):
+    calls = 0
+    def understand(ctx):
+        nonlocal calls
+        calls += 1
+        return {'relation': 'CONTINUE', 'mode': 'DRAFT',
+                'conversation_relation': 'CONTINUE_PRODUCTION' if calls == 1 else 'NEW_PRODUCTION'}
+    runner = agent(tmp_path, understand, [])
+    prepared = await runner.prepare_run(message('现在制作一条短片'))
+    assert prepared['parsed_input']['relation'] == 'NEW_PRODUCTION'
+    assert prepared['usage']['model_calls'] == 2
+    assert prepared['usage']['repairs'] == 1
+
+
+@pytest.mark.asyncio
+async def test_literal_null_question_is_repaired_instead_of_published_as_a_wait(tmp_path):
+    calls = 0
+    def understand(ctx):
+        nonlocal calls
+        calls += 1
+        return {'relation': 'NEW', 'mode': 'DISCUSS', 'conversation_relation': 'INDEPENDENT',
+                'question': 'null' if calls == 1 else None}
+    runner = agent(tmp_path, understand, [answer([], '可以保持简洁开场。')])
+    value = message()
+    prepared = await runner.prepare_run(value)
+    assert prepared['usage']['model_calls'] == 2
+    result = await runner.execute_run(value, identity=value.identity)
+    assert result['status'] == 'ANSWER'
+    assert result['usage']['repairs'] == 1
+    assert result['waiting'] is None
+
+
+@pytest.mark.asyncio
 async def test_fixed_input_is_understood_once_and_discussion_uses_public_history(tmp_path):
     history = [{'messageId': str(uuid.uuid4()), 'role': 'USER', 'content': '上一轮', 'references': []}]
     value = message(history=history)

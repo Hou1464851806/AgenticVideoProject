@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from typing import Any, Literal, Required, TypedDict
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ..editing import Draft, OutputCondition, ProductionRequirements
 
@@ -51,6 +51,13 @@ class Understanding(Value):
     forbidden_content: list[str] | None = None
     question: str | None = None
     defaults: list[str] = Field(default_factory=list)
+
+    @field_validator("question")
+    @classmethod
+    def actual_question_or_null(cls, value):
+        if value is not None and value.strip() == "null":
+            raise ValueError('无澄清问题时 question 必须为 JSON null，不能为字符串 "null"')
+        return value
 
 
 class Action(Value):

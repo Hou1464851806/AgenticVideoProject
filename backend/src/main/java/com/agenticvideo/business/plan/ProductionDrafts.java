@@ -53,7 +53,7 @@ public class ProductionDrafts {
             throw new ToolFailure("CONTENT_HASH_MISMATCH","IDENTITY_CONFLICT","草稿或条件哈希核验失败");
         var assetIds=new HashSet<String>();scope.assets().forEach(a->assetIds.add(a.path("id").asText()));
         if(!assetIds.containsAll(input.requirements().asset_ids()))throw new ToolFailure("ASSET_OUTSIDE_SCOPE","PERMISSION_DENIED","制作条件包含固定范围以外的素材");
-        if(execution!=null && !parse(browser.get("requirements_json")).equals(json.valueToTree(input.requirements())))
+        if(execution!=null && !ToolJson.hash(parse(browser.get("requirements_json"))).equals(input.requirements_hash()))
             throw new ToolFailure("REQUIREMENTS_MISMATCH","IDENTITY_CONFLICT","校验条件与本轮持久制作条件不符");
         UUID id=UUID.randomUUID();var checked=validation.validate(scope,input,id);envelope.set("data",checked.result());
         bound(envelope);

@@ -45,3 +45,11 @@ async def test_multiple_actions_are_rejected_with_serial_repair_feedback():
     assert '2' in response['error']
     assert '只调用一次' in response['error']
     assert response['value'] is None
+@pytest.mark.parametrize('phase', ['understand', 'decide'])
+def test_real_browser_prompt_describes_available_buttons_without_cli_guidance(phase):
+    from agent_service.prompts import messages
+    system = messages(phase, {'mock_tools': False, 'request': {'public_context': {}}})[0][1]
+    assert '页面按钮' in system
+    assert 'CLI save' not in system
+    assert '尚未开放' not in system
+    assert '自然语言保存请求为UNSUPPORTED' not in system

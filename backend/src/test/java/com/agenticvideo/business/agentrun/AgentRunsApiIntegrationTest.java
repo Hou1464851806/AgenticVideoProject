@@ -276,6 +276,22 @@ class AgentRunsApiIntegrationTest {
         assertEquals(0,db.queryForObject("SELECT count(*) FROM render_requests WHERE conversation_id=?",Integer.class,conversation));
     }
 
+    @Test void strictDurationConditionsRemainEqualAcrossThePublicValidationBoundary() throws Exception {
+        var media=media();var run=send("制作严格五秒短片","strict-duration");var claim=claim(run);
+        var binding=parsed(run,claim,"DRAFT","NEW_PRODUCTION",Map.of("topic","主题","duration_min_ms",5000,"duration_max_ms",5000),null,200);
+        var draft=validatedDraft(run,claim,binding,media,"strict-validation");
+        var changed=binding.path("production").path("requirements").deepCopy();
+        ((com.fasterxml.jackson.databind.node.ObjectNode)changed.path("outputs").get(0)).put("duration_max_ms",6000);
+        var clip=Map.of("asset_id",media.asset(),"source_in_ms",0,"source_out_ms",5000,"evidence_ids",List.of(media.evidence()),"reason","按原文开始");
+        var content=json.valueToTree(Map.of("title","主题","outputs",List.of(Map.of("output_key","out-1","title","主片","clips",List.of(clip)))));
+        var rejected=tool(run,claim,binding,"changed-conditions","validate_edit_draft",Map.of("draft",content,"requirements",changed,"draft_hash",com.agenticvideo.business.tools.ToolJson.hash(content),"requirements_hash",com.agenticvideo.business.tools.ToolJson.hash(changed)),200);
+        assertEquals("REQUIREMENTS_MISMATCH",rejected.path("error").path("code").asText(),rejected.toString());
+        publish(run,claim,result(binding,"DRAFT_READY","严格五秒草稿",draft,null,null),200);
+        var snapshot=response(http.perform(get("/api/v1/conversations/"+conversation+"/snapshot").with(user(owner))),200);
+        assertTrue(snapshot.path("agent").path("canAcceptDraft").asBoolean(),snapshot.toString());
+        assertEquals(5000,snapshot.path("agent").path("currentDraft").path("normalizedContent").path("outputs").get(0).path("durationMs").asLong());
+    }
+
     @Test void currentDraftSurvivesDiscussionAndAcceptanceCreatesAndConfirmsOnlyOneVersion() throws Exception {
         var media=media();var run=send("制作主题短片","production");var claim=claim(run);
         var binding=parsed(run,claim,"DRAFT","NEW_PRODUCTION",Map.of("topic","主题"),null,200);

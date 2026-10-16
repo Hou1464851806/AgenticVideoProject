@@ -91,12 +91,14 @@ class ExportApiIntegrationTest {
         var access=owner.post("/artifacts/"+artifact+"/download-access",Map.of());assertEquals(200,access.statusCode(),access.body());
         var downloaded=HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create(data(access).path("url").asText())).GET().build(),HttpResponse.BodyHandlers.ofByteArray());
         assertEquals(200,downloaded.statusCode());assertArrayEquals(bytes,downloaded.body());assertTrue(downloaded.headers().firstValue("Content-Disposition").orElse("").contains("attachment"));
-        assertEquals(bytes.length,data(owner.get("/artifacts/"+artifact)).path("storedBytes").asLong());
+        var available=owner.get("/artifacts/"+artifact);assertEquals(200,available.statusCode(),available.body());
+        assertTrue(data(available).path("storedBytes").isIntegralNumber());assertEquals(bytes.length,data(available).path("storedBytes").asLong());
         assertEquals(400,owner.delete("/artifacts/"+artifact,Map.of()).statusCode());
         assertEquals(404,other.delete("/artifacts/"+artifact,Map.of("explicitIntent","DELETE")).statusCode());
         var removed=owner.delete("/artifacts/"+artifact,Map.of("explicitIntent","DELETE"));assertEquals(200,removed.statusCode(),removed.body());
         assertEquals("REMOVED",data(removed).path("state").asText());assertEquals(bytes.length,data(removed).path("removedBytes").asLong());
-        assertEquals(0,data(owner.get("/artifacts/"+artifact)).path("storedBytes").asLong());assertEquals(410,owner.post("/artifacts/"+artifact+"/download-access",Map.of()).statusCode());
+        var removedStatus=owner.get("/artifacts/"+artifact);assertEquals(200,removedStatus.statusCode(),removedStatus.body());
+        assertTrue(data(removedStatus).path("storedBytes").isIntegralNumber());assertEquals(0,data(removedStatus).path("storedBytes").asLong());assertEquals(410,owner.post("/artifacts/"+artifact+"/download-access",Map.of()).statusCode());
         JsonNode source=data(owner.post("/assets/"+plan.asset()+"/playback-access",Map.of()));
         var original=HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create(source.path("url").asText())).GET().build(),HttpResponse.BodyHandlers.ofByteArray());
         assertArrayEquals("original".getBytes(java.nio.charset.StandardCharsets.UTF_8),original.body());
@@ -108,7 +110,8 @@ class ExportApiIntegrationTest {
         assertEquals(200,internal(missingTask,"complete",Map.of("attemptId",missingClaim.path("attemptId").asText(),"leaseToken",missingClaim.path("leaseToken").asText(),"producerKey","missing-export","resultType","EXPORT_RENDERED","result",missingResult)).statusCode());
         // Real external object loss must not be reported as newly released storage.
         try(var store=storage()){store.deleteObject(b->b.bucket("export-tests").key(missingKey));}
-        assertEquals(0,data(owner.get("/artifacts/"+missingArtifact)).path("storedBytes").asLong());
+        var missingStatus=owner.get("/artifacts/"+missingArtifact);assertEquals(200,missingStatus.statusCode(),missingStatus.body());
+        assertTrue(data(missingStatus).path("storedBytes").isIntegralNumber());assertEquals(0,data(missingStatus).path("storedBytes").asLong());
         var missingRemoved=owner.delete("/artifacts/"+missingArtifact,Map.of("explicitIntent","DELETE"));assertEquals(200,missingRemoved.statusCode());
         assertEquals(0,data(missingRemoved).path("removedBytes").asLong());
     }

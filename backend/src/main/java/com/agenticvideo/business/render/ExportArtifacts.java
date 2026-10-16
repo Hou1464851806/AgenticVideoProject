@@ -28,7 +28,7 @@ public class ExportArtifacts {
     }
     public Object read(UUID id) {
         var row=exported(id);
-        Long bytes="REMOVED".equals(row.get("state"))?0L:storage.objectSize(row.get("object_key").toString());
+        Long bytes="REMOVED".equals(row.get("state"))?Long.valueOf(0):storage.objectSize(row.get("object_key").toString());
         return Map.of("artifactId",id,"state",row.get("state"),"storedBytes",bytes==null?0L:bytes);
     }
     public Object delete(UUID id, UUID actor, JsonNode body) {

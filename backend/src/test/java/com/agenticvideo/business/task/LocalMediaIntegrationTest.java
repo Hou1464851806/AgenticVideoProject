@@ -82,6 +82,7 @@ class LocalMediaIntegrationTest {
     @org.springframework.beans.factory.annotation.Autowired org.springframework.jdbc.core.JdbcTemplate db;
     @org.springframework.beans.factory.annotation.Autowired TaskExecution tasks;
     @org.springframework.beans.factory.annotation.Autowired LocalTaskRunner runtime;
+    @org.springframework.beans.factory.annotation.Autowired com.agenticvideo.business.upload.MultipartStorage objectStorage;
 
     @Test
     void unacceptedAndSavedSilentDraftsRenderThroughMqWithTheirOwnSources() throws Exception {
@@ -172,18 +173,54 @@ class LocalMediaIntegrationTest {
         assertEquals(saved,internal("GET",path+"/save",null));
         // Opt-in browser seam on the same isolated real media infrastructure and analysed asset.
         if(Boolean.getBoolean("lifecycle.browser")) {
+            String revision=saved.path("revision_id").asText();
+            var confirmation=browser.post("/revisions/"+revision+"/confirmations","{\"explicitIntent\":\"CONFIRM\"}");
+            assertEquals(201,confirmation.statusCode(),confirmation.body());
+            var version=json(browser.get("/revisions/"+revision)).path("data");
+            var missingExport=browser.post("/revisions/"+revision+"/export-requests",json.writeValueAsString(java.util.Map.of("outputIds",java.util.List.of(version.path("content").path("outputs").get(0).path("outputId").asText()),"confirmationId",json(confirmation).path("data").path("confirmationId").asText(),"exportProfile","HD_720","explicitIntent","EXPORT")));
+            assertEquals(202,missingExport.statusCode(),missingExport.body());
+            var missing=json(missingExport).path("data");
+            var missingTask=java.util.UUID.fromString(missing.path("taskId").asText());awaitState(missingTask,"SUCCEEDED");
+            var missingArtifact=db.queryForMap("SELECT id,object_key FROM artifacts WHERE task_id=?",missingTask);
+            objectStorage.deleteObject(missingArtifact.get("object_key").toString());
             var command=new ProcessBuilder("npm","run","test:e2e","--","conversation-lifecycle-live.spec.ts","--output=../backend/target/lifecycle-browser-results")
                     .directory(java.nio.file.Path.of("../frontend").toFile()).redirectErrorStream(true)
                     .redirectOutput(java.nio.file.Path.of("target/conversation-lifecycle-browser.log").toFile());
             command.environment().put("E2E_BASE_URL","http://localhost:"+port);
             command.environment().put("E2E_LIFECYCLE_REAL","1");
             command.environment().put("E2E_LIFECYCLE_TOKEN","internal-integration-worker-token");
-            command.environment().put("E2E_LIFECYCLE_SEED",json.writeValueAsString(java.util.Map.of("projectId",project,"assetId",asset,"evidenceId",evidence)));
+            command.environment().put("E2E_LIFECYCLE_SEED",json.writeValueAsString(java.util.Map.of("projectId",project,"assetId",asset,"evidenceId",evidence,"missingPlanId",version.path("planId").asText(),"missingExportId",missing.path("requestId").asText(),"missingArtifactId",missingArtifact.get("id").toString())));
             var process=command.start();
             try {
                 assertTrue(process.waitFor(240,java.util.concurrent.TimeUnit.SECONDS),"浏览器验收超时");
                 assertEquals(0,process.exitValue(),java.nio.file.Files.readString(java.nio.file.Path.of("target/conversation-lifecycle-browser.log")));
             } finally { process.destroyForcibly(); }
+            // Explicit paid acceptance only; normal regressions never start a real model.
+            if(Boolean.getBoolean("lifecycle.model")) {
+                var root=java.nio.file.Path.of("..").toAbsolutePath().normalize();
+                var workerCommand=new ProcessBuilder(root.resolve("agent-service/.venv/bin/python").toString(),"-c",
+                        "from agent_service.config import load_env; load_env('.env'); from agent_service.worker import main; main()")
+                        .directory(root.toFile()).redirectErrorStream(true).redirectOutput(java.nio.file.Path.of("target/conversation-lifecycle-model-worker.log").toFile());
+                workerCommand.environment().put("PYTHONPATH",root.resolve("agent-service").toString());
+                workerCommand.environment().put("JAVA_URL","http://localhost:"+port);
+                workerCommand.environment().put("INTERNAL_WORKER_TOKEN","internal-integration-worker-token");
+                workerCommand.environment().put("RABBITMQ_HOST",BROKER.getHost());
+                workerCommand.environment().put("RABBITMQ_PORT",BROKER.getMappedPort(5672).toString());
+                workerCommand.environment().put("RABBITMQ_USER","integration-worker");
+                workerCommand.environment().put("RABBITMQ_PASSWORD","integration-broker-password");
+                workerCommand.environment().put("AGENT_DATA_DIRECTORY",java.nio.file.Files.createTempDirectory("lifecycle-model-").toString());
+                var worker=workerCommand.start();
+                command.command("npm","run","test:e2e","--","conversation-lifecycle-model.spec.ts","--output=../backend/target/lifecycle-model-results");
+                command.environment().put("E2E_LIFECYCLE_MODEL","1");
+                command.redirectOutput(java.nio.file.Path.of("target/conversation-lifecycle-model-browser.log").toFile());
+                try {
+                    var live=command.start();
+                    try {
+                        assertTrue(live.waitFor(600,java.util.concurrent.TimeUnit.SECONDS),"真实模型浏览器验收超时");
+                        assertEquals(0,live.exitValue(),java.nio.file.Files.readString(java.nio.file.Path.of("target/conversation-lifecycle-model-browser.log")));
+                    } finally { live.destroyForcibly(); }
+                } finally { worker.destroy();assertTrue(worker.waitFor(15,java.util.concurrent.TimeUnit.SECONDS)); }
+            }
         }
     }
     private JsonNode internal(String method,String path,Object body) throws Exception {
