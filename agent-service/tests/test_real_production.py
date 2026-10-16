@@ -144,6 +144,47 @@ async def test_explicit_save_recovers_lost_response_and_makes_production_readonl
 
 
 @pytest.mark.asyncio
+async def test_first_invalid_draft_after_repeated_reads_allows_context_repair(tmp_path):
+    backend = ProductionBackend()
+    issue = {'code': 'CONTEXT_NOT_READ', 'field': 'outputs[0].clips[0]',
+             'output_key': 'out-1', 'message': '范围尚未读完'}
+    def actions(ctx):
+        step = ctx['usage']['decisions']
+        if step < 3:
+            return {**READ, 'arguments': {**READ['arguments'], 'end_ms': 5000}}
+        if step == 3:
+            assert ctx['usage']['no_progress'] == 2
+            backend.issues = [issue]
+            return DRAFT
+        if step == 4:
+            assert ctx['validation']['issues'] == [issue]
+            assert ctx['usage']['no_progress'] == 0
+            assert ctx['usage']['repairs'] == 1
+            # A new range completes the missing context without changing the draft.
+            backend.issues = []
+            return READ
+        return DRAFT
+    result = await runner(tmp_path, backend, ScriptedModel(UNDERSTAND, actions)).send('挑选亮点')
+    assert result['status'] == 'DRAFT_READY'
+    assert len(backend.validations) == 2
+    assert backend.validations[0]['arguments']['draft'] == backend.validations[1]['arguments']['draft']
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('repairs', [0, 1, 10])
+async def test_first_validation_credit_does_not_bypass_repair_or_stall_limits(tmp_path, repairs):
+    from agent_service.runtime.policy import Limits
+    backend = ProductionBackend()
+    backend.issues = [{'code': 'CONTEXT_NOT_READ', 'field': 'outputs[0].clips[0]', 'message': '补读'}]
+    result = await runner(tmp_path, backend, ScriptedModel(UNDERSTAND, [READ, DRAFT]),
+                          Limits(repairs=repairs, no_progress=2)).send('制作')
+    assert result['status'] == 'INCOMPLETE'
+    assert len(backend.validations) == min(repairs + 1, 3)
+    assert result['usage']['repairs'] == min(repairs, 3)
+    assert result['usage']['no_progress'] == (2 if repairs == 10 else 1)
+
+
+@pytest.mark.asyncio
 async def test_invalid_draft_stops_with_latest_inspectable_issues_and_cannot_save(tmp_path):
     from agent_service.runtime.policy import Limits
     backend = ProductionBackend()
@@ -178,13 +219,18 @@ async def test_progress_requires_changed_draft_and_resolved_issue_set(tmp_path, 
             changed = copy.deepcopy(DRAFT)
             changed['draft']['outputs'][0]['clips'][0]['source_out_ms'] = 9000
             return changed
-        assert resolved  # A smaller unrelated issue list must not reset the no-progress bound.
+        if not resolved:
+            # The first validation credit applies once; unrelated issues still accumulate stalls.
+            assert ctx['usage']['no_progress'] == 1
+            changed = copy.deepcopy(DRAFT)
+            changed['draft']['outputs'][0]['clips'][0]['source_out_ms'] = 9000
+            return changed
         assert ctx['usage']['no_progress'] == 0
         backend.issues = []
         return DRAFT
     result = await runner(tmp_path, backend, ScriptedModel(UNDERSTAND, actions), Limits(no_progress=2)).send('制作')
     assert result['status'] == ('DRAFT_READY' if resolved else 'INCOMPLETE')
-    assert len(backend.validations) == (3 if resolved else 2)
+    assert len(backend.validations) == 3
 
 
 @pytest.mark.asyncio

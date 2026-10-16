@@ -25,6 +25,7 @@ class Search(Page):
 
 
 class Range(Overview):
+    cursor: int = Field(default=0, ge=0, description="Start a new range at 0. To continue, keep asset_id/start_ms/end_ms unchanged and use that range's returned next_cursor.")
     start_ms: int = Field(ge=0)
     end_ms: int = Field(gt=0)
 

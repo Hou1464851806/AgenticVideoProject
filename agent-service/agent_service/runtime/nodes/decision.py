@@ -77,6 +77,18 @@ def check_action(state: State, runtime: Runtime[Context]):
             raise ValueError("Asset outside fixed scope")
         if args.get("asset_ids") and not set(args["asset_ids"]) <= allowed:
             raise ValueError("Search outside fixed scope")
+        if name == "read_video_range" and args["cursor"] != 0:
+            ranges = state["coverage"].get("_range_reads", {})
+            key = fingerprint({k: args[k] for k in ("asset_id", "start_ms", "end_ms")})
+            entry = ranges.get(key)
+            if entry is None or (args["cursor"] != entry["next_cursor"] and args["cursor"] not in entry["pages"]):
+                updates = repair(state, ctx, "RANGE_CURSOR_INVALID",
+                                 "翻页必须保持同一素材和起止时间，cursor 使用该范围返回的 next_cursor；新范围从 0 开始。")
+                updates["feedback"]["error"]["expected"] = {
+                    "restart": {**args, "cursor": 0},
+                    "next_pages": [{k: r[k] for k in ("asset_id", "start_ms", "end_ms")} | {"cursor": r["next_cursor"]}
+                                   for r in ranges.values() if r["asset_id"] == args["asset_id"] and not r["complete"]]}
+                return updates
         if name == "search_evidence" and scope is not None and args.get("asset_ids") is None:
             args["asset_ids"] = sorted(allowed)
         if state["usage"]["tools"] >= ctx.limits.tool_calls:

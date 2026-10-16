@@ -162,14 +162,52 @@ async def test_range_pages_expose_consumption_and_only_new_pages_make_progress(t
             assert len(ranges) == 1
             assert {key: ranges[0][key] for key in ('asset_id', 'start_ms', 'end_ms')} == {
                 'asset_id': 'a', 'start_ms': 0, 'end_ms': 10000}
-            assert ranges[0]['complete'] is (step >= 3)
-            assert ctx['usage']['no_progress'] == (1 if step == 4 else 0)
-        if step < 4:
-            return {**READ, 'arguments': {**READ['arguments'], 'cursor': [1, 0, 1, 1][step]}}
+            assert ranges[0]['complete'] is (step >= 2)
+            assert ctx['usage']['no_progress'] == (1 if step == 3 else 0)
+        if step < 3:
+            return {**READ, 'arguments': {**READ['arguments'], 'cursor': [0, 1, 1][step]}}
         return ANSWER
     executor = JavaToolExecutor('http://java', 'private-token', 'p', transport=httpx.MockTransport(handle))
     result = await Agent(Config(tmp_path, trace=False), ScriptedModel(UNDERSTAND, actions), executor=executor).send('读取画面')
     assert result['status'] == 'ANSWER'
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('invalid_args', [
+    {'start_ms': 2000, 'cursor': 1},  # A cursor cannot be transferred to a smaller range.
+    {'cursor': 2},  # Nor can a page be skipped within the original range.
+])
+async def test_invalid_range_cursor_is_repaired_before_java_call(tmp_path, invalid_args):
+    backend = Backend()
+    def handle(req):
+        response = backend.handle(req)
+        if req.url.path.endswith('/tools'):
+            body = json.loads(req.content)
+            value = response.json()
+            value['data'] = {'next_cursor': 1 if body['arguments']['cursor'] == 0 else None}
+            return httpx.Response(200, json=value)
+        return response
+    def actions(ctx):
+        step = ctx['usage']['decisions']
+        if step == 0:
+            return READ
+        if step == 1:
+            return {**READ, 'arguments': {**READ['arguments'], **invalid_args}}
+        if step == 2:
+            error = ctx['feedback']['error']
+            assert error['code'] == 'RANGE_CURSOR_INVALID'
+            assert error['expected']['next_pages'] == [{**READ['arguments'], 'cursor': 1}]
+            assert ctx['usage']['tools'] == 1
+            return {**READ, 'arguments': error['expected']['next_pages'][0]}
+        entry = next(iter(ctx['coverage']['_range_reads'].values()))
+        assert entry['complete'] is True
+        assert ctx['usage']['no_progress'] == 0
+        return ANSWER
+    executor = JavaToolExecutor('http://java', 'private-token', 'p', transport=httpx.MockTransport(handle))
+    result = await Agent(Config(tmp_path, trace=False), ScriptedModel(UNDERSTAND, actions), executor=executor).send('读取画面')
+    assert result['status'] == 'ANSWER'
+    assert result['usage']['repairs'] == 1
+    assert [c[2]['arguments']['cursor'] for c in backend.calls if c[1].endswith('/tools')] == [0, 1]
 
 
 @pytest.mark.asyncio

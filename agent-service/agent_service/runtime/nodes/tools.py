@@ -128,6 +128,8 @@ def observe_tool(state: State, runtime: Runtime[Context]):
                 "requirements_hash": result.data["requirements_hash"], "issues": sorted(issues),
                 "issues_truncated": result.data["issues_truncated"]}
             updates.update(repair(state, ctx, "DRAFT_INVALID", "草稿未通过校验；完整结构化问题见 validation。"))
-            if improved:
+            # The first validation provides new, actionable feedback even after repeated reads.
+            # It still consumes repair budget; unchanged later failures retain the stop bound.
+            if updates["next_node"] == "decide_next" and (previous is None or improved):
                 updates["usage"]["no_progress"] = 0
     return updates
