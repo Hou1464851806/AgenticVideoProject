@@ -131,7 +131,7 @@ test('batched public drafts survive interrupted SSE and duplicate delivery witho
     const restored=(await(await page.request.get(`/api/v1/conversations/${session}/snapshot`)).json()).data;
     expect(restored.items).toHaveLength(2);expect(restored.items[1].content).toBe(answer);
     await page.request.post('/api/v1/auth/logout',{headers:{'X-XSRF-TOKEN':(await(await page.request.get('/api/v1/auth/csrf')).json()).data.csrfToken},data:{}});
-    await expect(page.getByRole('heading',{name:'登录工作区'})).toBeVisible({timeout:10000});
+    await expect(page.getByRole('heading',{name:'登录工作台'})).toBeVisible({timeout:10000});
     await expect(page.getByRole('status')).toContainText('登录已到期');
   }finally{
     await page.close();recreate(false);rmSync(override,{force:true});

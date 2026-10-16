@@ -14,7 +14,7 @@ for (const viewport of viewports) {
     mkdirSync(screenshots, { recursive: true });
     await page.setViewportSize(viewport);
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: '登录工作区', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '登录工作台', exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: `${screenshots}/real-login-${size}.png`, fullPage: true });
     await page.getByLabel('用户名', { exact: true }).fill(seed.username);

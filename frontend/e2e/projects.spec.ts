@@ -46,6 +46,6 @@ test('two browser accounts use private projects and all workspace regions remain
   await expect(outsiderPage.getByRole('heading', { name: '演讲短视频', exact: true })).toHaveCount(0);
   await ownerPage.getByText('账户', { exact: true }).click();
   await ownerPage.getByRole('button', { name: '退出登录', exact: true }).click();
-  await expect(ownerPage.getByRole('heading', { name: '登录工作区', exact: true })).toBeVisible();
+  await expect(ownerPage.getByRole('heading', { name: '登录工作台', exact: true })).toBeVisible();
   await outsider.close();
 });

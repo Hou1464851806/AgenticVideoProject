@@ -62,7 +62,7 @@ onMounted(async () => {
 <template>
   <div class="shell">
     <a class="skip-link" href="#main-content">跳至主内容</a>
-    <header v-if="!user" class="brand-header"><span class="mark">AV</span><span>Agent 视频工作区</span></header>
+    <header v-if="!user" class="brand-header"><span class="mark">叙帧</span><span>叙帧 · 视频工作台</span></header>
     <main v-if="user" id="main-content" class="authenticated" tabindex="-1">
       <ProjectWorkspace :user-id="user.id">
         <template #account>
@@ -75,9 +75,9 @@ onMounted(async () => {
       <p v-if="error" role="alert" class="error">{{ error }}</p>
     </main>
     <main v-else id="main-content" class="sign-in" tabindex="-1">
-      <section class="intro"><p class="eyebrow">视频理解 · 内容检索 · 编排剪辑</p><h1>让素材成为<br>你的下一条作品。</h1><p>登录你的私有工作区，开始整理视频素材。</p></section>
+      <section class="intro"><p class="eyebrow">视频理解 · 内容检索 · 编排剪辑</p><h1>让素材成为<br>你的下一条作品。</h1><p>登录你的私有工作台，开始整理视频素材。</p></section>
       <section class="account" aria-label="账号入口">
-          <h2>{{ registering ? '创建你的账号' : '登录工作区' }}</h2>
+          <h2>{{ registering ? '创建你的账号' : '登录工作台' }}</h2>
           <form @submit.prevent="submit">
             <label for="username">用户名</label><input id="username" v-model="username" required maxlength="64" autocomplete="username">
             <label for="password">密码</label><input id="password" v-model="password" required type="password" minlength="8" maxlength="72" :autocomplete="registering ? 'new-password' : 'current-password'">

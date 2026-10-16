@@ -181,14 +181,14 @@ test('account logout and session expiry return to sign in without old project co
   await page.getByText('账户', { exact: true }).click();
   await expect(page.getByRole('button', { name: '退出登录', exact: true })).toBeInViewport({ ratio: 1 });
   await page.getByRole('button', { name: '退出登录', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '登录工作区', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '登录工作台', exact: true })).toBeVisible();
   await expect(page.getByRole('tab')).toHaveCount(0);
   await page.reload();
   await page.getByRole('tab', { name: '制作', exact: true }).click();
   await expect(page.getByLabel('对话输入', { exact: true })).toHaveValue('');
   await page.route('**/api/v1/projects/a/usage', route => route.fulfill({ status: 401, json: { error: { message: '登录已到期' } } }));
   await page.getByRole('button', { name: '用量', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '登录工作区', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '登录工作台', exact: true })).toBeVisible();
   await expect(page.getByRole('status')).toHaveText('登录已到期，请重新登录');
   await expect(page.getByRole('tab')).toHaveCount(0);
 });

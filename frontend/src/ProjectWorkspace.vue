@@ -178,7 +178,7 @@ onUnmounted(() => { mounted = false; ++selectionRequest; window.removeEventListe
 <template>
   <section class="projects" :aria-busy="busy">
     <header class="workspace-header">
-      <a class="workspace-brand" href="/" @click.prevent="backToProjects"><span class="mark">AV</span><span v-if="!selected">视频工作区</span></a>
+      <a class="workspace-brand" href="/" @click.prevent="backToProjects"><span class="mark">叙帧</span><span v-if="!selected">叙帧 · 视频工作台</span></a>
       <template v-if="selected">
         <button class="text-button back-button" @click="backToProjects">← 项目列表</button>
         <h1>{{ selected.name }}</h1>
@@ -210,7 +210,7 @@ onUnmounted(() => { mounted = false; ++selectionRequest; window.removeEventListe
         <div class="usage-heading"><h2>项目用量</h2><button ref="usageClose" class="text-button" @click="toggleUsage">关闭用量</button></div>
         <UsagePanel :key="`usage-${selected.id}`" :project-id="selected.id" :diagnostics="diagnostics" />
       </aside>
-      <div class="workspace-tabs" role="tablist" aria-label="工作区区域">
+      <div class="workspace-tabs" role="tablist" aria-label="工作台区域">
         <button v-for="(pane, index) in panes" :id="`tab-${pane.id}`" :key="pane.id" role="tab" :aria-selected="activePane === pane.id" :aria-controls="`panel-${pane.id}`" :tabindex="activePane === pane.id ? 0 : -1" @click="setPane(pane.id)" @keydown="navigateTabs($event, index)">{{ pane.label }}</button>
       </div>
       <div :key="selected.id" class="workspace">

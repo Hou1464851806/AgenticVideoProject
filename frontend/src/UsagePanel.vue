@@ -47,7 +47,7 @@ onUnmounted(()=>clearInterval(timer));
       <dl class="usage-summary"><div><dt>已用存储</dt><dd>{{bytes(storageTotals.storedBytes)}}</dd></div><div><dt>未完成预留</dt><dd>{{bytes(storageTotals.reservedBytes)}}</dd></div><div><dt>待清理占用</dt><dd>{{bytes(storageTotals.pendingCleanupBytes)}}</dd></div><div><dt>估算费用</dt><dd>¥{{money(usage.models.estimatedCostCny)}}</dd></div></dl>
       <p>费用未知 {{usage.models.unpricedCallCount}} 次，未包含在估算合计中；尚未确认的调用 {{usage.models.uncertainCallCount}} 次。</p>
       <details><summary>存储分类</summary><div class="table-scroll"><table><caption>实际对象与未完成预留</caption><thead><tr><th>类别</th><th>已占用</th><th>未完成预留</th><th>待清理占用</th></tr></thead><tbody><tr v-for="(label,key) in categories" :key="key"><td>{{label}}</td><td>{{bytes(usage.storage[key]!.storedBytes)}}</td><td>{{bytes(usage.storage[key]!.reservedBytes)}}</td><td>{{bytes(usage.storage[key]!.pendingCleanupBytes)}}</td></tr></tbody></table></div></details>
-      <p>已占用直接核对对象与上传分片；预留含处理工作区的保守预算，待清理是已占用的一部分。未发布的派生文件也计入占用。</p>
+      <p>已占用直接核对对象与上传分片；预留含临时处理空间的保守预算，待清理是已占用的一部分。未发布的派生文件也计入占用。</p>
       <details><summary>用量明细与估算依据</summary><p>模型调用：{{usage.models.callCount}}</p><p>估算费用：¥{{money(usage.models.estimatedCostCny)}} · Token：{{usage.models.tokens}} · 音频：{{usage.models.audioSeconds}} 秒</p>
       <p>向量批次复用 {{usage.models.reusedBatchCount}} 次；尚未确认的调用 {{usage.models.uncertainCallCount}} 次。缺价格的调用 {{usage.models.unpricedCallCount}} 次，其费用未包含在合计中。</p>
       <p>费用按 2026-10-12 北京百炼公开价及 DeepSeek 高峰价保守估算，未扣免费额度、百炼缓存优惠和时段折扣；实际账单以提供方为准。无回执用量按输入与输出预算估算，VLM 按 8192 输入、1200 输出 token 估算。</p>
