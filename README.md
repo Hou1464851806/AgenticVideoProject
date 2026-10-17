@@ -153,6 +153,10 @@ Silo 管理界面为 [http://localhost:9001](http://localhost:9001)，用户名 
 | `DEEPSEEK_API_KEY` | Python Agent 模型调用 | 空 | 真实 Agent 对话需要 |
 | `DATABASE_PASSWORD`、`STORAGE_SECRET_KEY`、`RABBITMQ_PASSWORD`、`INTERNAL_WORKER_TOKEN` | 基础设施及内部执行认证 | 脚本随机生成 | 否；保留已有值 |
 | `APP_PORT` | 本机业务 HTTP 端口 | `8080` | 否 |
+| `REDIS_HOST` / `REDIS_PORT` | 上传准入 Redis（宿主开发） | `localhost` / `6379` | Compose 固定为 `redis:6379`，不发布宿主端口 |
+| `REDIS_CONNECT_TIMEOUT` / `REDIS_COMMAND_TIMEOUT` | 准入 Redis 连接／命令超时 | `300ms` / `300ms` | 正时长；超时拒绝新上传，不自动重放 |
+| `UPLOAD_ADMISSION_CAPACITY` | 每用户上传准入桶容量 | `3` | 正整数；跨项目共享 |
+| `UPLOAD_ADMISSION_PERIOD_MS` | 每个令牌的补充周期 | `60000` | 正毫秒数；配置重启生效 |
 | `APP_ALLOWED_ORIGIN` | 浏览器写请求的可信 Origin | `http://localhost:8080` | 访问 Origin 改变时需同步调整 |
 | `DASHSCOPE_BASE_URL`、`DEEPSEEK_BASE_URL` | 模型 API 地址 | `https://dashscope.aliyuncs.com/api/v1`、`https://api.deepseek.com` | 否 |
 | `ANALYSIS_EXECUTION_ENABLED` | 开启 Java 分析派发及消费 | Compose 为 `true`；应用单独运行默认 `false` | 否 |
@@ -164,7 +168,7 @@ Silo 管理界面为 [http://localhost:9001](http://localhost:9001)，用户名 
 | `MODEL_RECORD_REQUEST_MAX_BYTES`、`MODEL_RECORD_RESPONSE_MAX_BYTES` | 内部模型记录 JSON 的 UTF-8 字节上限 | `16777216`（16 MiB）、`4194304`（4 MiB） | 否；不是模型 Token 窗口 |
 | `LANGFUSE_PUBLIC_KEY`、`LANGFUSE_SECRET_KEY` | 可选的本机 Trace | 未配置则不开启观测 | 按需；见 [Agent README](agent-service/README.md) |
 
-`APP_ALLOWED_ORIGIN` 必须与浏览器完整 Origin 一致，包括协议、主机和端口；`localhost` 与 `127.0.0.1` 也有区别。更换 `APP_PORT` 时同步调整它。上传取消会先释放素材名额，真实残留清理完成后才释放字节占用；分片签名也不构成存储物理硬配额，见[上传空间验证与残余窗口](docs/verification/issue-8.md)。两项模型记录字节上限均须为正数，语义见[验证说明](docs/verification/model-record-limits.md)。
+`APP_ALLOWED_ORIGIN` 必须与浏览器完整 Origin 一致，包括协议、主机和端口；`localhost` 与 `127.0.0.1` 也有区别。更换 `APP_PORT` 时同步调整它。上传取消会先释放素材名额，真实残留清理完成后才释放字节占用；分片签名也不构成存储物理硬配额，见[上传空间验证与残余窗口](docs/verification/issue-8.md)。上传准入使用独立 Redis（32 MiB、noeviction；容器 64 MiB／0.5 CPU），不持久化。Redis 不可用时新上传返回 503，合法幂等重放仍沿用原会话；SQL 回滚及取消不返还已消耗额度。详情见[上传准入规格](docs/upload-admission-rate-limit-spec.md)与[验收记录](docs/verification/upload-admission-rate-limit.md)。两项模型记录字节上限均须为正数，语义见[验证说明](docs/verification/model-record-limits.md)。
 
 ### Compose 固定注入与配置生效
 
@@ -267,7 +271,7 @@ npm --prefix frontend run build
 `build` 先执行 `vue-tsc --noEmit`，再运行 Vite。保持上一节的 Vite 服务运行，在另一终端执行当前 HTTP 受控清单：
 
 ```bash
-E2E_BASE_URL=http://127.0.0.1:5173 npm --prefix frontend run test:e2e -- results-usage-workspace.spec.ts production-workspace.spec.ts conversation-lifecycle.spec.ts workspace-navigation.spec.ts frontend-redesign-baseline.spec.ts assets-workflow.spec.ts --grep-invert 'real existing'
+E2E_BASE_URL=http://127.0.0.1:5173 npm --prefix frontend run test:e2e -- results-usage-workspace.spec.ts production-workspace.spec.ts conversation-lifecycle.spec.ts workspace-navigation.spec.ts frontend-redesign-baseline.spec.ts assets-workflow.spec.ts upload-admission.spec.ts --grep-invert 'real existing'
 ```
 
 该清单验证浏览器与受控 API 的交互，不等于真实模型或全链路验收。真实媒体浏览器回归可通过 Java 的 `-Dlifecycle.browser=true -Dlifecycle.model=false` 接入，前提是前端已构建、Chrome 和上述开发依赖已就绪。完整操作与证据见[前端阶段验收](docs/verification/frontend-redesign-stage.md)。

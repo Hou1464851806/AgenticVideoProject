@@ -4,7 +4,7 @@
 
 ## 1. 模块定位与边界
 
-前端 uploads.ts 创建上传会话并直接 PUT 到 Silo；Java 保存上传身份、核对存储分片，再创建待验证素材与 MEDIA_PREPARE 任务。依赖 project 的归属检查、storage 的容量核算、PostgreSQL 和 S3 兼容存储。对象完成不等于素材 VALID；本包不执行 FFmpeg 或模型分析。
+前端 uploads.ts 创建上传会话并直接 PUT 到 Silo；Java 保存上传身份、核对存储分片，再创建待验证素材与 MEDIA_PREPARE 任务。依赖 project 的归属检查、storage 的容量核算、PostgreSQL、上传准入 Redis 和 S3 兼容存储。对象完成不等于素材 VALID；本包不执行 FFmpeg 或模型分析。
 
 ## 2. 快速导航
 
@@ -18,6 +18,8 @@
 | [UploadService.java](UploadService.java) | 8 MiB 分片规则、幂等创建、writerToken 资格、续传、完成及预留核对 |
 | [MultipartStorage.java](MultipartStorage.java) | S3 multipart 创建／列举／签名／完成／终止、对象检查与播放签名 |
 | [UploadCleanup.java](UploadCleanup.java) | 取消、过期、在途操作核对与持续清理、配额释放 |
+| [UploadAdmission.java](UploadAdmission.java) | 按用户 Redis 令牌桶；Lua 原子补充和扣减；拒绝时不创建上传 |
+| [UploadAdmissionRedisConfiguration.java](UploadAdmissionRedisConfiguration.java) | 独立短连接、连接／命令超时与禁止断线重放 |
 | [UploadErrors.java](UploadErrors.java) | 存储不可用、空间不足和上传状态冲突的错误映射 |
 
 ## 4. 架构与内部交互流程
@@ -31,7 +33,7 @@ flowchart LR
   D --> M[Java 媒体验证]
 ```
 
-1. create 在账号／项目锁和容量检查下保存 upload_sessions 与 storage_reservations，相同幂等键必须对应相同文件与页面身份。
+1. create 在账号／项目锁和容量检查下保存 upload_sessions 与 storage_reservations，相同幂等键必须对应相同文件与页面身份。合法重放不访问 Redis；新请求在文件／项目配额检查后、全局容量检查前扣减令牌。
 2. 初始化 multipart 后返回 writerToken；每次最多为 3 个分片签名。浏览器上传后报告 ETag／字节数，服务端结合真实存储核对。
 3. 暂停／恢复先核对大小、SHA-256、writerId 与写入租约；resume 返回存储已有分片，仅读取状态不延长恢复期限。
 4. complete 核对分片并完成对象，写入待验证素材、MEDIA_PREPARE 和 Outbox；响应 202，不把素材直接标为可用。
@@ -56,18 +58,22 @@ flowchart LR
 
 `UPLOAD_MAX_FILE_BYTES=2147483648`、`UPLOAD_MAX_PROJECT_BYTES=5368709120`、`UPLOAD_MAX_PROJECT_ASSETS=10`；分片固定 8 MiB。`UPLOAD_INACTIVITY_SECONDS=86400`。清理使用 `UPLOAD_CLEANUP_SETTLE_SECONDS=30`、`UPLOAD_CLEANUP_INTERVAL_MS=10000`。`STORAGE_PART_URL_SECONDS=300`；对象存储地址、凭据见根配置，S3 bucket 应用默认 originals。容量开关与预算由 storage 管理。
 
+上传准入默认 `UPLOAD_ADMISSION_CAPACITY=3`、`UPLOAD_ADMISSION_PERIOD_MS=60000`，同一数据库用户跨项目共用桶。每个新准入尝试消耗一次；容量失败、SQL 回滚、取消及后续失败均不返还。`REDIS_HOST=localhost`、`REDIS_PORT=6379`；`REDIS_CONNECT_TIMEOUT=300ms`、`REDIS_COMMAND_TIMEOUT=300ms`，须为正值。Compose 使用独立 Redis，地址为 `redis:6379`，不发布宿主端口。Redis 内存上限 32 MiB、容器 64 MiB／0.5 CPU，`noeviction`、无 AOF／快照；状态丢失接受恢复满桶。
+
+每次准入建立并关闭专用连接，Lettuce `autoReconnect=false`、`REJECT_COMMANDS`；业务层不重试脚本。Spring 脚本执行器仅在 `NOSCRIPT`（尚未执行扣减）时从 EVALSHA 改用 EVAL。断线／超时返回 503，结果不确定时不补偿。下一次请求建立新连接，可在 Redis 恢复后继续准入。参数变更需重启，并在验收前清空测试桶或隔离测试用户，避免混用旧策略状态。这是准入频率限制，不是模型费用预算；不改变已有任务、登录或注册限流。
+
 配置生效方式及 Compose 可覆盖范围见[根配置说明](../../../../../../../../README.md#8-配置说明)；Spring 配置来源为[application.properties](../../../../../resources/application.properties)。
 
 ## 7. 错误处理与可观测性
 
-同幂等键内容不同、文件身份不符、写入租约失效、配额超限返回 409／UPLOAD_CONFLICT；空间不足为 STORAGE_SPACE_LOW。S3 SDK 异常映射 503／STORAGE_UNAVAILABLE。清理保存待重试状态并周期复核，不能提前宣称字节已释放；已发布素材不走上传取消删除。
+同幂等键内容不同、文件身份不符、写入租约失效、配额超限返回 409／UPLOAD_CONFLICT；空间不足为 STORAGE_SPACE_LOW。`RATE_LIMITED` 返回 429／retryable=true，包含 `details.retryAfterMs` 和向上取整秒数的 `Retry-After`；Redis 网络／超时／内存不足返回 503／`UPLOAD_ADMISSION_UNAVAILABLE`，不编造恢复时间。浏览器保留错误码和等待信息，显示失败并允许手动继续，停止这两类错误的快速自动重试。S3 SDK 异常映射 503／STORAGE_UNAVAILABLE。清理保存待重试状态并周期复核，不能提前宣称字节已释放；已发布素材不走上传取消删除。
 
 ## 8. 测试
 
 同名测试包还包含 UploadLowSpaceIntegrationTest，以及 SiloFaultProxy／UploadTestApi 夹具；覆盖真实 Silo、并发配额、失败与清理。前端 upload-resume／upload-cancel／upload-limits 覆盖交互；成功上传共享部署可能触发真实分析费用。
 
 ```bash
-mvn -B -ntp -pl backend -am test -Dtest=UploadApiIntegrationTest,UploadExpiryIntegrationTest,UploadQuotaIntegrationTest,UploadGlobalCapacityIntegrationTest,UploadSpaceRecheckIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false
+mvn -B -ntp -pl backend -am test -Dtest=UploadAdmissionTest,UploadAdmissionApiIntegrationTest,UploadApiIntegrationTest,UploadExpiryIntegrationTest,UploadQuotaIntegrationTest,UploadGlobalCapacityIntegrationTest,UploadSpaceRecheckIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
 测试源码见[后端测试目录](../../../../../../test/java/com/agenticvideo/business)；集成测试需要 Docker，媒体测试另需宿主 FFmpeg／ffprobe。此处是相关回归命令，文档改动不执行应用测试。
@@ -81,3 +87,5 @@ mvn -B -ntp -pl backend -am test -Dtest=UploadApiIntegrationTest,UploadExpiryInt
 [根 README](../../../../../../../../README.md) · [后端模块地图](../../../../../../../README.md) · [领域术语](../../../../../../../../GLOSSARY.md) · [asset](../asset/README.md) · [storage](../storage/README.md) · [media](../media/README.md) · [project](../project/README.md)
 
 [upload-design.md](../../../../../../../../docs/upload-design.md) · [issue-8.md](../../../../../../../../docs/verification/issue-8.md)
+
+准入规格与方案比较见[上传准入 Spec](../../../../../../../../docs/upload-admission-rate-limit-spec.md)，最终证据见[验收记录](../../../../../../../../docs/verification/upload-admission-rate-limit.md)。

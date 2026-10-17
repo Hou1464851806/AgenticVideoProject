@@ -1,5 +1,16 @@
 name: agenticvideo
 services:
+  redis:
+    image: redis:7.4.6-alpine@sha256:3b73847e72874be07e6657b129a94761662b79bc0f679273757d4218573b2a98
+    platform: linux/arm64
+    command: [redis-server, --save, '', --appendonly, 'no', --maxmemory, 32mb, --maxmemory-policy, noeviction]
+    mem_limit: 64m
+    cpus: 0.5
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 3s
+      timeout: 1s
+      retries: 20
   qdrant:
     image: qdrant/qdrant:v1.19.2@sha256:b7b0444c4c351c970b98e90a6f89c2ee4287c65b44e52b4cb503fa5b2aa927ad
     platform: linux/arm64
@@ -62,6 +73,11 @@ services:
     ports:
       - '127.0.0.1:${APP_PORT:-8080}:8080'
     environment:
+      REDIS_HOST: redis
+      REDIS_CONNECT_TIMEOUT: ${REDIS_CONNECT_TIMEOUT:-300ms}
+      REDIS_COMMAND_TIMEOUT: ${REDIS_COMMAND_TIMEOUT:-300ms}
+      UPLOAD_ADMISSION_CAPACITY: ${UPLOAD_ADMISSION_CAPACITY:-3}
+      UPLOAD_ADMISSION_PERIOD_MS: ${UPLOAD_ADMISSION_PERIOD_MS:-60000}
       DATABASE_URL: jdbc:postgresql://postgres:5432/agentic_video
       DATABASE_USER: agentic_video
       DATABASE_PASSWORD: ${DATABASE_PASSWORD}
@@ -100,6 +116,8 @@ services:
       - silo_data:/capacity/silo:ro
       - worker_work:/work
     depends_on:
+      redis:
+        condition: service_healthy
       postgres:
         condition: service_healthy
     healthcheck:

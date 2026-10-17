@@ -1,5 +1,5 @@
 export class ApiFailure extends Error {
-  constructor(message: string, readonly retryable: boolean) { super(message); }
+  constructor(message: string, readonly retryable: boolean, readonly code?: string, readonly details?: { retryAfterMs?: number }) { super(message); }
 }
 
 /** Browser calls only the same-origin business API. */
@@ -15,6 +15,6 @@ export async function request<T>(path: string, method = 'GET', data?: unknown, e
   });
   const result = await response.json();
   if(response.status===401)window.dispatchEvent(new Event('auth-required'));
-  if (!response.ok) throw new ApiFailure(result.error?.message ?? '请求失败，请稍后重试', result.error?.retryable === true);
+  if (!response.ok) throw new ApiFailure(result.error?.message ?? '请求失败，请稍后重试', result.error?.retryable === true, result.error?.code, result.error?.details);
   return result.data;
 }

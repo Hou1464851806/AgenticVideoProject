@@ -10,6 +10,18 @@ import software.amazon.awssdk.core.exception.SdkException;
 
 @RestControllerAdvice
 class UploadErrors {
+    @ExceptionHandler(UploadAdmission.RateLimited.class)
+    ResponseEntity<?> rateLimited(UploadAdmission.RateLimited failure) {
+        return ResponseEntity.status(429).header("Retry-After", Long.toString((failure.retryAfterMs + 999) / 1000))
+                .body(Map.of("requestId", UUID.randomUUID(), "error", Map.of(
+                        "code", "RATE_LIMITED", "message", failure.getMessage(), "retryable", true,
+                        "details", Map.of("retryAfterMs", failure.retryAfterMs))));
+    }
+    @ExceptionHandler(UploadAdmission.Unavailable.class)
+    ResponseEntity<?> admissionUnavailable(UploadAdmission.Unavailable failure) {
+        return ResponseEntity.status(503).body(error("UPLOAD_ADMISSION_UNAVAILABLE", failure.getMessage(), true));
+    }
+
     @ExceptionHandler(SdkException.class)
     ResponseEntity<?> storageUnavailable() {
         return ResponseEntity.status(503).body(error("STORAGE_UNAVAILABLE", "对象存储暂时不可用，请稍后核对并重试", true));

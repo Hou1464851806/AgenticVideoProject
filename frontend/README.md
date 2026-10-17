@@ -164,3 +164,5 @@ E2E_BASE_URL=http://127.0.0.1:5173 npm --prefix frontend run test:e2e -- results
 [根 README](../README.md) · [领域术语](../GLOSSARY.md) · [后端 README](../backend/README.md) · [Agent README](../agent-service/README.md)
 
 [前端设计](../docs/frontend-redesign-design.md) · [实施计划](../docs/frontend-redesign-implementation-plan.md) · [阶段验收与试用](../docs/verification/frontend-redesign-stage.md) · [当前生命周期设计](../docs/conversation-lifecycle-browser-design.md)
+
+上传创建收到 `RATE_LIMITED`（429）或 `UPLOAD_ADMISSION_UNAVAILABLE`（503）时保留服务端提示并停止快速自动重试，用户可稍后点击“继续上传”；分片和已有上传恢复仍使用原重试规则。`ApiFailure` 保留 code 与 details.retryAfterMs。受控浏览器验收见 `e2e/upload-admission.spec.ts`，不调用真实模型。

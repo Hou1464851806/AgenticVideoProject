@@ -29,6 +29,7 @@ async function retryWrite<T>(path: string, method: string, data: unknown): Promi
   for (let attempt = 0; ; attempt++) {
     try { return await request<T>(path, method, data); }
     catch (failure) {
+      if (failure instanceof ApiFailure && (failure.code === 'RATE_LIMITED' || failure.code === 'UPLOAD_ADMISSION_UNAVAILABLE')) throw failure;
       if (!(failure instanceof TypeError || failure instanceof ApiFailure && failure.retryable) || attempt >= 2) throw failure;
       await new Promise(resolve => setTimeout(resolve, 250 * 2 ** attempt));
     }

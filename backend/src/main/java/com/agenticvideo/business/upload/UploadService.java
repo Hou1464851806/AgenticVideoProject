@@ -14,13 +14,14 @@ public class UploadService {
     private final JdbcTemplate database;
     private final TransactionTemplate transactions;
     private final MultipartStorage storage;
+    private final UploadAdmission admission;
     private final UploadCleanup cleanup;
     private final com.agenticvideo.business.storage.StorageCapacity capacity;
     private final long inactivitySeconds;
     private final long maxFileBytes;
     private final long maxProjectBytes;
     private final int maxProjectAssets;
-    public UploadService(JdbcTemplate database, PlatformTransactionManager manager, MultipartStorage storage, UploadCleanup cleanup, com.agenticvideo.business.storage.StorageCapacity capacity,
+    public UploadService(JdbcTemplate database, PlatformTransactionManager manager, MultipartStorage storage, UploadCleanup cleanup, UploadAdmission admission, com.agenticvideo.business.storage.StorageCapacity capacity,
             @org.springframework.beans.factory.annotation.Value("${upload.inactivity-seconds:86400}") long inactivitySeconds,
             @org.springframework.beans.factory.annotation.Value("${upload.max-file-bytes:2147483648}") long maxFileBytes,
             @org.springframework.beans.factory.annotation.Value("${upload.max-project-bytes:5368709120}") long maxProjectBytes,
@@ -28,7 +29,7 @@ public class UploadService {
         if(inactivitySeconds<1)throw new IllegalArgumentException("Invalid upload inactivity lifetime");
         if(maxFileBytes<1 || maxFileBytes>PART_BYTES*10000 || maxProjectBytes<1 || maxProjectAssets<1)
             throw new IllegalArgumentException("Invalid upload limits");
-        this.capacity=capacity;this.cleanup=cleanup;
+        this.capacity=capacity;this.cleanup=cleanup;this.admission=admission;
         this.maxFileBytes=maxFileBytes;this.maxProjectBytes=maxProjectBytes;this.maxProjectAssets=maxProjectAssets;
         this.database = database; this.transactions = new TransactionTemplate(manager); this.storage = storage;this.inactivitySeconds=inactivitySeconds;
     }
@@ -54,6 +55,7 @@ public class UploadService {
                 throw new ResponseStatusException(CONFLICT, "项目原始素材总量超过上限 " + maxProjectBytes + " 字节，请取消未完成上传、删除不需要的素材或新建项目");
             if (((Number) reserved.get("slots")).longValue() >= maxProjectAssets)
                 throw new ResponseStatusException(CONFLICT, "项目视频数量达到上限 " + maxProjectAssets + "，请取消未完成上传、删除不需要的素材或新建项目");
+            admission.require(actorId);
             capacity.require(capacity.uploadBudget(request.sizeBytes()));
             UUID uploadId = UUID.randomUUID();
             database.update("INSERT INTO upload_sessions (id,project_id,actor_user_id,idempotency_key,filename,declared_bytes,declared_sha256,part_size_bytes,expected_parts,object_key,writer_token,writer_owner) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
