@@ -29,6 +29,7 @@ Q58 已确认首期 MVP 整体设计；2026-10-12 补充确认统一自然语言
 | 百炼分析模型与 DeepSeek Flash 推理的视频理解、补查与评测设计草案 | [视频理解设计](research/bailian-video-understanding-design.md) |
 | 面向用户目标的 Agent 循环、统一时间线、工具与完成判断草案 | [视频 Agent 与时间线设计](research/goal-driven-video-agent-design.md) |
 | 分片、恢复、限额与清理 | [上传设计](upload-design.md) |
+| 新视频上传准入的用户级 Redis 令牌桶、幂等/故障语义、实施顺序与验收（已实现） | [上传准入限流规格](upload-admission-rate-limit-spec.md) |
 | 对话、上下文与工作区 | [对话与前端](conversation-design.md) |
 | 方案内容、字幕与渲染约束 | [方案契约](edit-plan-contract.md) |
 | 表结构、引用保护与事务 | [数据库规格](database-design.md) |
