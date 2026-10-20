@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>叙帧 · 剪辑台原型</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-plus" viewBox="0 0 16 16"><path d="M8 3.2v9.6M3.2 8h9.6"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 16 16"><path d="M6.2 4.5 10 8l-3.8 3.5"/></symbol>
+  <symbol id="i-chev-left" viewBox="0 0 16 16"><path d="M9.8 4.2 6.2 8l3.6 3.8"/></symbol>
+  <symbol id="i-right" viewBox="0 0 16 16"><path d="M3.8 4.2h8.4v7.6H3.8zM10.2 4.2v7.6"/></symbol>
+  <symbol id="i-left" viewBox="0 0 16 16"><path d="M3.8 4.2h8.4v7.6H3.8zM5.8 4.2v7.6"/></symbol>
+  <symbol id="i-more" viewBox="0 0 16 16"><circle cx="3.2" cy="8" r=".9" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r=".9" fill="currentColor" stroke="none"/><circle cx="12.8" cy="8" r=".9" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 16 16"><path d="M2.8 5.2c0-.6.4-1 1-1h2.4l1.1 1.2h5c.6 0 1 .4 1 1v5.2c0 .6-.4 1-1 1H3.8c-.6 0-1-.4-1-1z"/></symbol>
+  <symbol id="i-film" viewBox="0 0 16 16"><rect x="2.8" y="3.6" width="10.4" height="8.8" rx="1"/><path d="M5.4 3.6v8.8M10.6 3.6v8.8M2.8 6.1h2.6M2.8 9.9h2.6M10.6 6.1h2.6M10.6 9.9h2.6"/></symbol>
+  <symbol id="i-play" viewBox="0 0 16 16"><path d="M6 4.6 11 8l-5 3.4z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 16 16"><path d="M6 4.5v7M10 4.5v7"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 16 16"><path d="M8 10.8V3.6M5.4 6.1 8 3.5l2.6 2.6M3.4 11.2v1.2h9.2v-1.2"/></symbol>
+  <symbol id="i-search" viewBox="0 0 16 16"><circle cx="7.2" cy="7.2" r="3.7"/><path d="m10 10 2.6 2.6"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 16 16"><path d="M8 12.5v-9M4.5 7 8 3.5 11.5 7"/></symbol>
+  <symbol id="i-x" viewBox="0 0 16 16"><path d="m4.2 4.2 7.6 7.6M11.8 4.2l-7.6 7.6"/></symbol>
+  <symbol id="i-download" viewBox="0 0 16 16"><path d="M8 3.5v7M4.8 7.5 8 10.7l3.2-3.2M3.5 12.5h9"/></symbol>
+  <symbol id="i-check" viewBox="0 0 16 16"><path d="m3.5 8.3 3 3 6-6.6"/></symbol>
+</svg>
+
+<div class="app" id="app">
+  <aside class="rail" id="rail" aria-label="工作区">
+    <div class="rail-inner" id="railInner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-name">叙帧</span>
+        <span class="brand-badge">STUDIO</span>
+        <span class="grow"></span>
+        <button class="icon-btn" data-act="toggle-left" aria-label="收起工作区"><svg class="ic"><use href="#i-left"/></svg></button>
+      </div>
+      <button class="new-chat" data-act="new-chat"><svg class="ic ic-sm"><use href="#i-plus"/></svg>新聊天</button>
+      <div class="rail-scroll">
+        <div class="section-label"><span>工作区</span><span class="count" id="projectCount">3</span></div>
+        <div id="projectList"></div>
+      </div>
+      <section class="asset-block" aria-label="素材">
+        <div class="asset-title"><strong>素材</strong><span class="n" id="assetCount">0</span><span class="grow"></span><button class="up" data-act="open-drawer" data-focus="upload"><svg class="ic ic-sm"><use href="#i-upload"/></svg>上传</button></div>
+        <div class="asset-mini" id="assetSummary"></div>
+        <button class="all-assets" data-act="open-drawer">全部素材 <span aria-hidden="true">→</span></button>
+      </section>
+      <footer class="account">
+        <span class="avatar">林</span>
+        <span class="who"><b>林屿</b><span>内容组 · 私有项目</span></span>
+      </footer>
+    </div>
+    <div class="rail-compact" id="railCompact">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <button class="icon-btn" data-act="new-chat" aria-label="新聊天"><svg class="ic ic-sm"><use href="#i-plus"/></svg></button>
+      <button class="icon-btn" data-act="toggle-left" aria-label="展开工作区"><svg class="ic ic-sm"><use href="#i-chev"/></svg></button>
+    </div>
+  </aside>
+
+  <main class="chat">
+    <header class="chat-head">
+      <h1 id="chatTitle">45 秒竖屏预告</h1>
+      <span class="state" id="chatState"><i></i><span id="chatStateText">草稿待确认</span></span>
+      <span class="grow"></span>
+      <button class="icon-btn" data-act="toggle-panel" id="panelToggle" aria-label="收起产物面板"><svg class="ic"><use href="#i-right"/></svg></button>
+    </header>
+
+    <div class="thread-scroll" id="threadScroll">
+      <div class="thread" id="thread"></div>
+    </div>
+    <button class="jump-latest" id="jumpLatest" data-act="jump-latest" hidden>回到最新 <span aria-hidden="true">↓</span></button>
+
+    <div class="run-status" id="runStatus" hidden>
+      <span class="spin" aria-hidden="true"></span>
+      <span id="runText">正在理解你的修改</span>
+      <button data-act="stop-gen">停止生成</button>
+    </div>
+
+    <div class="composer-wrap">
+      <form class="composer" id="composerForm">
+        <div class="ctx" id="ctxChips"></div>
+        <label class="sr" for="composerInput">对话输入</label>
+        <textarea id="composerInput" rows="1" maxlength="8000" placeholder="继续修改，或回答上面的问题…"></textarea>
+        <div class="composer-foot">
+          <button type="button" class="round-btn" data-act="open-drawer" aria-label="添加素材"><svg class="ic"><use href="#i-plus"/></svg></button>
+          <span class="model"><i></i>deepseek-flash</span>
+          <span class="foot-space"></span>
+          <span class="kbd">⌘ ↵ 发送</span>
+          <button type="submit" class="send" id="sendBtn" aria-label="发送"><svg class="ic"><use href="#i-arrow"/></svg></button>
+        </div>
+      </form>
+      <p class="autosave">对话自动保存 · 关闭页面不会停止后台任务</p>
+    </div>
+  </main>
+
+  <aside class="artifacts" id="artifacts" aria-label="产物">
+    <div class="artifacts-inner">
+      <header class="pane-head">
+        <strong>产物</strong><span class="n" id="artifactCount">0</span>
+        <span class="grow"></span>
+        <button class="icon-btn" data-act="toggle-panel" aria-label="收起产物面板"><svg class="ic"><use href="#i-right"/></svg></button>
+      </header>
+      <div class="pane-body" id="artifactBody"></div>
+    </div>
+    <button class="artifacts-rail" id="artifactsRail" data-act="toggle-panel" aria-label="展开产物面板">
+      <span class="rail-label">产物</span>
+      <svg class="ic"><use href="#i-chev-left"/></svg>
+    </button>
+  </aside>
+</div>
+
+<div class="scrim" id="scrim" data-act="close-drawer"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="素材库">
+  <header class="drawer-head">
+    <div class="drawer-title"><strong>素材库</strong><span class="n" id="drawerCount">0</span></div>
+    <button class="icon-btn" id="drawerClose" data-act="close-drawer" aria-label="关闭素材库"><svg class="ic"><use href="#i-x"/></svg></button>
+  </header>
+  <div class="drawer-body">
+    <button type="button" class="dropzone" id="dropzone">
+      <span class="up-ic"><svg class="ic ic-sm"><use href="#i-upload"/></svg></span>
+      <b>拖入视频，或选择文件</b>
+      <span>MP4 / MOV · 单文件不超过 2 GiB</span>
+    </button>
+    <input type="file" id="fileInput" accept="video/*" hidden>
+    <div class="drawer-tools">
+      <label class="search"><svg class="ic ic-sm"><use href="#i-search"/></svg><span class="sr">查找素材</span><input id="assetSearch" placeholder="查找台词、画面或素材名"></label>
+      <div class="filters" id="assetFilters"></div>
+    </div>
+    <div class="asset-list" id="assetList"></div>
+    <div id="assetDetail"></div>
+  </div>
+</aside>
+
+<div class="player-veil" id="playerVeil" hidden>
+  <section class="player-dialog" role="dialog" aria-modal="true" aria-labelledby="playerTitle">
+    <button class="player-close" data-act="close-player" aria-label="关闭预览"><svg class="ic"><use href="#i-x"/></svg></button>
+    <div class="player-stage" id="playerStage">
+      <img id="playerImage" src="./assets/stage.jpg" alt="">
+      <div class="player-placeholder" id="playerPlaceholder" hidden><svg class="ic"><use href="#i-film"/></svg><span>原片</span></div>
+      <span class="player-badge" id="playerBadge">低清预览</span>
+      <button class="player-bigplay" id="playerBigPlay" data-act="toggle-play" aria-label="播放"><svg class="ic"><use href="#i-play"/></svg></button>
+      <div class="player-controls">
+        <button class="player-play" id="playerPlayBtn" data-act="toggle-play" aria-label="播放"><svg class="ic ic-sm"><use href="#i-play"/></svg></button>
+        <span class="player-time" id="playerTime">00:00</span>
+        <div class="player-progress" id="playerProgress" role="slider" tabindex="0" aria-label="播放进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></div>
+        <span class="player-time" id="playerDuration">00:45</span>
+      </div>
+    </div>
+    <aside class="player-info">
+      <span class="eyebrow" id="playerKind">低清预览</span>
+      <h2 id="playerTitle">预告 · 竖屏 45 秒</h2>
+      <p id="playerMeta">V2 · 1080 × 1920 · 4 段</p>
+      <p id="playerSource">创始人访谈_林屿.mp4</p>
+      <p class="player-note" id="playerNote">预览与成片都来自已确认版本；切换会话不会改变正在导出的来源。</p>
+      <div class="player-actions"><button class="btn" id="playerDownload" data-act="download-player">下载成片</button><button class="btn" data-act="close-player">关闭</button></div>
+    </aside>
+  </section>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="./app.js"></script>
+</body>
+</html>

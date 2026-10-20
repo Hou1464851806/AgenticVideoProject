@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "project": "叙帧 · AI 视频工作台",
+  "brief": "面向内容创作者的 AI 剪辑工作台：左侧项目与会话，素材库，中央多轮对话与剪辑草稿，右侧可折叠的已确认方案和渲染任务。三个候选共用同一份真实感数据，只在骨架与页面结构上拉开。",
+  "round": "01",
+  "nativeViewport": "1440x900",
+  "candidates": [
+    {
+      "id": "a",
+      "name": "A · 一屏对话",
+      "concept": "一个左栏装下工作区与素材，中间整块留给对话；产物在右侧随时可收。最接近参考的安静构图。",
+      "typography": "SF Pro / Inter + PingFang SC；界面 13–14px，对话 14.5px/1.75，标题 16–17px；时间码 SF Mono，tabular-nums。",
+      "palette": ["#f9fafb", "#ffffff", "#0f1115", "#4176e6", "#61666b"],
+      "traits": ["单左栏分区 300px", "对话内容宽 680px", "右侧产物 380px", "素材在左栏底部"],
+      "source": "a.html"
+    },
+    {
+      "id": "b",
+      "name": "B · 剪辑台",
+      "concept": "会话、素材、对话、产物四个区同时在场，像一张真的剪辑台；两侧栏都可收起，焦点随时回到对话。",
+      "typography": "SF Pro / Inter + PingFang SC；界面 12.5–14px，对话 13.5px/1.72，标题 15px；时间码 SF Mono，tabular-nums。",
+      "palette": ["#f9fafb", "#ffffff", "#0f1115", "#4176e6", "#dbdde0"],
+      "traits": ["四区并置 236/288/1fr/336", "对话内容宽 532px", "素材常驻可折叠", "左右面板同高表头"],
+      "source": "b.html"
+    },
+    {
+      "id": "c",
+      "name": "C · 胶片带",
+      "concept": "把素材变成底部一条深色胶片带，对话拿到最大画幅；素材还在手边，只是换成了横向的场记板。",
+      "typography": "SF Pro / Inter + PingFang SC；界面 12.5–14px，对话 13.5px/1.72，标题 15px；胶片带用 SF Mono 编号与时间码。",
+      "palette": ["#f9fafb", "#ffffff", "#111318", "#4176e6", "#0f1115"],
+      "traits": ["左 240 / 右 320", "对话内容宽 680px", "底部 98px 深色胶片带", "胶片带可展开为素材库"],
+      "source": "c.html"
+    }
+  ]
+}
