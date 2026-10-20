@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { hidePlan, showPlan, showRail } from './fixtures/workspace';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -32,7 +33,6 @@ test.beforeEach(async ({ page }) => {
 
 test('a confirmed single version opens directly as awaiting export without confirmation again', async ({ page }) => {
   await page.goto('/?project=project');
-  await page.getByRole('tab', { name: '作品', exact: true }).click();
   await page.getByLabel('查看方案', { exact: true }).selectOption('plan');
   await expect(page.getByRole('heading', { name: 'V1 · 正式开场', exact: true })).toBeVisible();
   await expect(page.getByLabel('查看版本', { exact: true })).toHaveCount(0);
@@ -52,7 +52,6 @@ test('deleting an export requires explicit object confirmation and keeps cleanup
     await route.fulfill({ json: { data: { state, removedBytes: 0 } } });
   });
   await page.goto('/?project=project');
-  await page.getByRole('tab', { name: '作品', exact: true }).click();
   await page.getByLabel('查看方案', { exact: true }).selectOption('plan');
   await expect(page.getByRole('button', { name: '确认当前版本', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '删除成片文件', exact: true }).click();
@@ -121,7 +120,6 @@ test('multi-output export pins revision, output and profile through a lost respo
   const cancelled: string[] = [];
   await page.route('**/api/v1/tasks/*/cancel', async route => { cancelled.push(new URL(route.request().url()).pathname); await route.fulfill({ json: { data: {} } }); });
   await page.goto('/?project=project');
-  await page.getByRole('tab', { name: '作品', exact: true }).click();
   await page.getByLabel('查看方案', { exact: true }).selectOption('plan');
   await page.getByLabel('查看版本', { exact: true }).selectOption('revision-2');
   await page.getByLabel('成片导出清晰度', { exact: true }).selectOption('FULL_HD_1080');
@@ -131,8 +129,8 @@ test('multi-output export pins revision, output and profile through a lost respo
   await page.getByLabel('选择导出输出', { exact: true }).selectOption('output-2');
   await page.getByRole('button', { name: '导出所选输出', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Failed to fetch');
-  await page.getByRole('tab', { name: '制作', exact: true }).click();
-  await page.getByRole('tab', { name: '作品', exact: true }).click();
+  await page.locator('.chat-head [aria-label="收起或展开产物面板"]').click();
+  await page.locator('.artifact-rail').click();
   await page.getByRole('button', { name: '导出所选输出', exact: true }).click();
   await expect.poll(() => writes.length).toBe(2);
   expect(writes[1]).toEqual(writes[0]);
@@ -151,7 +149,6 @@ test('historical unconfirmed versions require explicit confirmation before expor
     else await route.fulfill({ json: { data: { items: [] } } });
   });
   await page.goto('/?project=project');
-  await page.getByRole('tab', { name: '作品', exact: true }).click();
   await page.getByLabel('查看方案', { exact: true }).selectOption('plan');
   await expect(page.getByRole('button', { name: '导出正式成片', exact: true })).toBeDisabled();
   expect(confirmed).toBe(false);
@@ -167,8 +164,8 @@ for (const state of ['UNAVAILABLE', 'REMOVED']) {
     await page.route('**/api/v1/render-requests/export', route => route.fulfill({ json: { data: completed } }));
     await page.route('**/api/v1/artifacts/artifact', route => route.fulfill({ json: { data: { state, storedBytes: 0 } } }));
     await page.goto('/?project=project');
-    await page.getByRole('tab', { name: '作品', exact: true }).click();
-    await page.getByLabel('查看方案', { exact: true }).selectOption('plan');
+    await showPlan(page);
+      await page.getByLabel('查看方案', { exact: true }).selectOption('plan');
     await expect(page.getByRole('region', { name: '正式成片导出', exact: true })).toContainText(state === 'UNAVAILABLE' ? '成片文件不可用' : '成片文件已删除');
     await expect(page.getByRole('button', { name: '播放正式成片', exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '下载正式成片', exact: true })).toHaveCount(0);
@@ -180,21 +177,24 @@ for (const viewport of [{ width: 1366, height: 768 }, { width: 768, height: 1024
     await page.setViewportSize(viewport);
     await page.route('**/api/v1/projects/project/usage', route => route.fulfill({ json: { data: { ...usage, models: { ...usage.models, estimatedCostCny: 2.67844952 } } } }));
     await page.goto('/?project=project');
-    await page.getByRole('tab', { name: '作品', exact: true }).click();
-    await page.getByLabel('查看方案', { exact: true }).selectOption('plan');
+    await showPlan(page);
+      await page.getByLabel('查看方案', { exact: true }).selectOption('plan');
     await expect(page.getByText('待导出', { exact: true })).toBeVisible();
     mkdirSync(screenshots, { recursive: true });
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: `${screenshots}/controlled-works-${viewport.width}x${viewport.height}.png`, fullPage: true });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await showRail(page);
     await page.getByRole('button', { name: '用量', exact: true }).click();
     await expect(page.getByLabel('存储与模型用量', { exact: true })).toContainText('费用未知 1 次');
     await page.screenshot({ path: `${screenshots}/controlled-usage-summary-${viewport.width}x${viewport.height}.png`, fullPage: true });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.getByRole('button', { name: '关闭用量', exact: true }).click();
     await expect(page.getByRole('button', { name: '用量', exact: true })).toBeFocused();
+    await hidePlan(page);
     const operations: string[] = [];
     page.on('request', req => { if (req.method() !== 'GET' && !req.url().endsWith('/auth/csrf')) operations.push(req.url()); });
+    await showRail(page);
     await page.getByRole('button', { name: '诊断与高级维护', exact: true }).click();
     await page.getByRole('button', { name: '前往素材索引维护', exact: true }).click();
     await expect(page.getByLabel('维护素材', { exact: true })).toBeVisible();
@@ -210,7 +210,6 @@ test('a running export prevents duplicate submission while another resolution re
   });
   await page.route('**/api/v1/render-requests/export', route => route.fulfill({ json: { data: render } }));
   await page.goto('/?project=project');
-  await page.getByRole('tab', { name: '作品', exact: true }).click();
   await page.getByLabel('查看方案', { exact: true }).selectOption('plan');
   await expect(page.getByRole('button', { name: '导出正式成片', exact: true })).toBeDisabled();
   expect(writes).toEqual([]);
@@ -226,7 +225,6 @@ test('unrecognized export failure keeps its reason and offers no automatic resub
   const writes: string[] = [];
   page.on('request', req => { if (req.method() === 'POST' && req.url().endsWith('/export-requests')) writes.push(req.url()); });
   await page.goto('/?project=project');
-  await page.getByRole('tab', { name: '作品', exact: true }).click();
   await page.getByLabel('查看方案', { exact: true }).selectOption('plan');
   await expect(page.getByRole('region', { name: '正式成片导出', exact: true }).getByRole('alert')).toHaveText('存储暂时不可写，请稍后显式导出。');
   expect(writes).toEqual([]);
@@ -241,7 +239,6 @@ test('single-version selection completes even while a background plan refresh is
     await route.fulfill({json:{data:{items:[{id:'plan',title:'已确认作品',editingTaskId:null}]}}});
   });
   await page.goto('/?project=project');
-  await page.getByRole('tab',{name:'作品',exact:true}).click();
   await expect.poll(()=>reads).toBeGreaterThanOrEqual(2);
   await page.getByLabel('查看方案',{exact:true}).selectOption('plan');
   await expect(page.getByRole('heading',{name:'V1 · 正式开场',exact:true})).toBeVisible();
@@ -263,7 +260,6 @@ test('expired formal playback renews the same artifact without submitting anothe
   await page.route('**/expired-export.mp4',route=>route.fulfill({status:403,body:'expired'}));
   await page.route('**/fresh-export.mp4',route=>route.fulfill({contentType:'video/mp4',path:'e2e/fixtures/short-video.mp4'}));
   await page.goto('/?project=project');
-  await page.getByRole('tab',{name:'作品',exact:true}).click();
   await page.getByLabel('查看方案',{exact:true}).selectOption('plan');
   await page.getByRole('button',{name:'播放正式成片',exact:true}).click();
   await expect.poll(()=>accesses).toBe(2);
@@ -281,7 +277,6 @@ test('a saved-plan preview keeps its original output name when another plan is s
   await page.route('**/api/v1/revisions/revision/previews', route => route.fulfill({ json: { data: preview } }));
   await page.route('**/api/v1/render-requests/preview', route => route.fulfill({ json: { data: preview } }));
   await page.goto('/?project=project');
-  await page.getByRole('tab', { name: '作品', exact: true }).click();
   await page.getByLabel('查看方案', { exact: true }).selectOption('plan');
   await page.getByRole('button', { name: '生成低清效果预览', exact: true }).click();
   const result = page.getByRole('region', { name: '低清效果预览', exact: true });

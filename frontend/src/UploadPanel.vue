@@ -3,6 +3,8 @@ import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
 import { enqueueFiles, loadUploads, uploadRows, pauseUpload, continueUpload, reselectFile, cancelUpload } from './uploads';
 const props = defineProps<{ projectId: string; availableAssetIds: string[] }>();
 const error = ref('');
+const fileInput = ref<HTMLInputElement | null>(null);
+const dragOver = ref(false);
 const rows = computed(() => uploadRows.filter(row => row.projectId === props.projectId && !(row.upload?.status === 'COMPLETED' && row.upload.assetId && props.availableAssetIds.includes(row.upload.assetId))));
 watch(() => props.projectId, async id => {
   try { await loadUploads(id); } catch (failure) { error.value = failure instanceof Error ? failure.message : '无法查询上传'; }
@@ -21,6 +23,12 @@ function select(event: Event) {
   enqueueFiles(props.projectId, Array.from(input.files ?? []));
   input.value = '';
 }
+function openPicker() { fileInput.value?.click(); }
+function drop(event: DragEvent) {
+  dragOver.value = false;
+  const files = Array.from(event.dataTransfer?.files ?? []).filter(file => file.type.startsWith('video/'));
+  if (files.length) enqueueFiles(props.projectId, files);
+}
 function reselect(event: Event, key: string) {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
@@ -30,9 +38,12 @@ function reselect(event: Event, key: string) {
 </script>
 <template>
   <section class="upload-panel" aria-label="导入视频">
-    <h3>导入视频</h3><p class="upload-hint">可同时选择多个视频。上传完成后将验证媒体，验证通过后可播放。</p>
-    <label :for="`video-files-${projectId}`">选择视频</label>
-    <input :id="`video-files-${projectId}`" type="file" multiple accept="video/*" @change="select">
+    <button type="button" class="dropzone" :class="{ 'is-over': dragOver }" @click="openPicker" @dragover.prevent="dragOver = true" @dragenter.prevent="dragOver = true" @dragleave="dragOver = false" @drop.prevent="drop">
+      <span class="up-ic" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M8 10.8V3.6M5.4 6.1 8 3.5l2.6 2.6M3.4 11.2v1.2h9.2v-1.2"/></svg></span>
+      <b>拖入视频，或选择文件</b>
+      <span>MP4 / MOV · 可同时选择多个 · 上传后验证媒体</span>
+    </button>
+    <input ref="fileInput" class="sr-only" tabindex="-1" type="file" multiple accept="video/*" aria-label="选择视频" @change="select">
     <p v-if="error" role="alert">{{ error }}</p>
     <article v-for="row in rows" :key="row.key" :aria-label="`上传：${row.filename}`">
       <div class="upload-title"><strong>{{ row.filename }}</strong><span>上传记录</span></div>
@@ -57,14 +68,22 @@ function reselect(event: Event, key: string) {
   </section>
 </template>
 <style scoped>
-h3 { margin: 0; font-size: 18px; }
-.upload-panel { margin-bottom: 24px; }
-.upload-title { display: flex; justify-content: space-between; gap: 16px; }
-.upload-title span, .upload-hint { color: var(--muted); font-size: 13px; }
-input { padding: 10px 0; border: 0; font-size: 13px; }
-article { border-top: 1px solid #dce5de; padding: 18px 0; overflow-wrap: anywhere; }
-article strong { font-size: 14px; }
-article p { font-size: 13px; color: #69766e; }
-progress { width: 100%; accent-color: #245c45; }
-small { display: block; margin-top: 6px; color: #69766e; }
+.upload-panel { margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.dropzone { width: 100%; height: 96px; min-height: 96px; margin: 0; padding: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: 1px dashed #cfd3d8; border-radius: 10px; background: #fcfcfd; color: var(--ink-3); text-align: center; transition: border-color .16s, background .16s; }
+.dropzone:hover, .dropzone.is-over { border-color: #9fb4df; background: #f7faff; }
+.dropzone .up-ic { width: 26px; height: 26px; margin-bottom: 2px; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: 7px; background: #fff; color: var(--ink-2); }
+.dropzone .up-ic svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.dropzone b { font-size: 12px; font-weight: 550; color: var(--ink-2); }
+.dropzone > span:last-child { font-size: 10px; color: var(--ink-4); }
+.upload-title { display: flex; justify-content: space-between; gap: 12px; }
+.upload-title span, .upload-hint { color: var(--ink-4); font-size: 10.5px; line-height: 1.55; }
+.upload-hint { margin: 4px 0 8px; }
+input { padding: 6px 0; border: 0; font-size: 11px; }
+article { border-top: 1px solid #f0f1f2; padding: 10px 0; overflow-wrap: anywhere; }
+article strong { font-size: 12px; }
+article p { font-size: 10.5px; color: var(--ink-3); line-height: 1.55; margin: 4px 0; }
+article button { min-height: 26px; padding: 3px 7px; font-size: 10.5px; margin: 3px 3px 0 0; }
+progress { width: 100%; accent-color: var(--blue); height: 4px; }
+small { display: block; margin-top: 4px; color: var(--ink-4); font-size: 10px; }
+label { margin-top: 4px; font-size: 11px; }
 </style>

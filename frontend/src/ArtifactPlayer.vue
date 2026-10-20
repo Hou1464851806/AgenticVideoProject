@@ -30,4 +30,4 @@ onUnmounted(() => { alive = false; });
     <video v-if="url" ref="video" :src="url" controls preload="metadata" aria-label="聊天草稿预览播放器" @error="access(true)" @loadedmetadata="loaded" />
   </div>
 </template>
-<style scoped>video { width: 100%; max-height: 360px; background: #18271f; }</style>
+<style scoped>video { width: 100%; max-height: 360px; background: var(--ink); }</style>

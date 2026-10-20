@@ -66,4 +66,4 @@ onUnmounted(()=>clearInterval(timer));
     <p v-for="(failure,key) in information?.analysis?.errors" :key="`error-${key}`" role="alert">{{ failure.message }}</p>
     <p v-if="information?.analysis?.stages.MEDIA === 'FAILED' && !information?.analysis?.mediaRetryable">文件已确认无效或已进入清理，请按失败原因重新上传有效视频。</p>
 </section></template>
-<style scoped>summary{cursor:pointer;min-height:44px;padding:10px 0}.capabilities{font-weight:500;color:var(--accent)}p{font-size:13px;overflow-wrap:anywhere}label{display:block;font-size:12px;margin:8px 0}button{font-size:12px}</style>
+<style scoped>summary{cursor:pointer;min-height:30px;padding:6px 0;font-size:11px}.capabilities{font-weight:500;color:var(--ink-2);font-size:11px;line-height:1.55}p{font-size:11px;line-height:1.55;overflow-wrap:anywhere}label{display:block;font-size:10.5px;margin:5px 0}button{font-size:10.5px;min-height:26px;padding:3px 7px;margin:3px 3px 0 0}</style>

@@ -41,9 +41,10 @@ onMounted(start);
 </template>
 
 <style scoped>
-section { margin-top: 24px; padding: 20px; background: #edf3ee; border-radius: 8px; }
-h4 { margin: 0 0 12px; font-size: 17px; }
-p { font-size: 14px; line-height: 1.7; }
-section section { background: white; border: 1px solid var(--line); margin-top: 16px; }
-@media(max-width:720px) { section { padding: 16px; } }
+section { margin-top: 12px; padding: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 7px; }
+h4 { margin: 0 0 6px; font-size: 13px; }
+p { font-size: 11px; line-height: 1.6; color: var(--ink-3); }
+section section { background: #fff; border: 1px solid var(--line); margin-top: 8px; }
+button { min-height: 26px; padding: 3px 7px; font-size: 10.5px; margin: 3px 3px 0 0; }
+@media(max-width:720px) { section { padding: 10px; } }
 </style>

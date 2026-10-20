@@ -1,133 +1,99 @@
-import { test, expect } from './fixtures/current-frontend';
-import { readFileSync, mkdirSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { test, expect } from '@playwright/test';
 
-// Baseline evidence only: no model calls, uploads, render requests or Compose changes.
-const screenshots = resolve(process.env.E2E_REDESIGN_SCREENSHOTS ?? 'test-results/frontend-redesign');
-const viewports = [{ width: 1366, height: 768 }, { width: 768, height: 1024 }, { width: 390, height: 844 }];
-
-for (const viewport of viewports) {
-  const size = `${viewport.width}x${viewport.height}`;
-  test(`real existing workspace baseline ${size}`, async ({ page }) => {
-    test.skip(process.env.E2E_REDESIGN_REAL !== '1', 'Requires existing preview-seed.json and running Java deployment');
-    const seed = JSON.parse(readFileSync(resolve('../.scratch/asr-fixture/preview-seed.json'), 'utf8'));
-    mkdirSync(screenshots, { recursive: true });
-    await page.setViewportSize(viewport);
-    await page.goto('/');
-    await expect(page.getByRole('heading', { name: '登录工作台', exact: true })).toBeVisible();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await page.screenshot({ path: `${screenshots}/real-login-${size}.png`, fullPage: true });
-    await page.getByLabel('用户名', { exact: true }).fill(seed.username);
-    await page.getByLabel('密码', { exact: true }).fill('analysis-browser-password');
-    await page.getByRole('button', { name: '登录', exact: true }).click();
-    await expect(page.getByRole('heading', { name: '我的项目', exact: true })).toBeVisible();
-    await page.getByText('账户', { exact: true }).click();
-    await expect(page.getByRole('button', { name: '退出登录', exact: true })).toBeVisible();
-    await page.getByText('账户', { exact: true }).click();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await page.screenshot({ path: `${screenshots}/real-projects-${size}.png`, fullPage: true });
-    const project = await page.request.get(`/api/v1/projects/${seed.projectId}`);
-    expect(project.status()).toBe(200);
-    const projectName = (await project.json()).data.name;
-    await page.goto(`/?project=${seed.projectId}`);
-    await expect(page.getByRole('heading', { name: projectName, exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: '查看分析状态 labelled-speech.mp4', exact: true })).toBeVisible();
-    // All three panels mount on desktop; wait for session restoration before capturing.
-    await expect(page.getByRole('button', { name: '新聊天', exact: true, includeHidden: true })).toBeEnabled();
-    const sessionId = await page.getByLabel('制作会话', { exact: true }).inputValue();
-    const saved = await page.request.get(`/api/v1/conversations/${sessionId}/messages`);
-    expect(saved.status()).toBe(200);
-    const view = (await saved.json()).data.view;
-    if (view.planId && view.revisionId) {
-      await page.getByRole('tab', { name: '作品', exact: true }).click();
-      await expect(page.getByLabel('查看方案', { exact: true })).toHaveValue(view.planId);
-      if (await page.getByLabel('查看版本', { exact: true }).count()) await expect(page.getByLabel('查看版本', { exact: true })).toHaveValue(view.revisionId);
-      await expect(page.getByRole('heading', { level: 4, name: /^V[0-9]+ ·/, includeHidden: true })).toHaveCount(1);
-    }
-    await page.getByRole('tab', { name: '素材', exact: true }).click();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await page.screenshot({ path: `${screenshots}/real-assets-${size}.png`, fullPage: true });
-    for (const [tab, label] of [['制作', 'conversation'], ['作品', 'results']]) {
-      await page.getByRole('tab', { name: tab, exact: true }).click();
-      await expect(page.getByRole('heading', { name: tab, exact: true })).toBeVisible();
-      await expect(page.getByLabel('制作会话', { exact: true })).toBeAttached();
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-      await page.screenshot({ path: `${screenshots}/real-${label}-${size}.png`, fullPage: true });
-    }
+// Current shell only; every API response is controlled. No uploads, model calls,
+// preview/confirm/export writes or question answers reach the real services.
+test('current three-pane workspace renders the inline draft, question, preview and asset drawer', async ({ page }) => {
+  let previewRequested = false;
+  await page.route('**/api/v1/**', async route => {
+    const url = new URL(route.request().url());
+    const path = url.pathname.replace('/api/v1', '');
+    const method = route.request().method();
+    let data: unknown;
+    let status = 200;
+    if (path === '/auth/me') data = { user: { id: 'redesign-user', username: '新版工作台' } };
+    else if (path === '/auth/csrf') data = { csrfToken: 'csrf' };
+    else if (path === '/projects') data = { items: [{ id: 'baseline', name: '草稿布局测试', rowVersion: 0 }], nextCursor: null };
+    else if (path === '/projects/baseline') data = { id: 'baseline', name: '草稿布局测试', rowVersion: 0 };
+    else if (path === '/projects/baseline/snapshot') data = { cursor: 'baseline:1' };
+    else if (path === '/projects/baseline/assets') data = { items: [{ id: 'asset', filename: '讲话素材.mp4', validationStatus: 'VALID' }] };
+    else if (path === '/projects/baseline/uploads') data = { items: [], nextCursor: null };
+    else if (path === '/projects/baseline/plans') data = { items: [] };
+    else if (path === '/projects/baseline/conversations') data = { items: [{ id: 'chat', title: '两条输出草稿', assetIds: ['asset'] }] };
+    else if (path === '/conversations/chat/messages') data = { view: { planId: null, revisionId: null } };
+    else if (path === '/conversations/chat/drafts/previews' && method === 'POST') {
+      previewRequested = true; status = 202; data = { requestId: 'preview-1' };
+    } else if (path === '/conversations/chat/snapshot') data = {
+      cursor: 'baseline:1',
+      assetIds: ['asset'],
+      items: [{ id: 'welcome', role: 'ASSISTANT', content: '我已根据素材整理出一版双输出草稿，请确认镜头和字幕。', references: [{ type: 'EDIT_DRAFT', id: 'draft-current' }] }],
+      latestTask: { taskId: 'task-q', status: 'WAITING_INPUT' },
+      agent: {
+        currentProduction: {
+          productionId: 'production',
+          currentDraft: { messageId: 'draft-current', validationId: 'validation-current', editGeneration: 2, draftHash: 'a'.repeat(64), requirementsHash: 'b'.repeat(64) },
+          frozen: false,
+          requirements: { topic: '双输出讲解', profile: 'PORTRAIT_720', subtitles_enabled: true },
+        },
+        currentDraft: {
+          id: 'draft-current',
+          content: '当前双输出草稿',
+          normalizedContent: {
+            outputs: ['横屏开场', '竖屏结尾'].map((title, index) => ({
+              output_key: `out-${index + 1}`,
+              title,
+              durationMs: 2000,
+              render: index ? { width: 720, height: 1280 } : { width: 1280, height: 720 },
+              clips: [{ assetId: 'asset', sourceInMs: 0, sourceOutMs: 2000, reason: '已有语音证据' }],
+              subtitles: { cues: [{ startMs: 0, endMs: 1900, text: '已有字幕' }] },
+            })),
+          },
+        },
+        canAcceptDraft: true,
+        canPreviewDraft: true,
+        pendingQuestions: [],
+      },
+      previews: {
+        items: previewRequested
+          ? [{ requestId: 'preview-1', taskId: 'media-1', sourceDraftMessageId: 'draft-current', outputKey: 'out-1', status: 'RUNNING' }]
+          : [],
+      },
+      questions: [{ id: 'question-1', taskId: 'task-q', turnId: 'turn-1', prompt: '新制作需要多少秒？', reason: '时长尚未确定', fields: ['duration'], status: 'OPEN' }],
+    };
+    else if (path.endsWith('/events')) {
+      await route.fulfill({ status: 200, contentType: 'text/event-stream', body: ': heartbeat\n\n' });
+      return;
+    } else data = { items: [] };
+    await route.fulfill({ status, json: { data } });
   });
 
-  test(`controlled lifecycle and partial analysis baseline ${size}`, async ({ page }) => {
-    mkdirSync(screenshots, { recursive: true });
-    await page.setViewportSize(viewport);
-    let readonly = false, failure = 'PAID_SUBMISSION_UNKNOWN';
-    const binding = { messageId: 'draft-current', validationId: 'validation-current', editGeneration: 2, draftHash: 'a'.repeat(64), requirementsHash: 'b'.repeat(64) };
-    const unexpected: string[] = [];
-    await page.route('**/api/v1/**', async route => {
-      const path = new URL(route.request().url()).pathname.replace('/api/v1', '');
-      let data: unknown;
-      if (route.request().method() !== 'GET') {
-        unexpected.push(`${route.request().method()} ${path}`);
-        await route.fulfill({ status: 400, json: { error: { message: '基线采集禁止业务写入' } } }); return;
-      }
-      if (path === '/auth/me') data = { user: { id: 'baseline-user', username: '受控基线' } };
-      else if (path === '/projects') data = { items: [{ id: 'baseline', name: '受控状态（非真实服务）', rowVersion: 0 }], nextCursor: null };
-      else if (path === '/projects/baseline') data = { id: 'baseline', name: '受控状态（非真实服务）', rowVersion: 0 };
-      else if (path === '/projects/baseline/assets') data = { items: [{ id: 'asset', filename: '讲话素材.mp4', validationStatus: 'VALID' }] };
-      else if (path === '/projects/baseline/uploads') data = { items: [], nextCursor: null };
-      else if (path === '/projects/baseline/plans') data = { items: [] };
-      else if (path === '/projects/baseline/conversations') data = { items: [{ id: 'chat', title: '当前与历史草稿', assetIds: ['asset'] }] };
-      else if (path === '/projects/baseline/snapshot') data = { cursor: 'baseline:1' };
-      else if (path === '/conversations/chat/messages') data = { view: { planId: null, revisionId: null } };
-      else if (path === '/conversations/chat/snapshot') data = {
-        cursor: 'baseline:1', assetIds: ['asset'],
-        items: [
-          { id: 'draft-old', role: 'ASSISTANT', content: '第一版草稿', references: [{ type: 'EDIT_DRAFT', id: 'draft-old' }] },
-          { id: 'preview-message', role: 'ASSISTANT', content: '第一版历史预览', references: [{ type: 'PREVIEW_RESULT', id: 'artifact-old', sourceDraftMessageId: 'draft-old', outputKey: 'out-2' }] },
-        ],
-        latestTask: { taskId: 'agent', status: 'FAILED', failure: { code: failure, message: failure === 'PAID_SUBMISSION_UNKNOWN' ? '模型提交状态未知，停止自动重付。' : '预算已耗尽，保留制作条件。', recoverable: false } },
-        agent: { currentProduction: { productionId: 'production', currentDraft: binding, frozen: readonly, requirements: { topic: '两条短片', profile: 'PORTRAIT_720', subtitles_enabled: false }, editGeneration: 2 },
-          currentDraft: { id: binding.messageId, content: '当前双输出草稿', normalizedContent: { outputs: ['横屏开场', '竖屏结尾'].map((title, index) => ({ output_key: `out-${index + 1}`, title, durationMs: 2000, render: index ? { width: 720, height: 1280 } : { width: 1280, height: 720 }, clips: [{ assetId: 'asset', sourceInMs: 0, sourceOutMs: 2000, reason: '已有语音证据' }], subtitles: { cues: [] } })) } },
-          canAcceptDraft: !readonly, canPreviewDraft: !readonly, pendingQuestions: [] },
-        previews: { items: [{ requestId: 'preview-old', taskId: 'media', sourceDraftMessageId: 'draft-old', outputKey: 'out-2', status: 'SUCCEEDED', artifactId: 'artifact-old', artifactState: 'AVAILABLE' }] },
-      };
-      else if (path === '/assets/asset') data = { id: 'asset', filename: '讲话素材.mp4', durationMs: 2000, validationStatus: 'VALID', analysis: { stages: { MEDIA: 'SUCCEEDED', ASR: 'SUCCEEDED', VISION: 'FAILED', EMBEDDING: 'SUCCEEDED', INDEX: 'SUCCEEDED' }, errors: { VISION: { message: '画面分析失败，语音证据仍可使用' } } } };
-      else if (path === '/assets/asset/search-index') data = { publishedGeneration: null, generations: [] };
-      else if (path === '/assets/asset/evidence') data = { observations: [], units: [] };
-      else if (path.endsWith('/events')) { await route.fulfill({ contentType: 'text/event-stream', body: ': heartbeat\n\n' }); return; }
-      else { unexpected.push(`GET ${path}`); await route.fulfill({ status: 404, json: { error: { message: `未定义基线接口 ${path}` } } }); return; }
-      await route.fulfill({ json: { data } });
-    });
-    await page.goto('/?project=baseline');
-    await page.getByRole('tab', { name: '制作', exact: true }).click();
-    await expect(page.getByText('历史草稿 1 · 只读', { exact: true })).toBeVisible();
-    await expect(page.getByText('历史草稿预览', { exact: true })).toBeVisible();
-    await expect(page.getByRole('alert')).toContainText('模型提交状态未知');
-    await expect(page.getByRole('button', { name: '重试原需求', exact: true })).toHaveCount(0);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await page.screenshot({ path: `${screenshots}/controlled-conversation-unknown-${size}.png`, fullPage: true });
-    if (viewport.width <= 1024) await page.getByRole('tab', { name: '预览', exact: true }).click();
-    await expect(page.getByRole('region', { name: '剪辑草稿', exact: true })).toContainText('竖屏结尾');
-    await expect(page.getByRole('button', { name: '确认全部输出', exact: true })).toBeEnabled();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await page.screenshot({ path: `${screenshots}/controlled-draft-history-unknown-${size}.png`, fullPage: true });
-    readonly = true; failure = 'BUDGET_EXHAUSTED';
-    await page.reload();
-    await page.getByRole('tab', { name: '制作', exact: true }).click();
-    await expect(page.getByRole('alert')).toContainText('预算已耗尽');
-    await expect(page.getByRole('button', { name: '重试原需求', exact: true })).toHaveCount(0);
-    if (viewport.width <= 1024) await page.getByRole('tab', { name: '预览', exact: true }).click();
-    await expect(page.getByRole('button', { name: '确认全部输出', exact: true })).toBeDisabled();
-    await expect(page.getByRole('button', { name: '预览草稿', exact: true })).toBeDisabled();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await page.screenshot({ path: `${screenshots}/controlled-readonly-budget-${size}.png`, fullPage: true });
-    await page.getByRole('tab', { name: '素材', exact: true }).click();
-    await page.getByRole('button', { name: '查看分析状态 讲话素材.mp4', exact: true }).click();
-    const analysis = page.getByRole('region', { name: '素材分析状态', exact: true });
-    await expect(analysis).toContainText('语音：已就绪');
-    await expect(analysis).toContainText('画面：失败');
-    await expect(analysis.getByRole('button', { name: '仅重试失败的 画面', exact: true })).toBeVisible();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await page.screenshot({ path: `${screenshots}/controlled-partial-analysis-${size}.png`, fullPage: true });
-    expect(unexpected).toEqual([]);
-  });
-}
+  await page.goto('/?project=baseline');
+  await expect(page.locator('.chat-head h1')).toHaveText('两条输出草稿');
+  await expect(page.locator('.project-current .name')).toHaveText('草稿布局测试');
+  await expect(page.getByRole('region', { name: '剪辑草稿' })).toContainText('横屏开场');
+  await expect(page.getByRole('region', { name: '剪辑草稿' })).toContainText('竖屏结尾');
+  await expect(page.getByRole('region', { name: '待回答问题' })).toContainText('新制作需要多少秒');
+  await expect(page.locator('.plan-panel')).toContainText('暂无方案');
+
+  await page.getByRole('button', { name: '暂不采纳', exact: true }).click();
+  await expect(page.locator('.draft-collapsed-inline')).toContainText('剪辑草稿已收起');
+  await page.locator('.draft-collapsed-inline').getByRole('button', { name: '查看草稿', exact: true }).click();
+  await expect(page.getByRole('button', { name: '预览草稿', exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: '预览草稿', exact: true }).click();
+  await page.getByLabel('选择预览输出', { exact: true }).selectOption('out-1');
+  await page.getByRole('button', { name: '预览所选输出', exact: true }).click();
+  await expect(page.getByRole('region', { name: '草稿预览记录' })).toContainText('正在执行');
+
+  await page.getByRole('button', { name: '打开素材库', exact: true }).click();
+  const drawer = page.getByRole('dialog', { name: '素材库' });
+  await expect(drawer).toBeVisible();
+  await expect(drawer.locator('.dropzone')).toContainText('拖入视频，或选择文件');
+  await expect(drawer.locator('input[type=file][aria-label="选择视频"]')).toHaveCount(1);
+  await expect(drawer.getByRole('article', { name: '素材：讲话素材.mp4' })).toBeVisible();
+  await page.getByRole('button', { name: '关闭素材库', exact: true }).click();
+  await expect(drawer).toBeHidden();
+
+  await page.locator('.project-current').click();
+  await expect(page.getByRole('menu', { name: '切换项目' })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: /草稿布局测试/ })).toBeVisible();
+});

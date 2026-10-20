@@ -198,8 +198,14 @@ async function choosePlan(id: string) {
   }catch(failure){if(alive&&operation===epoch)error.value=failure instanceof Error?failure.message:'无法读取版本';}
   finally{if(alive&&operation===epoch)loading.value=false;}
 }
+function clearRenderedSections() {
+  preview.value = null; previewVersion.value = 0; previewUrl.value = ''; previewBusy.value = false; previewTitle.value = '';
+  exported.value = null; exportVersion.value = 0; exportUrl.value = ''; exportRemoved.value = false; exportDeletePending.value = false; exportUnavailable.value = false; deleteCandidate.value = null;
+  exportHistory.value = []; exportHistoryReading = false; exportRenewed = false; exportRestore = undefined;
+}
 async function restoreView() {
   const session = props.sessionId, operation = ++epoch;
+  clearRenderedSections(); error.value = '';
   current.value = null; selectedPlan.value = ''; selectedRevision.value = ''; versions.value = []; emit('base', null);
   if (!session) return;
   try {
@@ -245,7 +251,7 @@ onMounted(async () => { await refresh(); await restoreView(); timer = setInterva
 onUnmounted(() => { alive = false; ++epoch; clearInterval(timer); });
 </script>
 <template>
-  <section aria-label="编排剪辑方案">
+  <section class="plan-panel" aria-label="编排剪辑方案">
     <h3>已保存方案</h3>
     <aside v-if="diagnostics" aria-label="作品诊断"><p v-if="current">方案 {{current.planId}} · 版本 {{current.id}}</p><p v-if="exported">导出请求 {{exported.requestId}} · 任务 {{exported.taskId}} · 产物 {{exported.artifactId ?? '未发布'}}</p></aside>
     <p v-if="error" role="alert">{{ error }}</p>
@@ -326,13 +332,20 @@ onUnmounted(() => { alive = false; ++epoch; clearInterval(timer); });
   </section>
 </template>
 <style scoped>
-section { margin-top: 22px; } h3 { font-size: 20px; } h4 { font-size: 18px; }
-.output-card { border-top: 1px solid var(--line); padding: 16px 0; }
-.output-card h5 { font-size: 18px; margin: 8px 0; }
-.awaiting, .export-spec { background: #edf3ee; padding: 12px; }
-.delete-confirmation { border: 1px solid #b65d48; padding: 16px; margin: 16px 0; background: #fff5ef; }
-summary { cursor: pointer; padding: 12px 0; min-height: 44px; }
-p,summary,strong { font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
-.clip { border: 1px solid #dce5de; border-radius: 8px; padding: 12px; margin: 12px 0; }
-button { font-size: 13px; }
+.plan-panel { margin: 0; }
+.plan-panel > section, .plan-panel section { margin-top: 16px; }
+.plan-panel h3 { font-size: 12px; color: var(--ink-3); font-weight: 550; margin: 0 0 8px; }
+.plan-panel h4 { font-size: 14px; margin: 10px 0 4px; }
+.plan-panel h5 { font-size: 12px; margin: 4px 0; }
+.plan-panel label { margin-top: 8px; font-size: 10.5px; }
+.plan-panel select { min-height: 30px; font-size: 11.5px; }
+.plan-panel p, .plan-panel summary, .plan-panel strong, .plan-panel li { font-size: 11px; line-height: 1.55; overflow-wrap: anywhere; }
+.plan-panel .output-card { border-top: 1px solid var(--line); padding: 10px 0; }
+.plan-panel .output-card h5 { font-size: 12px; margin: 4px 0; }
+.plan-panel .awaiting, .plan-panel .export-spec { background: var(--panel); padding: 7px 8px; border-radius: 5px; font-size: 10.5px; }
+.plan-panel .delete-confirmation { border: 1px solid #d9a29e; padding: 10px; margin: 10px 0; background: #fff6f5; }
+.plan-panel summary { cursor: pointer; padding: 6px 0; min-height: 30px; }
+.plan-panel .clip { border: 1px solid var(--line); border-radius: 6px; padding: 8px; margin: 6px 0; }
+.plan-panel button { font-size: 11px; min-height: 28px; padding: 4px 8px; margin: 4px 4px 0 0; }
+.plan-panel video { max-height: 280px; }
 </style>

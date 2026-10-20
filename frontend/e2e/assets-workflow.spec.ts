@@ -1,7 +1,9 @@
 import { test, expect, type Route } from '@playwright/test';
+import { openAssets, openSearch } from './fixtures/workspace';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 const screenshots = resolve(process.env.E2E_REDESIGN_SCREENSHOTS ?? 'test-results/frontend-redesign');
+
 
 // Match S3 range responses so seeking exercises a real media HTTP boundary.
 const sourceBytes = readFileSync('e2e/fixtures/short-video.mp4');
@@ -38,6 +40,7 @@ test('completed uploads merge only by asset identity while equal filenames remai
     { uploadId: 'u-pending', assetId: 'pending', filename: '验证中.mp4', status: 'COMPLETED', validationStatus: 'VALIDATING', declaredBytes: 40 },
   ], nextCursor: null } } }));
   await page.goto('/?project=assets');
+  await openAssets(page);
   await expect(page.getByRole('article', { name: '素材：同名.mp4', exact: true })).toHaveCount(2);
   await expect(page.getByRole('article', { name: '上传：同名.mp4', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '播放 同名.mp4', exact: true })).toHaveCount(2);
@@ -56,6 +59,7 @@ test('partial analysis retains speech and retries only the failed stage; mainten
   });
   await page.route('**/api/v1/assets/a/analysis-stages/*/retry', async route => { writes.push(new URL(route.request().url()).pathname); await route.fulfill({ json: { data: {} } }); });
   await page.goto('/?project=assets');
+  await openAssets(page);
   await page.getByRole('button', { name: '查看分析状态 讲话.mp4', exact: true }).click();
   const status = page.getByRole('region', { name: '素材分析状态', exact: true });
   await expect(status).toContainText('语音已就绪');
@@ -64,7 +68,7 @@ test('partial analysis retains speech and retries only the failed stage; mainten
   expect(writes).toEqual([]);
   await status.getByRole('button', { name: '仅重试失败的 画面', exact: true }).click();
   await expect.poll(() => writes).toEqual(['/api/v1/assets/a/analysis-stages/VISION/retry']);
-  await page.getByRole('button', { name: '诊断与高级维护', exact: true }).click();
+  await page.getByRole('dialog', { name: '素材库' }).getByText('诊断与高级维护', { exact: true }).click();
   await page.getByLabel('维护素材', { exact: true }).selectOption('a');
   await expect(page.getByLabel('索引 Embedding 模型', { exact: true })).toBeVisible();
   expect(writes).toHaveLength(1);
@@ -82,6 +86,7 @@ test('query filters preserve request semantics and results retain their original
     await route.fulfill({ json: { data: { id: 'inspection', status: 'NO_NEW_EVIDENCE', budget: { maxFrames: 4, maxCalls: 4, maxSteps: 8, maxSeconds: 180, maxInputBytes: 4194304 }, usage: { frames: 4, calls: 1, steps: 1, inputBytes: 100 }, coverage: { startMs: 0, endMs: 2000 }, observations: [], coverageWarning: '仍可能遗漏', expansionProposal: null } } });
   });
   await page.goto('/?project=assets');
+  await openSearch(page);
   await page.getByText('筛选条件', { exact: true }).click();
   await page.getByLabel('证据类型', { exact: true }).selectOption('VISUAL');
   await page.getByLabel('检索方式', { exact: true }).selectOption('semantic');
@@ -112,6 +117,7 @@ test('restored uploads show confirmed bytes, reselect requirements, expiry and c
     await route.fulfill({ status: 409, json: { error: { message: '文件内容与原上传不一致' } } });
   });
   await page.goto('/?project=assets');
+  await openAssets(page);
   const paused = page.getByRole('article', { name: '上传：暂停.mp4', exact: true });
   await expect(paused).toContainText('刷新后浏览器无法保留原文件');
   await expect(paused.getByRole('progressbar')).toHaveAttribute('value', '30');
@@ -135,6 +141,7 @@ test('cancelled upload keeps occupied bytes until the service reports cleanup co
   await page.route('**/api/v1/projects/assets/uploads', route => route.fulfill({ json: { data: { items: [{ ...upload, status: cancelled ? 'CANCELLED' : 'PAUSED', cleanupStatus: cleaned ? 'CLEANED' : 'PENDING' }], nextCursor: null } } }));
   await page.route('**/api/v1/uploads/cancel/cancel', async route => { cancelled = true; await route.fulfill({ json: { data: { ...upload, status: 'CANCELLED', cleanupStatus: 'PENDING' } } }); });
   await page.goto('/?project=assets');
+  await openAssets(page);
   await page.getByRole('button', { name: '待取消.mp4 取消上传', exact: true }).click();
   const row = page.getByRole('article', { name: '上传：待取消.mp4', exact: true });
   await expect(row).toContainText('字节占用尚未释放');
@@ -149,6 +156,7 @@ test('silent media is a capability limit and expanding details performs no analy
   await page.route('**/api/v1/assets/silent', route => route.fulfill({ json: { data: { filename: '静音.mp4', analysis: { stages: { MEDIA: 'SUCCEEDED', ASR: 'NOT_APPLICABLE', VISION: 'NOT_STARTED', EMBEDDING: 'NOT_APPLICABLE', INDEX: 'NOT_APPLICABLE' }, errors: {} } } } }));
   page.on('request', request => { if (request.method() === 'POST') writes.push(request.url()); });
   await page.goto('/?project=assets');
+  await openAssets(page);
   await page.getByRole('button', { name: '查看分析状态 静音.mp4', exact: true }).click();
   await expect(page.getByRole('region', { name: '素材分析状态', exact: true })).toContainText('无音轨，不能进行语音分析');
   await page.getByText('完整分析阶段', { exact: true }).click();
@@ -168,6 +176,7 @@ for (const mode of ['literal', 'semantic']) {
       ] } } } });
     });
     await page.goto('/?project=assets');
+  await openSearch(page);
     await page.getByText('筛选条件', { exact: true }).click();
     await page.getByLabel('检索方式', { exact: true }).selectOption(mode);
     await page.getByLabel('查找原句', { exact: true }).fill('未找到的句子');
@@ -197,6 +206,7 @@ for (const choice of ['DECLINE', 'APPROVE']) {
     });
     await page.route('**/api/v1/visual-inspections/child', async route => { children++; await route.fulfill({ json: { data: { ...run, id: 'child', status: 'SUCCEEDED', budget: { ...run.budget, maxFrames: 8, maxCalls: 8 }, observations: [{ id: 'new', sourceKind: 'VISUAL', text: '扩大后的新观察', observedAtMs: 3000 }] } } }); });
     await page.goto('/?project=assets');
+  await openSearch(page);
     await page.getByText('筛选条件', { exact: true }).click();
     await page.getByLabel('证据类型', { exact: true }).selectOption('VISUAL');
     await page.getByLabel('查找原句', { exact: true }).fill('街景');
@@ -235,20 +245,23 @@ test('source playback stays in assets, renews the same source, seeks and returns
   await page.route('**/api/v1/assets/a', route => route.fulfill({ json: { data: { mediaInfo: { streams: [{ codec_type: 'video', codec_name: 'h264', width: 160, height: 90 }] }, timeMapping: { hasAudio: false }, analysis: { stages: { MEDIA: 'SUCCEEDED', ASR: 'NOT_APPLICABLE' }, errors: {} } } } }));
   await page.route('**/api/v1/assets/a/evidence', route => route.fulfill({ json: { data: { observations: [], units: [], summary: {} } } }));
   await page.goto('/?project=assets');
+  const drawer = await openSearch(page);
   await page.getByLabel('查找原句', { exact: true }).fill('保留的查询');
+  await drawer.getByRole('tab', { name: '素材', exact: true }).click();
   await page.getByRole('button', { name: '播放 原片.mp4', exact: true }).click();
   const player = page.getByLabel('视频播放器', { exact: true });
   await expect.poll(() => player.evaluate((video: HTMLVideoElement) => video.readyState)).toBeGreaterThanOrEqual(1);
   expect(accesses).toBe(2);
-  await expect(page.getByRole('tab', { name: '素材', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(drawer.getByRole('tab', { name: '素材', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByLabel('索引 Embedding 模型', { exact: true })).toHaveCount(0);
   await page.getByText('媒体详情与精确定位', { exact: true }).click();
   await page.getByLabel('定位秒数', { exact: true }).fill('0.4');
   await page.getByRole('button', { name: '定位播放', exact: true }).click();
   await expect.poll(() => player.evaluate((video: HTMLVideoElement) => video.currentTime)).toBeGreaterThanOrEqual(.35);
   await expect(page.getByText('H.264', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '返回素材列表', exact: true }).click();
+  await page.getByRole('button', { name: '关闭原片', exact: true }).click();
   await expect(player).toHaveCount(0);
+  await drawer.getByRole('tab', { name: '查找', exact: true }).click();
   await expect(page.getByLabel('查找原句', { exact: true })).toHaveValue('保留的查询');
 });
 
@@ -261,7 +274,6 @@ test('source clips from a saved plan stop at their original end boundary', async
   await page.route('**/api/v1/assets/a/playback-access', route => route.fulfill({ json: { data: { assetId: 'a', filename: '原片.mp4', url: '/source.mp4', durationMs: 1000, expiresAt: '2099-01-01' } } }));
   await page.route('**/source.mp4', sourceVideo);
   await page.goto('/?project=assets');
-  await page.getByRole('tab', { name: '作品', exact: true }).click();
   await page.getByLabel('查看方案', { exact: true }).selectOption('plan');
   await page.getByText('片段与选取依据（1）', { exact: true }).click();
   await page.getByRole('button', { name: '播放源片段', exact: true }).click();
@@ -286,11 +298,13 @@ for (const viewport of [{ width: 1366, height: 768 }, { width: 768, height: 1024
     await page.route('**/expired-source.mp4', route => route.fulfill({ status: 403, body: 'expired' }));
     await page.route('**/source.mp4', sourceVideo);
     await page.goto('/?project=assets');
+  await openAssets(page);
     await page.getByRole('button', { name: `查看分析状态 ${filename}`, exact: true }).click();
     await expect(page.getByRole('region', { name: '素材分析状态', exact: true })).toContainText('语音已就绪');
     mkdirSync(screenshots, { recursive: true });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: `${screenshots}/controlled-assets-${viewport.width}x${viewport.height}.png`, fullPage: true });
+    await page.getByRole('dialog', { name: '素材库' }).getByRole('tab', { name: '查找', exact: true }).click();
     await page.getByLabel('查找原句', { exact: true }).fill('新篇章');
     await page.getByRole('button', { name: '查找语音', exact: true }).click();
     const hit = page.getByRole('article', { name: '语音检索证据', exact: true });
@@ -305,7 +319,7 @@ for (const viewport of [{ width: 1366, height: 768 }, { width: 768, height: 1024
     await player.evaluate((video: HTMLVideoElement) => video.pause());
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: `${screenshots}/controlled-source-${viewport.width}x${viewport.height}.png`, fullPage: true });
-    await page.getByRole('button', { name: '返回素材列表', exact: true }).click();
+    await page.getByRole('button', { name: '关闭原片', exact: true }).click();
     await expect(hit).toBeVisible();
     await expect(page.getByLabel('查找原句', { exact: true })).toHaveValue('新篇章');
   });

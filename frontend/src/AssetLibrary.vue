@@ -6,7 +6,7 @@ import UploadPanel from './UploadPanel.vue';
 import AnalysisStatus from './AnalysisStatus.vue';
 export type Playback = { assetId: string; filename: string; url: string; durationMs: number; expiresAt: string; startMs?: number; endMs?: number };
 const props = defineProps<{ projectId: string; diagnostics?: boolean }>();
-const emit = defineEmits<{ play: [value: Playback]; loaded: [count: number] }>();
+const emit = defineEmits<{ play: [value: Playback]; loaded: [count: number]; items: [items: Asset[]] }>();
 type Asset = { id: string; filename: string; validationStatus: string };
 const items = ref<Asset[]>([]);
 const projectUploads = computed(() => uploadRows.filter(row => row.projectId === props.projectId));
@@ -24,6 +24,7 @@ async function refresh() {
     items.value = (await request<{ items: Asset[] }>(`/projects/${props.projectId}/assets?includePending=true`)).items;
     loadError.value = '';
     emit('loaded', items.value.length);
+    emit('items', items.value);
   } catch (failure) { loadError.value = failure instanceof Error ? failure.message : '无法查询素材'; }
   finally { loading.value = false; }
 }
@@ -65,16 +66,16 @@ onUnmounted(() => clearInterval(timer));
   </section>
 </template>
 <style scoped>
-h3 { font-size: 18px; }
-.asset-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 24px; border-top: 1px solid var(--line); padding: 20px 0; }
-.asset-summary strong { font-weight: 600; }
-.asset-summary p, .asset-actions p, .maintenance p { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
-.asset-actions { display: flex; align-items: start; flex-wrap: wrap; gap: 8px; }
-.asset-actions button { margin: 0; }
-.asset-actions details { max-width: 240px; }
-summary { cursor: pointer; min-height: 44px; padding: 10px 0; }
-.asset-details { grid-column: 1 / -1; background: #f3f5f0; border-radius: 8px; padding: 16px; }
-.maintenance { border-top: 1px solid var(--line); margin-top: 24px; padding-top: 12px; }
-.empty { padding: 24px; background: #edf3ee; border-radius: 8px; }
-@media (max-width: 720px) { .asset-row { grid-template-columns: minmax(0, 1fr); gap: 12px; } }
+.asset-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: start; border-bottom: 1px solid var(--line); padding: 10px 0; }
+.asset-summary strong { font-weight: 550; font-size: 12px; }
+.asset-summary p, .asset-actions p, .maintenance p { font-size: 10.5px; color: var(--ink-4); margin: 3px 0 0; line-height: 1.5; }
+.asset-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 3px; }
+.asset-actions button { margin: 0; min-height: 26px; padding: 3px 7px; font-size: 10.5px; }
+.asset-actions details { max-width: 180px; }
+summary { cursor: pointer; min-height: 30px; padding: 6px 0; font-size: 11px; color: var(--ink-3); }
+.asset-details { grid-column: 1 / -1; background: var(--panel); border-radius: 6px; padding: 10px; }
+.maintenance { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 8px; }
+.maintenance label { margin-top: 8px; }
+.empty { padding: 12px; background: var(--panel); border-radius: 6px; font-size: 11.5px; color: var(--ink-3); }
+@media (max-width: 720px) { .asset-row { grid-template-columns: minmax(0, 1fr); gap: 6px; } }
 </style>

@@ -16,11 +16,12 @@ function time(ms: number) {
   </section>
 </template>
 <style scoped>
-.draft-output { padding: 16px 0; border-bottom: 1px solid var(--line); }
-h4 { margin: 0 0 8px; font-size: 18px; }
-p, li { overflow-wrap: anywhere; font-size: 13px; }
-.output-summary { color: var(--muted); }
-summary { min-height: 44px; padding: 10px 0; cursor: pointer; }
-ol { padding-left: 24px; }
-li { margin-bottom: 16px; }
+.draft-output { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.draft-output:last-child { border-bottom: 0; }
+h4 { margin: 0 0 4px; font-size: 13px; }
+p, li { overflow-wrap: anywhere; font-size: 11.5px; line-height: 1.6; }
+.output-summary { color: var(--ink-4); font-size: 10.5px; margin: 0; }
+summary { min-height: 30px; padding: 6px 0; cursor: pointer; font-size: 11px; color: var(--ink-3); }
+ol { padding-left: 18px; }
+li { margin-bottom: 8px; }
 </style>

@@ -123,7 +123,7 @@ function enforceClipEnd() {
 .player-heading button { margin: 0; flex-shrink: 0; }
 .media-information { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; font-size: 13px; color: var(--muted); }
 dd { margin: 0; }
-video { width: 100%; max-height: min(60vh, 560px); background: #18271f; border-radius: 8px; }
+video { width: 100%; max-height: min(60vh, 560px); background: var(--ink); border-radius: 8px; }
 p { font-size: 13px; overflow-wrap: anywhere; }
 summary { cursor: pointer; padding: 16px 0; min-height: 44px; }
 form { max-width: 400px; }

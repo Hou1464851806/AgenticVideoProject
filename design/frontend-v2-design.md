@@ -10,9 +10,10 @@
 - 设计参考：[design/reference/dsh-reference.png](reference/dsh-reference.png)（用户提供的 DeepSeek Harness 截图）。
 - Vue 实现：`frontend/src/ProjectWorkspace.vue`、`WorkspaceRail.vue`、`AssetDrawer.vue`、`ConversationPanel.vue`、`PlanPanel.vue`、`DraftCard.vue`、`style.css` 及素材/检索子组件。
 - 验证证据：`design/shots/deployed-final-3.png`、`deployed-login.png`、`vue-question-4.png`、`vue-asset-drawer.png`、`vue-draft-2.png`、`vue-draft-preview-2.png`、`deployed-upload-dropzone.png`、`vue-768.png`、`vue-390.png` 等。
-- 当前外壳回归：`frontend/e2e/workspace-redesign-vue.spec.ts`（受控 API，无写入真实服务）。
+- 当前外壳回归：`frontend/e2e/frontend-redesign-baseline.spec.ts`（受控 API，无写入真实服务）。
+- e2e 迁移记录：[docs/verification/frontend-redesign-vue-e2e.md](../docs/verification/frontend-redesign-vue-e2e.md)。
 
-**范围和边界：** 原型只做设计验证；Vue 版本只改前端，复用现有 API、幂等键、SSE、快照和渲染生命周期，没有新增后端接口，没有迁移 UI 框架或样式库。现有 e2e 仍按旧三页签编写，尚未迁移，因此不作为本轮通过项。真实付费模型、真实渲染和真实媒体播放需要单独安排验收。
+**范围和边界：** 原型只做设计验证；Vue 版本只改前端，复用现有 API、幂等键、SSE、快照和渲染生命周期，没有新增后端接口，没有迁移 UI 框架或样式库。当前 UI 验收门槛（三栏外壳、会话/项目导航、内联草稿、产物、素材抽屉）的 e2e 已迁移，59 条通过；历史表单、真实模型/付费和会重建服务的旧 spec 不纳入当前门槛。真实付费模型、真实渲染和真实媒体播放需要单独安排验收。
 
 ## Vue 接入结果
 
@@ -36,7 +37,7 @@
 ### Vue 验证
 
 - `npm run build` 通过（`vue-tsc --noEmit` + `vite build`，61 modules；本轮最终构建产物约 39KB CSS / 178KB JS）；后端镜像构建（Maven package，跳过测试）通过。
-- 新增 `e2e/workspace-redesign-vue.spec.ts`，覆盖当前三栏外壳、内联草稿、暂不采纳、预览选择与预览卡、追问卡、素材抽屉、项目切换器；`npx playwright test e2e/workspace-redesign-vue.spec.ts` 通过（1 passed）。
+- 当前 e2e 门槛迁移完成：`frontend-redesign-baseline`、`conversation-lifecycle`、`results-usage-workspace`、`production-workspace`、`workspace-navigation`、`assets-workflow` 与真实 Java 的 `projects` 共 **59 passed**；命令与逐文件说明见[迁移记录](../docs/verification/frontend-redesign-vue-e2e.md)。
 - 真实数据浏览器走查：1440×900、1366×768、768×1024、390×844；均无横向溢出，无页面级异常。走查了项目切换、会话切换、新聊天、素材抽屉、素材详情、搜索 tab、原片弹窗、用量弹窗、产物折叠、草稿卡（受控数据）、真实追问卡。
 - 草稿卡用受控响应验证：两输出、暂不采纳收起/恢复、预览输出选择、操作按钮可用；预览写请求用 mock 拦截，未触发真实付费或渲染。确认按钮已显示但本轮没有提交确认。
 - 上传 dropzone 已验证：点击会打开多选文件选择器，隐藏 input 保留 `选择视频` 可访问名称，现有上传测试选择器不被破坏；未实际选择/上传文件。
@@ -46,7 +47,7 @@
 
 ### 未运行 / 已知差距
 
-- 现有 45 个旧 Playwright spec 仍按旧三页签/制作会话选择器编写，尚未迁移；本轮没有运行旧 e2e，也不把旧结果当作新 UI 的通过证据。新增的当前外壳 spec 已单独通过。
+- 迁移的是当前 UI 门槛；其余历史 spec 依赖已移除的需求类型/旧会话创建表单、真实模型/付费调用或会重建共享服务的故障注入，未纳入本轮，也不以未运行结果冒充通过。旧的 `workspace-navigation`、`production-workspace`、`assets-workflow`、`results-usage-workspace`、`frontend-redesign-baseline` 已按新外壳重写；旧 baseline 的真实种子分支已由当前受控 baseline 取代。
 - Java/Python 回归未运行：本轮没有改后端、Agent 或任务契约；前端构建和真实数据冒烟是当前有效入口的验证。
 - 未做独立评审评分；设计原型阶段两次隔离评审超时，Vue 阶段沿用自查，不冒充独立评审。
 - 手机专用导航未做；390px 下依靠两侧自动收起仍可使用，但不是完整移动端信息架构。
@@ -161,7 +162,7 @@
 
 ## 后续工作
 
-1. 迁移现有 e2e：旧 `workspace-navigation`、`frontend-redesign-baseline` 以及依赖「制作会话」「素材/制作/作品」页签的 spec 需要按新外壳重写选择器；迁移前不要把这套旧测试当作新 UI 的回归门槛。
+1. 继续迁移历史 e2e：已移除需求类型表单的 `montage`、`editing-brief`、`model-record-limit`、`conversations` 旧表单用例按文档退役；其余真实模型/付费与故障注入 spec 需要单独环境，不并入当前 UI 门槛。
 2. 单独安排真实付费/渲染验收：真实草稿预览、确认、导出、追问回答和媒体播放；本轮刻意没有触发这些写操作。
 3. 真实浏览器媒体验收：确认部署环境里 `localhost:9000` 签名媒体请求不受本地网络策略拦截。
 4. 如需要完整手机端，再补专用导航（当前只有窄屏自动折叠）。

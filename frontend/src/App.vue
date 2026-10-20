@@ -62,7 +62,7 @@ onMounted(async () => {
 <template>
   <div class="shell">
     <a class="skip-link" href="#main-content">跳至主内容</a>
-    <header v-if="!user" class="brand-header"><span class="mark">叙帧</span><span>叙帧 · 视频工作台</span></header>
+    <header v-if="!user" class="brand-header"><span class="mark" aria-hidden="true"></span><span>叙帧 · 视频工作台</span></header>
     <main v-if="user" id="main-content" class="authenticated" tabindex="-1">
       <ProjectWorkspace :user-id="user.id">
         <template #account>
