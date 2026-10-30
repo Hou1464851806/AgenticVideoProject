@@ -6,6 +6,7 @@ Q58 已确认首期 MVP 整体设计；2026-10-12 补充确认统一自然语言
 
 | 阅读目的 | 文档 |
 | --- | --- |
+| 2026-10-30 Naive UI 接入、证据分页与定位布局、复杂面板改造；实施完成，受控浏览器验收通过 | [前端 Naive UI Spec](frontend-naive-ui-spec.md)、[实现计划](frontend-naive-ui-implementation-plan.md) |
 | 首版用户能力、完整需求与验收边界 | [完整需求](requirements.md) |
 | 已确认的统一聊天流程、九项决定与代码职责 | [统一自然语言设计](natural-language-workflow-design.md) |
 | 当前实际功能与待实施进度 | [功能清单](current-features.md)、[实施状态](implementation-status.md) |

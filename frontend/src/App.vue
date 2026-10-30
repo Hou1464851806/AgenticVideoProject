@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue';
 import { request } from './api';
+import { NConfigProvider, NButton, NInput, NPopover, type GlobalThemeOverrides } from 'naive-ui';
+const theme: GlobalThemeOverrides = { common: { primaryColor: '#0f1115', primaryColorHover: '#24272d', primaryColorPressed: '#0f1115', primaryColorSuppl: '#24272d', borderRadius: '7px' } };
 import ProjectWorkspace from './ProjectWorkspace.vue';
 
 type User = { id: string; username: string };
@@ -60,16 +62,13 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="shell">
+  <n-config-provider abstract :theme-overrides="theme"><div class="shell">
     <a class="skip-link" href="#main-content">跳至主内容</a>
     <header v-if="!user" class="brand-header"><span class="mark" aria-hidden="true"></span><span>叙帧 · 视频工作台</span></header>
     <main v-if="user" id="main-content" class="authenticated" tabindex="-1">
       <ProjectWorkspace :user-id="user.id">
         <template #account>
-          <details class="account-menu">
-            <summary>账户</summary>
-            <div class="account-popover"><p>已登录：{{ user.username }}</p><button class="text-button" :disabled="busy" @click="logout">退出登录</button></div>
-          </details>
+          <n-popover trigger="click" placement="top-end"><template #trigger><n-button quaternary size="small">账户</n-button></template><p>已登录：{{ user.username }}</p><n-button quaternary :disabled="busy" @click="logout">退出登录</n-button></n-popover>
         </template>
       </ProjectWorkspace>
       <p v-if="error" role="alert" class="error">{{ error }}</p>
@@ -79,15 +78,15 @@ onMounted(async () => {
       <section class="account" aria-label="账号入口">
           <h2>{{ registering ? '创建你的账号' : '登录工作台' }}</h2>
           <form @submit.prevent="submit">
-            <label for="username">用户名</label><input id="username" v-model="username" required maxlength="64" autocomplete="username">
-            <label for="password">密码</label><input id="password" v-model="password" required type="password" minlength="8" maxlength="72" :autocomplete="registering ? 'new-password' : 'current-password'">
+            <label for="username">用户名</label><n-input :input-props="{ id: 'username' }" v-model:value="username" required maxlength="64" autocomplete="username" />
+            <label for="password">密码</label><n-input :input-props="{ id: 'password' }" v-model:value="password" required type="password" minlength="8" maxlength="72" :autocomplete="registering ? 'new-password' : 'current-password'" />
             <p class="hint">密码至少 8 个字符，编码后不超过 72 字节。</p>
-            <button class="primary" type="submit" :disabled="busy">{{ busy ? '正在处理…' : registering ? '注册' : '登录' }}</button>
+            <n-button type="primary" attr-type="submit" :disabled="busy">{{ busy ? '正在处理…' : registering ? '注册' : '登录' }}</n-button>
           </form>
-          <button class="secondary" :disabled="busy" @click="registering = !registering; error = ''; notice = ''">{{ registering ? '已有账号，返回登录' : '创建账号' }}</button>
+          <n-button :disabled="busy" @click="registering = !registering; error = ''; notice = ''">{{ registering ? '已有账号，返回登录' : '创建账号' }}</n-button>
         <p v-if="error" role="alert" class="error">{{ error }}</p>
         <p role="status" class="notice">{{ notice }}</p>
       </section>
     </main>
-  </div>
+  </div></n-config-provider>
 </template>

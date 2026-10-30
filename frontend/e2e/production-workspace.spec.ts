@@ -131,6 +131,7 @@ test('reading older messages keeps scroll position and offers an explicit new-me
   await page.goto('/?project=project');
   const log = page.getByRole('log', { name: '对话记录', exact: true });
   await expect(page.getByLabel('对话输入', { exact: true })).toBeEnabled();
+  await expect(log.getByRole('article', { name: '助手答复' })).toHaveCount(40);
   await log.evaluate(node => { node.scrollTop = 0; node.dispatchEvent(new Event('scroll')); });
   await page.getByLabel('对话输入', { exact: true }).fill('新问题');
   await page.getByRole('button', { name: '发送需求', exact: true }).click();
@@ -213,9 +214,9 @@ test('a chat created after importing assets uses current filenames without a pag
   await page.goto('/?project=project');
   imported = true;
   await newChat(page);
-  await expect(page.getByText('引用素材', { exact: true })).toBeVisible({ timeout: 10000 });
-  await page.getByText('引用素材', { exact: true }).click();
-  await expect(page.getByLabel('刚导入的素材.mp4', { exact: true })).toBeVisible();
+  await expect(page.locator('.asset-choices .n-select')).toBeVisible({ timeout: 10000 });
+  await page.locator('.asset-choices .n-select').click();
+  await expect(page.getByText('刚导入的素材.mp4', { exact: true }).last()).toBeVisible();
   await expect(page.getByRole('region', { name: '剪辑草稿', exact: true })).toContainText('刚导入的素材.mp4');
 });
 

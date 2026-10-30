@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { NButton, NPopover, NTag } from 'naive-ui';
 import { request } from './api';
 import { uploadRows } from './uploads';
 import UploadPanel from './UploadPanel.vue';
@@ -50,11 +51,11 @@ onUnmounted(() => clearInterval(timer));
     <p v-if="error" role="alert">{{ error }}</p>
     <p v-if="notice" role="status">{{ notice }}</p>
     <article v-for="asset in visibleAssets" :key="asset.id" class="asset-row" :aria-label="`素材：${asset.filename}`">
-      <div class="asset-summary"><strong>{{ asset.filename }}</strong><p>{{ asset.validationStatus === 'VALID' ? '传输完成，媒体验证通过' : asset.validationStatus === 'INVALID' ? '媒体验证失败，请查看原因' : '媒体验证中，通过后可播放' }}</p></div>
+      <div class="asset-summary"><strong>{{ asset.filename }}</strong><n-tag size="small" :type="asset.validationStatus === 'VALID' ? 'success' : asset.validationStatus === 'INVALID' ? 'error' : 'warning'" :bordered="false">{{ asset.validationStatus === 'VALID' ? '传输完成，媒体验证通过' : asset.validationStatus === 'INVALID' ? '媒体验证失败，请查看原因' : '媒体验证中，通过后可播放' }}</n-tag></div>
       <div class="asset-actions">
-        <button v-if="asset.validationStatus === 'VALID'" :aria-label="`播放 ${asset.filename}`" @click="play(asset.id)">播放</button>
+        <n-button v-if="asset.validationStatus === 'VALID'" size="small" :aria-label="`播放 ${asset.filename}`" @click="play(asset.id)">播放</n-button>
         <button class="text-button" :aria-label="`查看分析状态 ${asset.filename}`" @click="selectedStatus = selectedStatus === asset.id ? null : asset.id">{{ selectedStatus === asset.id ? '收起状态' : '能力与详情' }}</button>
-        <details v-if="asset.validationStatus === 'VALID'"><summary>更多操作</summary><p>补充画面分析会产生模型用量；语音与画面能力独立。</p><button :aria-label="`分析画面 ${asset.filename}`" @click="analyzeVision(asset.id)">分析画面</button></details>
+        <n-popover v-if="asset.validationStatus === 'VALID'" trigger="click" :to="false"><template #trigger><n-button size="small" :aria-label="`更多操作 ${asset.filename}`">更多操作</n-button></template><div class="asset-menu"><p>补充画面分析会产生模型用量；语音与画面能力独立。</p><n-button size="small" :aria-label="`分析画面 ${asset.filename}`" @click="analyzeVision(asset.id)">分析画面</n-button></div></n-popover>
       </div>
       <div v-if="selectedStatus === asset.id" class="asset-details"><AnalysisStatus :key="asset.id" :asset-id="asset.id" /></div>
     </article>
@@ -67,10 +68,13 @@ onUnmounted(() => clearInterval(timer));
 </template>
 <style scoped>
 .asset-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: start; border-bottom: 1px solid var(--line); padding: 10px 0; }
-.asset-summary strong { font-weight: 550; font-size: 12px; }
+.asset-summary { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.asset-summary strong { font-weight: 550; font-size: 13px; overflow-wrap: anywhere; }
+.asset-menu { max-width: 240px; }
+.asset-menu p { font-size: 12px; color: var(--ink-3); }
 .asset-summary p, .asset-actions p, .maintenance p { font-size: 10.5px; color: var(--ink-4); margin: 3px 0 0; line-height: 1.5; }
 .asset-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 3px; }
-.asset-actions button { margin: 0; min-height: 26px; padding: 3px 7px; font-size: 10.5px; }
+.asset-actions button:not(.n-button) { margin: 0; min-height: 30px; padding: 4px 7px; font-size: 12px; }
 .asset-actions details { max-width: 180px; }
 summary { cursor: pointer; min-height: 30px; padding: 6px 0; font-size: 11px; color: var(--ink-3); }
 .asset-details { grid-column: 1 / -1; background: var(--panel); border-radius: 6px; padding: 10px; }

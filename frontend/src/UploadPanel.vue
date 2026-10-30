@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
+import { NProgress } from 'naive-ui';
 import { enqueueFiles, loadUploads, uploadRows, pauseUpload, continueUpload, reselectFile, cancelUpload } from './uploads';
 const props = defineProps<{ projectId: string; availableAssetIds: string[] }>();
 const error = ref('');
@@ -57,7 +58,7 @@ function reselect(event: Event, key: string) {
         <input :id="`resume-file-${row.key}`" type="file" accept="video/*" @change="reselect($event, row.key)">
         <small>可恢复至 {{ new Date(row.upload.expiresAt).toLocaleString() }}</small>
       </template>
-      <progress :value="row.confirmed" :max="row.size" :aria-label="`${row.filename} 上传进度`"></progress>
+      <n-progress role="progressbar" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="Math.floor(row.confirmed / Math.max(1, row.size) * 100)" type="line" :percentage="Math.floor(row.confirmed / Math.max(1, row.size) * 100)" :show-indicator="false" :aria-label="`${row.filename} 上传进度`" />
       <small>{{ Math.floor(row.confirmed / Math.max(1, row.size) * 100) }}% 已确认</small>
       <small v-if="row.state === '正在计算文件校验值'">校验 {{ Math.floor(row.hashing / Math.max(1, row.size) * 100) }}%</small>
       <small v-if="row.upload?.status === 'CANCELLED' || row.upload?.status === 'EXPIRED'">{{ row.upload.cleanupStatus==='CLEANED'?'残留清理完成，占用已释放':'上传已停止，残留正在清理，字节占用尚未释放' }}</small>
@@ -79,11 +80,11 @@ function reselect(event: Event, key: string) {
 .upload-title span, .upload-hint { color: var(--ink-4); font-size: 10.5px; line-height: 1.55; }
 .upload-hint { margin: 4px 0 8px; }
 input { padding: 6px 0; border: 0; font-size: 11px; }
-article { border-top: 1px solid #f0f1f2; padding: 10px 0; overflow-wrap: anywhere; }
+article { border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-top: 10px; overflow-wrap: anywhere; }
 article strong { font-size: 12px; }
-article p { font-size: 10.5px; color: var(--ink-3); line-height: 1.55; margin: 4px 0; }
-article button { min-height: 26px; padding: 3px 7px; font-size: 10.5px; margin: 3px 3px 0 0; }
+article p { font-size: 12px; color: var(--ink-3); line-height: 1.55; margin: 4px 0; }
+article button { min-height: 30px; padding: 4px 8px; font-size: 12px; margin: 3px 3px 0 0; }
 progress { width: 100%; accent-color: var(--blue); height: 4px; }
-small { display: block; margin-top: 4px; color: var(--ink-4); font-size: 10px; }
+small { display: block; margin-top: 4px; color: var(--ink-4); font-size: 12px; }
 label { margin-top: 4px; font-size: 11px; }
 </style>

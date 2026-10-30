@@ -41,7 +41,7 @@ onUnmounted(()=>clearInterval(timer));
 </script>
 <template>
   <section class="usage" aria-label="存储与模型用量">
-    <h3>存储与模型用量</h3><button :disabled="busy" @click="load()">刷新用量</button>
+    <div class="usage-heading"><h3>存储与模型用量</h3><button :disabled="busy" @click="load()">刷新用量</button></div>
     <p v-if="error" role="alert" class="error">{{error}}</p>
     <template v-if="usage">
       <dl class="usage-summary"><div><dt>已用存储</dt><dd>{{bytes(storageTotals.storedBytes)}}</dd></div><div><dt>未完成预留</dt><dd>{{bytes(storageTotals.reservedBytes)}}</dd></div><div><dt>待清理占用</dt><dd>{{bytes(storageTotals.pendingCleanupBytes)}}</dd></div><div><dt>估算费用</dt><dd>¥{{money(usage.models.estimatedCostCny)}}</dd></div></dl>
@@ -54,25 +54,46 @@ onUnmounted(()=>clearInterval(timer));
       <p><a href="https://help.aliyun.com/zh/model-studio/model-pricing" target="_blank" rel="noreferrer">百炼价格依据</a> · <a href="https://api-docs.deepseek.com/zh-cn/quick_start/pricing/" target="_blank" rel="noreferrer">DeepSeek 价格依据</a></p>
       </details>
       <p v-for="warning in usage.warnings" :key="warning.metric" role="status" class="warning">{{metrics[warning.metric]}}已达到预警阈值：{{warning.value}} / {{warning.threshold}}</p>
-      <form @submit.prevent="save"><h3>项目累计用量预警</h3><p>留空关闭该项预警。预警提示不会阻止执行。</p>
+      <form class="thresholds" @submit.prevent="save"><h3>项目累计用量预警</h3><p>留空关闭该项预警。预警提示不会阻止执行。</p>
         <label>估算费用预警阈值（元）<input v-model="form.costCny" type="number" min="0.000000001" step="any"></label>
         <label>模型调用次数预警阈值<input v-model="form.calls" type="number" min="1" step="1"></label>
         <label>Token 预警阈值<input v-model="form.tokens" type="number" min="1" step="1"></label>
         <label>音频秒数预警阈值<input v-model="form.audioSeconds" type="number" min="0.001" step="any"></label>
         <button type="submit">保存预警阈值</button><p v-if="notice" role="status">{{notice}}</p>
       </form>
-      <details><summary>模型调用记录</summary><p v-if="!usage.models.items.length">暂无模型调用</p>
-      <details v-for="call in usage.models.items" :key="call.id"><summary>{{purposes[call.purpose]??call.purpose}} · {{call.provider}} / {{call.model}} · {{call.status}} · {{call.usageBasis==='REPORTED'?'提供方报告用量':'估算用量'}} · {{call.estimatedCostCny===null?'费用未知':`估算 ¥${money(call.estimatedCostCny)}`}}</summary>
+      <details class="call-records"><summary>模型调用记录</summary><p v-if="!usage.models.items.length">暂无模型调用</p>
+      <div class="table-scroll" v-else><table><caption>模型调用明细</caption><thead><tr><th>调用与回执</th><th>费用</th></tr></thead><tbody><tr v-for="call in usage.models.items" :key="call.id"><td><details><summary>{{purposes[call.purpose]??call.purpose}} · {{call.provider}} / {{call.model}} · {{call.status}} · {{call.usageBasis==='REPORTED'?'提供方报告用量':'估算用量'}}</summary>
         <p v-if="diagnostics">记录 {{call.id}} · 重试／轮内调用序号 {{call.retryNumber}} · 请求 {{call.requestId??'尚无回执'}} · 提供方任务 {{call.providerTaskId??'不适用或尚无回执'}}</p>
         <p>输入 {{call.usage.inputTokens}}、输出 {{call.usage.outputTokens}} token；音频 {{call.usage.audioSeconds}} 秒；缓存命中 {{call.usage.cachedInputTokens}} token</p>
         <pre v-if="diagnostics">报告用量（数值字段）：{{JSON.stringify(safeReport(call.reportedUsage))}}</pre><p>{{call.pricingRef}}</p>
-      </details><button v-if="usage.models.nextOffset>=0" @click="more">加载更多调用记录</button></details>
+      </details></td><td>{{call.estimatedCostCny===null?'费用未知':`估算 ¥${money(call.estimatedCostCny)}`}}</td></tr></tbody></table></div><button v-if="usage.models.nextOffset>=0" @click="more">加载更多调用记录</button></details>
     </template><p v-else-if="!error">正在核对实际用量…</p>
   </section>
 </template>
 <style scoped>
-.usage{margin:0;padding:0;border:0;background:transparent}.usage h3{font-size:13px}.usage-summary{display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}.usage-summary dt{font-size:10.5px;color:var(--muted)}.usage-summary dd{margin:2px 0 0;font-size:16px;font-variant-numeric:tabular-nums}summary{min-height:30px;padding:6px 0;font-size:11px}.usage button{width:auto;margin:4px 0;font-size:11px}table{border-collapse:collapse;width:100%;text-align:left}th,td{padding:6px;border-bottom:1px solid var(--line);white-space:nowrap;font-size:10.5px}.table-scroll{overflow-x:auto}p{line-height:1.6;font-size:11.5px}form{max-width:560px}.warning{padding:8px 10px;border-radius:5px;background:#fff7e8;color:#8a5a00;font-size:11px}details{margin:8px 0}summary{cursor:pointer;line-height:1.7}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:10px}a{color:var(--blue)}
-@media (max-width: 480px) {
-  .usage-summary > div:last-child { grid-column: 1 / -1; }
-}
+.usage { margin: 0; padding: 0; border: 0; background: transparent; }
+.usage-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.usage h3 { font-size: 15px; margin: 0; }
+.usage-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 16px 0; }
+.usage-summary > div { background: var(--panel); border-radius: 8px; padding: 12px; min-width: 0; }
+.usage-summary dt { font-size: 12px; color: var(--muted); }
+.usage-summary dd { margin: 4px 0 0; font-size: 18px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+summary { cursor: pointer; min-height: 36px; padding: 7px 0; font-size: 13px; line-height: 1.5; }
+.usage button { width: auto; margin: 4px 0; font-size: 12px; }
+table { border-collapse: collapse; width: 100%; text-align: left; font-variant-numeric: tabular-nums; }
+caption { text-align: left; color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+th, td { padding: 8px; border-bottom: 1px solid var(--line); font-size: 12px; vertical-align: top; }
+.table-scroll { overflow-x: auto; }
+.call-records table { min-width: 380px; }
+.call-records td:last-child { white-space: nowrap; }
+.call-records details { margin: 0; }
+.call-records summary { overflow-wrap: anywhere; }
+p { line-height: 1.6; font-size: 13px; }
+.thresholds { max-width: 560px; border-top: 1px solid var(--line); padding-top: 16px; margin-top: 16px; }
+.thresholds label { font-size: 12px; }
+.warning { padding: 8px 10px; border-radius: 5px; background: #fff7e8; color: #8a5a00; font-size: 12px; }
+details { margin: 8px 0; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+a { color: var(--blue); }
+@media (max-width: 480px) { .usage-summary { gap: 8px; } .usage-summary > div { padding: 10px; } }
 </style>

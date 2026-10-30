@@ -28,7 +28,7 @@ onMounted(start);
     <template v-if="run"><p>{{names[run.status]??run.status}}</p>
       <p>本轮最多 {{run.budget.maxFrames}} 帧、{{run.budget.maxCalls}} 次视觉调用、{{run.budget.maxSteps}} 个步骤、{{run.budget.maxSeconds}} 秒、{{run.budget.maxInputBytes/1048576}} MiB 图片输入。</p>
       <p>已用 {{run.usage.frames}} 帧、{{run.usage.calls}} 次调用、{{run.usage.steps}} 个步骤；范围 {{(run.coverage.startMs/1000).toFixed(2)}}–{{(run.coverage.endMs/1000).toFixed(2)}} 秒。</p>
-      <p v-for="observation in run.observations" :key="observation.id">{{(observation.observedAtMs/1000).toFixed(2)}} 秒 · {{observation.sourceKind==='VISIBLE_TEXT'?'可见文字':'画面'}}：{{observation.text}}</p>
+      <div v-for="observation in run.observations" :key="observation.id" class="observation"><span>{{(observation.observedAtMs/1000).toFixed(2)}} 秒 · {{observation.sourceKind==='VISIBLE_TEXT'?'可见文字':'画面'}}</span><p>{{observation.text}}</p></div>
       <p>{{run.coverageWarning}}</p>
       <button v-if="!['PENDING','RUNNING'].includes(run.status)&&!run.expansionProposal" type="button" @click="propose">查看扩大补查方案</button>
       <section v-if="run.expansionProposal" aria-label="扩大补查方案"><p>拟扩大素材：{{filename}}；范围 {{(run.expansionProposal.startMs/1000).toFixed(2)}}–{{(run.expansionProposal.endMs/1000).toFixed(2)}} 秒；新增最多 {{run.expansionProposal.budget.maxFrames}} 帧、{{run.expansionProposal.budget.maxCalls}} 次视觉调用。</p><p>{{run.expansionProposal.cost.explanation}}</p>
@@ -43,7 +43,10 @@ onMounted(start);
 <style scoped>
 section { margin-top: 12px; padding: 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 7px; }
 h4 { margin: 0 0 6px; font-size: 13px; }
-p { font-size: 11px; line-height: 1.6; color: var(--ink-3); }
+p { font-size: 12px; line-height: 1.6; color: var(--ink-3); }
+.observation { padding: 8px 0; border-top: 1px solid var(--line); }
+.observation span { color: var(--ink-4); font-size: 12px; }
+.observation p { margin: 4px 0 0; color: var(--ink); }
 section section { background: #fff; border: 1px solid var(--line); margin-top: 8px; }
 button { min-height: 26px; padding: 3px 7px; font-size: 10.5px; margin: 3px 3px 0 0; }
 @media(max-width:720px) { section { padding: 10px; } }

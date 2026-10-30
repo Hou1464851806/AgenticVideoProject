@@ -187,4 +187,8 @@ function status(asset: Asset) {
 .account :deep(.account-menu summary) { min-height: 24px; padding: 4px 6px; font-size: 10.5px; }
 @media (max-width: 1280px) { .rail { width: 272px; } .rail-inner { width: 272px; } .rail.collapsed { width: 64px; } .rail.collapsed .rail-inner { width: 272px; } }
 @media (max-width: 1180px) { .rail { width: 244px; } .rail-inner { width: 244px; } .rail.collapsed { width: 64px; } .rail.collapsed .rail-inner { width: 244px; } }
+@media (max-width: 960px) {
+  .rail:not(.collapsed) { position: fixed; z-index: 21; left: 0; top: 0; bottom: 0; width: min(300px, calc(100vw - 32px)); box-shadow: 12px 0 40px rgba(15,17,21,.16); }
+  .rail:not(.collapsed) .rail-inner { width: 100%; }
+}
 </style>

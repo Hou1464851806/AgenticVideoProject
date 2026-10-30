@@ -17,6 +17,7 @@ const sourceKind=ref('SPEECH');
 const searched = ref({ query: '', sourceKind: 'SPEECH', mode: 'literal' });
 const sourceNames:Record<string,string>={SPEECH:'语音',VISUAL:'画面',VISIBLE_TEXT:'可见文字'};
 const frames=ref<Record<string,string>>({});
+const openContexts=ref<Record<string,boolean>>({}), openFrames=ref<Record<string,boolean>>({});
 const inspection=ref<{key:string;assetId:string;sourceKind:string;query:string;filename:string;observedAtMs?:number}|null>(null);
 function refine(assetId:string,kind:string,filename:string,observedAtMs?:number){inspection.value={key:crypto.randomUUID(),assetId,sourceKind:kind,query:searched.value.query,filename,observedAtMs};}
 const result=ref<Result|null>(null);
@@ -26,7 +27,7 @@ const hasAnalyzedEvidence=computed(()=>result.value?.coverage.assets.some(asset=
 const coverageStates:Record<string,string>={SUCCEEDED:'已分析',PENDING:'等待分析',RUNNING:'正在分析',NOT_APPLICABLE:'无音轨，不适用',FAILED:'分析失败',UNVERIFIED:'未验证',CANCELLED:'已取消'};
 async function search(){
   if(busy.value)return;
-  busy.value=true;error.value='';result.value=null;contexts.value={};frames.value={};
+  busy.value=true;error.value='';result.value=null;contexts.value={};frames.value={};openContexts.value={};openFrames.value={};
   searched.value = { query: query.value, sourceKind: sourceKind.value, mode: mode.value };
   try{result.value=await request<Result>(`/projects/${props.projectId}/search`,'POST',{query:searched.value.query,literalPhrase:searched.value.mode==='literal',limit:20,sourceKinds:[searched.value.sourceKind]});}
   catch(failure){error.value=failure instanceof Error?failure.message:'无法查询语音';}
@@ -35,8 +36,10 @@ async function search(){
 async function context(hit:Hit){
   const id=hit.evidenceIds[0];
   if(!id||loadingContext.value)return;
+  if (openContexts.value[id]) { openContexts.value[id] = false; return; }
+  if (contexts.value[id]) { openContexts.value[id] = true; return; }
   loadingContext.value=id;error.value='';
-  try{const value=await request<{observations:Observation[]}>(`/evidence/${id}/context?boundedWindowMs=5000`);contexts.value[id]=value;}
+  try{const value=await request<{observations:Observation[]}>(`/evidence/${id}/context?boundedWindowMs=5000`);contexts.value[id]=value;openContexts.value[id]=true;}
   catch(failure){error.value=failure instanceof Error?failure.message:'无法查询邻近原文';}
   finally{loadingContext.value=null;}
 }
@@ -46,7 +49,9 @@ async function inspect(hit:Hit){
   catch(failure){error.value=failure instanceof Error?failure.message:'无法核查原视频';}
 }
 async function frame(hit:Hit){
-  try{const access=await request<{url:string}>(`/evidence/${hit.evidenceIds[0]}/frame-access`,'POST',{});frames.value[hit.evidenceIds[0]!]=access.url;}
+  const id = hit.evidenceIds[0]!;
+  if (openFrames.value[id]) { openFrames.value[id] = false; return; }
+  try{const access=await request<{url:string}>(`/evidence/${hit.evidenceIds[0]}/frame-access`,'POST',{});frames.value[id]=access.url;openFrames.value[id]=true;}
   catch(failure){error.value=failure instanceof Error?failure.message:'无法读取观察帧';}
 }
 function time(value:{startMs?:number;endMs?:number;observedAtMs?:number}){
@@ -81,11 +86,10 @@ function time(value:{startMs?:number;endMs?:number;observedAtMs?:number}){
         <p>识别可能遗漏；未命中不能证明原视频没有该内容。</p>
       </section></details>
       <article v-for="hit in result.hits" :key="hit.evidenceIds.join(',')" :aria-label="`${sourceNames[hit.sourceKind]}检索证据`">
-        <h4>{{hit.filename}} · {{sourceNames[hit.sourceKind]}}</h4><p>{{hit.text}}</p>
-        <p>{{time(hit)}}</p>
-        <button v-if="hit.sourceKind!=='SPEECH'" type="button" @click="frame(hit)">查看观察帧</button><img v-if="frames[hit.evidenceIds[0]!]" :src="frames[hit.evidenceIds[0]!]" alt="证据观察帧" style="max-width:100%"><button type="button" @click="inspect(hit)">核查原视频</button>
-        <button type="button" :disabled="loadingContext!==null" @click="context(hit)">{{loadingContext===hit.evidenceIds[0]?'正在读取上下文…':'查看邻近上下文'}}</button>
-        <section v-if="contexts[hit.evidenceIds[0]!]" role="region" aria-label="邻近原文">
+        <header class="hit-header"><h4>{{hit.filename}}</h4><span>{{sourceNames[hit.sourceKind]}}</span></header><p class="hit-time">{{time(hit)}}</p><p class="hit-text">{{hit.text}}</p>
+        <button v-if="hit.sourceKind!=='SPEECH'" type="button" @click="frame(hit)">{{openFrames[hit.evidenceIds[0]!]?'收起观察帧':'查看观察帧'}}</button><img v-if="openFrames[hit.evidenceIds[0]!]" :src="frames[hit.evidenceIds[0]!]" alt="证据观察帧" style="max-width:100%"><button type="button" @click="inspect(hit)">核查原视频</button>
+        <button type="button" :disabled="loadingContext!==null" @click="context(hit)">{{loadingContext===hit.evidenceIds[0]?'正在读取上下文…':openContexts[hit.evidenceIds[0]!]?'收起邻近上下文':'查看邻近上下文'}}</button>
+        <section v-if="openContexts[hit.evidenceIds[0]!]" role="region" aria-label="邻近原文">
           <p v-for="observation in contexts[hit.evidenceIds[0]!]!.observations" :key="observation.id">{{time(observation)}} · {{observation.text}}</p>
         </section>
         <p v-if="hit.sourceKind!=='SPEECH'">复查会在现有预算内调用视觉模型；扩大范围与费用须另行接受。</p>
@@ -100,7 +104,7 @@ function time(value:{startMs?:number;endMs?:number;observedAtMs?:number}){
 .speech-search{margin-top:0}
 .query-input{display:flex;align-items:start;gap:6px}.query-input input{flex:1;min-width:0}.query-input button{margin:0;flex-shrink:0;font-size:11px}.filter-fields{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}.filter-summary{color:var(--ink-4)}summary{cursor:pointer;min-height:30px;padding:6px 0;font-size:11px;color:var(--ink-3)}.result-summary{font-weight:600}.coverage{margin:10px 0}h3{font-size:14px;margin:0 0 6px}h4{margin:0;font-size:12px;overflow-wrap:anywhere}
 p{font-size:11px;line-height:1.6;overflow-wrap:anywhere;color:var(--ink-3)}
-article{border-top:1px solid var(--line);padding:10px 0;margin-top:6px}
+article{border:1px solid var(--line);border-radius:8px;padding:12px;margin-top:10px}.hit-header{display:flex;justify-content:space-between;gap:8px;align-items:start}.hit-header span,.hit-time{color:var(--ink-4);font-size:12px}.hit-text{color:var(--ink);font-size:13px}article img{display:block;border-radius:6px;margin:8px 0}article section{background:var(--panel);padding:8px;border-radius:6px}
 article button{min-height:26px;padding:3px 7px;font-size:10.5px;margin:3px 3px 0 0}
 label{margin-top:6px;font-size:10.5px}
 form button{font-size:11px}

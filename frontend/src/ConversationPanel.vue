@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { NSelect } from 'naive-ui';
 import { request } from './api';
 import { useProjectEvents } from './projectEvents';
 import ArtifactPlayer from './ArtifactPlayer.vue';
@@ -254,6 +255,12 @@ function toggleReference(reference: Citation) {
     ? values.filter(item => item.type !== reference.type || item.id !== reference.id)
     : [...values, reference];
 }
+const assetOptions = computed(() => assets.value.map(asset => ({ label: asset.filename, value: asset.id })));
+const selectedAssetIds = computed(() => (references.value[selected.value] ?? []).filter(item => item.type === 'ASSET').map(item => item.id));
+function updateAssetReferences(ids: string[]) {
+  const other = (references.value[selected.value] ?? []).filter(item => item.type !== 'ASSET');
+  references.value[selected.value] = [...other, ...ids.map(id => ({ type: 'ASSET', id }))];
+}
 function inputShortcut(event: KeyboardEvent) {
   if (event.key !== 'Enter' || !(event.ctrlKey || event.metaKey) || event.isComposing || composing.value) return;
   event.preventDefault(); void send();
@@ -391,12 +398,10 @@ defineExpose({ createChat, choose });
         <div v-if="references[selected]?.length" class="reference-chips" aria-label="本轮引用">
           <span v-for="reference in references[selected]" :key="`${reference.type}:${reference.id}`">{{ referenceLabel(reference) }}<button class="text-button" type="button" :aria-label="`移除引用 ${referenceLabel(reference)}`" @click="toggleReference(reference)">×</button></span>
         </div>
-        <details v-if="assets.length" class="asset-choices">
-          <summary>引用素材</summary>
-          <fieldset><legend>本次明确引用素材</legend>
-            <label v-for="asset in assets" :key="asset.id" class="choice"><input type="checkbox" :checked="references[selected]?.some(item => item.type === 'ASSET' && item.id === asset.id)" @change="toggleReference({ type: 'ASSET', id: asset.id })">{{ asset.filename }}</label>
-          </fieldset>
-        </details>
+        <div v-if="assets.length" class="asset-choices">
+          <label class="sr-only" for="asset-reference-select">引用素材</label>
+          <n-select :input-props="{ id: 'asset-reference-select', 'aria-label': '引用素材' }" :value="selectedAssetIds" :options="assetOptions" :max-tag-count="1" multiple filterable clearable placeholder="搜索并引用素材" @update:value="updateAssetReferences" />
+        </div>
         <label class="sr-only" for="conversation-input">对话输入</label>
         <textarea id="conversation-input" v-model="text" maxlength="8000" required placeholder="继续修改，或描述你想制作的视频…" @compositionstart="composing = true" @compositionend="composing = false" @keydown="inputShortcut"></textarea>
         <div class="composer-footer">
@@ -475,6 +480,7 @@ defineExpose({ createChat, choose });
 .composer textarea { display: block; width: 100%; min-height: 72px; max-height: 160px; resize: vertical; border-radius: 12px; padding: 9px 11px; font-size: 13px; line-height: 1.55; }
 .reference-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
 .reference-chips > span { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; padding: 2px 5px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); font-size: 10.5px; color: var(--ink-3); overflow-wrap: anywhere; }
+.reference-chips { max-height: 78px; overflow-y: auto; }
 .reference-chips button { min-height: 18px; margin: 0; padding: 0 3px; font-size: 12px; color: var(--ink-4); }
 .asset-choices { margin-bottom: 6px; }
 .asset-choices summary { min-height: 26px; padding: 4px 0; font-size: 11px; color: var(--ink-3); }

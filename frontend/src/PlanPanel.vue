@@ -272,12 +272,13 @@ onUnmounted(() => { alive = false; ++epoch; clearInterval(timer); });
       </template>
       <p v-if="loading" role="status">正在读取版本…</p>
       <div v-if="current && !loading">
+        <section class="plan-content" aria-label="方案内容"><h3>方案内容</h3>
         <h4>V{{ current.revisionNumber }} · {{ current.content.outputs[0]?.title }}</h4>
         <p v-if="current.content.changeSummary">变更说明：{{current.content.changeSummary}}</p>
         <button class="secondary" @click="emit('reference',{type:'PLAN_REVISION',id:current.id,label:`V${current.revisionNumber} · ${current.content.outputs[0]?.title ?? '方案'}`})">引用当前版本</button>
         <p v-if="confirmationId">当前版本已确认；导出仍需另行操作。</p><p v-if="confirmationId && !exportHistory.length" class="awaiting" role="status">待导出</p>
         <button v-if="!confirmationId" class="secondary" :disabled="exportBusy" @click="confirmVersion">确认当前版本</button>
-        <label v-if="exportHistory.length" for="export-history-select">查看正式导出记录</label><select v-if="exportHistory.length" id="export-history-select" :value="exported?.revisionId===current.id?exported.requestId:''" @change="openStoredExport(($event.target as HTMLSelectElement).value)"><option value="">选择导出记录</option><option v-for="item in exportHistory" :key="item.requestId" :value="item.requestId">{{ exportLabel(item) }}</option></select>
+
         <article v-for="(output,outputIndex) in current.content.outputs" :key="output.outputId" class="output-card">
           <h5>成片 {{outputIndex+1}} · {{output.title}}</h5>
           <button class="secondary" @click="emit('reference',{type:'PLAN_REVISION',id:current.id,outputId:output.outputId,label:`V${current.revisionNumber} · ${output.title}`})">引用成片 {{outputIndex+1}}</button>
@@ -291,6 +292,9 @@ onUnmounted(() => { alive = false; ++epoch; clearInterval(timer); });
 
           <details><summary>映射后的原文字幕</summary><p v-for="(cue,index) in output.subtitles.cues" :key="index">{{ (cue.startMs/1000).toFixed(3) }}–{{ (cue.endMs/1000).toFixed(3) }} 秒 · {{ cue.text }}</p></details>
         </article>
+        </section>
+        <section class="export-controls" aria-label="导出设置"><h3>正式导出</h3>
+        <label v-if="exportHistory.length" for="export-history-select">查看正式导出记录</label><select v-if="exportHistory.length" id="export-history-select" :value="exported?.revisionId===current.id?exported.requestId:''" @change="openStoredExport(($event.target as HTMLSelectElement).value)"><option value="">选择导出记录</option><option v-for="item in exportHistory" :key="item.requestId" :value="item.requestId">{{ exportLabel(item) }}</option></select>
         <label for="export-profile-select">成片导出清晰度</label><select id="export-profile-select" v-model="exportProfile"><option value="HD_720">720p</option><option value="FULL_HD_1080">1080p</option></select>
         <p class="export-spec">本次导出：V{{current.revisionNumber}} · {{exportProfile === 'FULL_HD_1080' ? '1080p' : '720p'}} · 每次一条输出</p>
         <button class="primary" :disabled="!confirmationId || exportBusy || singleExporting" @click="chooseExport">导出正式成片</button>
@@ -299,8 +303,18 @@ onUnmounted(() => { alive = false; ++epoch; clearInterval(timer); });
           <button :disabled="!confirmationId || exportBusy || !exportOutputId || outputExporting(exportOutputId)" @click="exportOutput(current.content.outputs.find(output=>output.outputId===exportOutputId)!)">导出所选输出</button>
         </template>
         <p v-if="singleExporting || (exportOutputId && outputExporting(exportOutputId))" role="status">此版本、输出与清晰度正在导出，请等待完成或停止当前导出。</p><p>确认的方案不会自动预览或导出。</p>
+        </section>
       </div>
     </template>
+    <section v-if="preview" aria-label="低清效果预览">
+      <h4>低清效果预览 · 固定 V{{ previewVersion }}</h4><p>{{previewTitle}}；切换查看方案或版本不会改变此预览的来源。</p>
+      <p role="status">{{ ({PENDING:'等待合成',RUNNING:'正在合成',CANCEL_REQUESTED:'正在停止',CANCELLED:'已停止',SUCCEEDED:'合成完成',FAILED:'合成失败'} as Record<string,string>)[preview.status] }}</p>
+      <p v-if="preview.error" role="alert">{{ preview.error.message }}</p>
+      <button v-if="['PENDING','RUNNING'].includes(preview.status)" class="secondary" @click="cancelPreview">停止预览</button>
+      <button v-if="preview.status==='SUCCEEDED'" class="secondary" @click="playPreview">播放低清预览</button>
+      <button v-if="preview.status==='SUCCEEDED'" class="secondary" @click="previewAccess('download-access')">下载低清预览</button>
+      <video v-if="previewUrl" :src="previewUrl" controls aria-label="低清合成预览播放器" style="width:100%;max-height:420px" />
+    </section>
     <section v-if="exported" ref="exportSection" aria-label="正式成片导出" tabindex="-1">
       <h4>正式成片 · 固定 V{{ exportVersion }}</h4><p>{{exportTitle}} · {{exported.configuration?.profile === 'FULL_HD_1080' ? '1080p' : '720p'}}；切换查看版本不会改变此任务的来源。</p>
       <p role="status">{{ ({PENDING:'等待导出',RUNNING:'正在导出',CANCEL_REQUESTED:'正在停止',CANCELLED:'已停止',SUCCEEDED:'导出完成',FAILED:'导出失败'} as Record<string,string>)[exported.status] }}</p>
@@ -320,32 +334,24 @@ onUnmounted(() => { alive = false; ++epoch; clearInterval(timer); });
       </div>
       <video v-if="exportUrl" ref="exportVideo" :src="exportUrl" @error="artifactAction('playback-access', true)" @loadedmetadata="exportLoaded" controls aria-label="正式成片播放器" style="width:100%;max-height:420px" />
     </section>
-    <section v-if="preview" aria-label="低清效果预览">
-      <h4>低清效果预览 · 固定 V{{ previewVersion }}</h4><p>{{previewTitle}}；切换查看方案或版本不会改变此预览的来源。</p>
-      <p role="status">{{ ({PENDING:'等待合成',RUNNING:'正在合成',CANCEL_REQUESTED:'正在停止',CANCELLED:'已停止',SUCCEEDED:'合成完成',FAILED:'合成失败'} as Record<string,string>)[preview.status] }}</p>
-      <p v-if="preview.error" role="alert">{{ preview.error.message }}</p>
-      <button v-if="['PENDING','RUNNING'].includes(preview.status)" class="secondary" @click="cancelPreview">停止预览</button>
-      <button v-if="preview.status==='SUCCEEDED'" class="secondary" @click="playPreview">播放低清预览</button>
-      <button v-if="preview.status==='SUCCEEDED'" class="secondary" @click="previewAccess('download-access')">下载低清预览</button>
-      <video v-if="previewUrl" :src="previewUrl" controls aria-label="低清合成预览播放器" style="width:100%;max-height:420px" />
-    </section>
   </section>
 </template>
 <style scoped>
 .plan-panel { margin: 0; }
 .plan-panel > section, .plan-panel section { margin-top: 16px; }
-.plan-panel h3 { font-size: 12px; color: var(--ink-3); font-weight: 550; margin: 0 0 8px; }
+.plan-panel h3 { font-size: 13px; color: var(--ink-2); font-weight: 600; margin: 0 0 8px; }
 .plan-panel h4 { font-size: 14px; margin: 10px 0 4px; }
 .plan-panel h5 { font-size: 12px; margin: 4px 0; }
-.plan-panel label { margin-top: 8px; font-size: 10.5px; }
-.plan-panel select { min-height: 30px; font-size: 11.5px; }
-.plan-panel p, .plan-panel summary, .plan-panel strong, .plan-panel li { font-size: 11px; line-height: 1.55; overflow-wrap: anywhere; }
-.plan-panel .output-card { border-top: 1px solid var(--line); padding: 10px 0; }
+.plan-panel label { margin-top: 10px; font-size: 12px; }
+.plan-panel select { min-height: 34px; font-size: 13px; }
+.plan-panel p, .plan-panel summary, .plan-panel strong, .plan-panel li { font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
+.plan-panel .output-card { border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin: 12px 0; }
+.plan-content, .export-controls, .plan-panel > section { border-top: 1px solid var(--line); padding-top: 14px; }
 .plan-panel .output-card h5 { font-size: 12px; margin: 4px 0; }
 .plan-panel .awaiting, .plan-panel .export-spec { background: var(--panel); padding: 7px 8px; border-radius: 5px; font-size: 10.5px; }
 .plan-panel .delete-confirmation { border: 1px solid #d9a29e; padding: 10px; margin: 10px 0; background: #fff6f5; }
 .plan-panel summary { cursor: pointer; padding: 6px 0; min-height: 30px; }
 .plan-panel .clip { border: 1px solid var(--line); border-radius: 6px; padding: 8px; margin: 6px 0; }
-.plan-panel button { font-size: 11px; min-height: 28px; padding: 4px 8px; margin: 4px 4px 0 0; }
+.plan-panel button { font-size: 12px; min-height: 32px; padding: 4px 8px; margin: 4px 4px 0 0; }
 .plan-panel video { max-height: 280px; }
 </style>

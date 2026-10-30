@@ -174,6 +174,9 @@ for (const state of ['UNAVAILABLE', 'REMOVED']) {
 
 for (const viewport of [{ width: 1366, height: 768 }, { width: 768, height: 1024 }, { width: 390, height: 844 }]) {
   test(`works and usage stay usable without page overflow at ${viewport.width}`, async ({ page }) => {
+    const browserErrors: string[] = [];
+    page.on('pageerror', error => browserErrors.push(error.message));
+    page.on('console', message => { if (message.type() === 'error') browserErrors.push(message.text()); });
     await page.setViewportSize(viewport);
     await page.route('**/api/v1/projects/project/usage', route => route.fulfill({ json: { data: { ...usage, models: { ...usage.models, estimatedCostCny: 2.67844952 } } } }));
     await page.goto('/?project=project');
@@ -184,10 +187,16 @@ for (const viewport of [{ width: 1366, height: 768 }, { width: 768, height: 1024
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({ path: `${screenshots}/controlled-works-${viewport.width}x${viewport.height}.png`, fullPage: true });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    if (viewport.width <= 960) await hidePlan(page);
     await showRail(page);
     await page.getByRole('button', { name: '用量', exact: true }).click();
     await expect(page.getByLabel('存储与模型用量', { exact: true })).toContainText('费用未知 1 次');
     await page.screenshot({ path: `${screenshots}/controlled-usage-summary-${viewport.width}x${viewport.height}.png`, fullPage: true });
+    await page.getByText('模型调用记录', { exact: true }).click();
+    await page.getByText(/Agent 对话与编排 · DEEPSEEK/).click();
+    await expect(page.getByRole('table', { name: '模型调用明细' })).toBeVisible();
+    await page.screenshot({ path: `${screenshots}/controlled-usage-detail-${viewport.width}x${viewport.height}.png`, fullPage: true });
+    expect(browserErrors).toEqual([]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.getByRole('button', { name: '关闭用量', exact: true }).click();
     await expect(page.getByRole('button', { name: '用量', exact: true })).toBeFocused();
@@ -196,6 +205,7 @@ for (const viewport of [{ width: 1366, height: 768 }, { width: 768, height: 1024
     page.on('request', req => { if (req.method() !== 'GET' && !req.url().endsWith('/auth/csrf')) operations.push(req.url()); });
     await showRail(page);
     await page.getByRole('button', { name: '诊断与高级维护', exact: true }).click();
+    if (viewport.width <= 960) await page.getByRole('button', { name: '收起工作区', exact: true }).click();
     await page.getByRole('button', { name: '前往素材索引维护', exact: true }).click();
     await expect(page.getByLabel('维护素材', { exact: true })).toBeVisible();
     expect(operations).toEqual([]);

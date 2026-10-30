@@ -30,7 +30,7 @@ html, body, #app { height: 100%; }
 body { margin: 0; overflow: hidden; background: #ffffff; }
 button, input, select, textarea { font: inherit; max-width: 100%; }
 button, summary, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
-button {
+button:not(.n-button) {
   width: auto;
   min-height: 32px;
   margin: 6px 6px 0 0;
@@ -45,19 +45,19 @@ button {
   overflow-wrap: anywhere;
   transition: background 140ms, border-color 140ms, transform 120ms;
 }
-button:hover:not(:disabled) { background: #f7f8f9; border-color: #cfd2d6; }
-button:active:not(:disabled) { transform: scale(.97); }
-button:disabled { opacity: .48; cursor: not-allowed; }
-button.primary, button[type='submit'] { background: var(--ink); border-color: var(--ink); color: #fff; }
-button.primary:hover:not(:disabled), button[type='submit']:hover:not(:disabled) { background: #24272d; border-color: #24272d; }
+button:not(.n-button):hover:not(:disabled) { background: #f7f8f9; border-color: #cfd2d6; }
+button:not(.n-button):active:not(:disabled) { transform: scale(.97); }
+button:not(.n-button):disabled { opacity: .48; cursor: not-allowed; }
+button.primary, button[type='submit']:not(.n-button) { background: var(--ink); border-color: var(--ink); color: #fff; }
+button.primary:hover:not(:disabled), button[type='submit']:not(.n-button):hover:not(:disabled) { background: #24272d; border-color: #24272d; }
 button.secondary { background: var(--panel); border-color: var(--line); color: var(--ink-2); }
 button.secondary:hover:not(:disabled) { background: #eef0f2; }
 button.text-button { background: transparent; border-color: transparent; color: var(--ink-3); }
-button.text-button:hover:not(:disabled) { background: var(--panel); color: var(--ink); }
+button.text-button:not(.n-button):hover:not(:disabled) { background: var(--panel); color: var(--ink); }
 button.danger { background: #fff6f5; border-color: #d9a29e; color: var(--red); }
 button.danger:hover:not(:disabled) { background: #ffefed; }
 :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-input, select, textarea {
+input:not(.n-input__input-el), select, textarea:not(.n-input__textarea-el) {
   width: 100%;
   min-height: 32px;
   padding: 6px 9px;
@@ -124,3 +124,5 @@ summary { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
+
+.sign-in .account .n-button { width: 100%; margin-top: 14px; }
