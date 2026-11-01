@@ -6,7 +6,12 @@ Q58 已确认首期 MVP 整体设计；2026-10-12 补充确认统一自然语言
 
 | 阅读目的 | 文档 |
 | --- | --- |
+| 2026-10-31 后端为主、Agent 为辅的工程化诊断与面试准备；区分已有实现、待验证问题与后续计划，含并发、异常矩阵、迭代验收和简历边界 | [工程化诊断、迭代与面试准备](engineering-and-interview-roadmap.md) |
+| 2026-10-30 剪辑草稿定向修正、删段候选、分类预算与独立进展判断；尚未实施，不处理旧数据兼容 | [Agent 定向修正 Spec](agent-directed-repair-spec.md)、[分阶段实施计划](agent-directed-repair-implementation-plan.md) |
 | 2026-10-30 Naive UI 接入、证据分页与定位布局、复杂面板改造；实施完成，受控浏览器验收通过 | [前端 Naive UI Spec](frontend-naive-ui-spec.md)、[实现计划](frontend-naive-ui-implementation-plan.md) |
+| 按需求、规模、黑盒 API、数据模型、C4 架构、关键组件、扩展和风险八步梳理当前系统 | [项目系统设计梳理](system-design-review.md) |
+| 以简历六条设计为主线的完整口述、典型异常与取舍；保留原 39 题详细查阅、AI Coding 和实习回答，复杂方案移入可选扩展 | [面试准备文档](interview-preparation.md) |
+| 2026-10-24 确定的三层视频内容及 Chunk 索引、分层检索与四节点 Agent 最终方案；含现状差异、契约、实施阶段和验收，尚未实施 | [视频分析与 Agent 最终设计规格](video-analysis-and-agent-final-spec.md) |
 | 首版用户能力、完整需求与验收边界 | [完整需求](requirements.md) |
 | 已确认的统一聊天流程、九项决定与代码职责 | [统一自然语言设计](natural-language-workflow-design.md) |
 | 当前实际功能与待实施进度 | [功能清单](current-features.md)、[实施状态](implementation-status.md) |
@@ -33,7 +38,8 @@ Q58 已确认首期 MVP 整体设计；2026-10-12 补充确认统一自然语言
 | 新视频上传准入的用户级 Redis 令牌桶、幂等/故障语义、实施顺序与验收（已实现） | [上传准入限流规格](upload-admission-rate-limit-spec.md) |
 | 对话、上下文与工作区 | [对话与前端](conversation-design.md) |
 | 方案内容、字幕与渲染约束 | [方案契约](edit-plan-contract.md) |
-| 表结构、引用保护与事务 | [数据库规格](database-design.md) |
+| 当前 63 张业务表、Python SQLite、关系图、幂等、消息恢复与一致性代码依据 | [当前数据库模型与一致性设计](database-implementation-design.md) |
+| 早期表结构、引用保护与事务设计，包含后续演进前的拟议模型 | [早期数据库规格](database-design.md) |
 | 浏览器／内部端点与错误 | [HTTP契约](api-contract.md) |
 | 任务状态与执行恢复 | [任务协议](task-protocol.md) |
 | MQ、SSE与快照恢复 | [事件协议](event-protocol.md) |
